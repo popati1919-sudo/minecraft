@@ -27,7 +27,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final File file;
     private final Set<UUID> frozen = new HashSet<>();
     private final Set<UUID> vanished = new HashSet<>();
-    private final Map<UUID, UUID> tradeInvites = new HashMap<>();
+    private final SecureTradeManager tradeManager;
     private final Map<UUID, Long> lastQuiz = new HashMap<>();
     private final Map<UUID, Long> questClaims = new HashMap<>();
     private final Map<UUID, UUID> pendingBids = new HashMap<>();
@@ -47,6 +47,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     public LarpersFeatures(JavaPlugin plugin) {
         this.plugin = plugin;
         this.core = (LarpersCoin) plugin;
+        this.tradeManager = new SecureTradeManager(plugin, core);
         if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
         file = new File(plugin.getDataFolder(), "features.yml");
         db = YamlConfiguration.loadConfiguration(file);
@@ -129,7 +130,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     plugin.getLogger().info("[STAFF] "+sender.getName()+": "+text); return true;
                 }
                 case "ah" -> { return auction(sender,a); }
-                case "trade" -> { return trade(sender,a); }
+                case "trade" -> { return tradeManager.handle(sender,a); }
                 default -> { return false; }
             }
         } catch (RuntimeException ex) {
