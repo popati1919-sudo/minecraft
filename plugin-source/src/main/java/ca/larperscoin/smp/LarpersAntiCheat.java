@@ -275,8 +275,13 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         }
     }
 
-    private boolean isStaff(CommandSender sender) {
-        return sender.isOp() || sender.hasPermission("larpers.staff") || sender.hasPermission("larpers.admin");
+    private boolean isAdmin(CommandSender sender) {
+        return sender.isOp() || sender.hasPermission("larpers.admin");
+    }
+
+    private boolean isModerator(CommandSender sender) {
+        return isAdmin(sender) || sender.hasPermission("larpers.anticheat.mod")
+                || sender.hasPermission("larpers.anticheat.use");
     }
 
     private void send(CommandSender sender, String message) {
@@ -285,8 +290,13 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!isStaff(sender)) {
-            send(sender, ChatColor.RED + "Permission insuffisante.");
+        if (!isModerator(sender)) {
+            send(sender, ChatColor.RED + "Permission insuffisante. Réservé au staff anti-triche.");
+            return true;
+        }
+        String subcommand = args.length == 0 ? "help" : args[0].toLowerCase(Locale.ROOT);
+        if ((subcommand.equals("reset") || subcommand.equals("reload")) && !isAdmin(sender)) {
+            send(sender, ChatColor.RED + "Cette action est réservée aux administrateurs.");
             return true;
         }
         if (args.length == 0 || args[0].equalsIgnoreCase("help")) {
