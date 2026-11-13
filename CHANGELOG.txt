@@ -5,7 +5,9 @@ Date: 2026-11-12
 Added
 - Secure player trades with invitation, item offers, LPC offers, two-player confirmation, cancellation and inventory/balance validation.
 - Daily and weekly quest objectives: block breaking, mature crop harvesting, mob kills and fishing.
-- LPC shop purchases with configurable prices stored in plugins/LarpersCoin/features.yml.
+- LPC shop purchases with configurable prices stored in plugins/LarpersCoin/features.yml, plus a clickable shop GUI.
+- Clan and quest inventory menus.
+- Multiple-choice Minecraft quiz GUI.
 - Clan XP and level progression earned through quest activities.
 - Clan leader/officer/member roles and officer bank withdrawals.
 - Bilateral clan alliances using request and acceptance.
@@ -20,7 +22,7 @@ Not yet complete / not yet verified
 - Full admin management GUI with real paginated actions.
 - Full clan leadership transfer, dissolution and detailed role permissions.
 - Configurable quiz question bank and quiz leaderboard.
-- Full GUI shop.
+- Expanded admin GUI actions and paginated player-management pages.
 - Automated integration tests and live Paper 26.3 server test.
 - Geyser/Floodgate Java-Bedrock validation.
 - CI build result for this commit has not yet been confirmed.
