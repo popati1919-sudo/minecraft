@@ -96,6 +96,25 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         return Double.isFinite(value)&&value>0.0?value:0.0;
     }
 
+    public double bountyAmount(UUID uuid) {
+        double value=data.getDouble("bounties."+key(uuid),0.0);
+        return Double.isFinite(value)&&value>0.0?value:0.0;
+    }
+
+    public java.util.Map<UUID,Double> bountyLeaderboard() {
+        java.util.Map<UUID,Double> result=new java.util.HashMap<>();
+        var section=data.getConfigurationSection("bounties");
+        if(section==null)return result;
+        for(String raw:section.getKeys(false)) {
+            try {
+                UUID uuid=UUID.fromString(raw);
+                double value=bountyAmount(uuid);
+                if(value>0.0)result.put(uuid,value);
+            } catch(IllegalArgumentException ignored) { }
+        }
+        return result;
+    }
+
     private void setBalance(UUID uuid, double amount) {
         if (!Double.isFinite(amount)) return;
         data.set("balances." + key(uuid), Math.max(0.0, amount));
@@ -282,6 +301,10 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     return true;
                 }
                 case "bounty" -> {
+                    if (args.length == 0 || args.length == 1 && args[0].equalsIgnoreCase("list")) {
+                        features.openBountyMenu(sender);
+                        return true;
+                    }
                     Player player = requirePlayer(sender);
                     if (player == null) return true;
                     if (args.length != 2) {
