@@ -29,7 +29,10 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/bounty` ou `/bounty list` — menu graphique de toutes les primes actives; bouton pour choisir un joueur en ligne et saisir le montant dans le chat.
 - `/bounty <joueur> <montant>` — prime payée au joueur qui élimine la cible.
 - `/eco give|take|set <joueur> <montant>` — administration.
-- `/lottery buy [1-10]`, `/lottery pot`, `/lottery draw` — tickets, jackpot et tirage hebdomadaire.
+- `/lottery` — menu graphique pour tous: jackpot, nombre de tickets et achat de tickets.
+- `/lottery buy [1-10]` — acheter de 1 à 10 tickets à 25 LPC chacun; disponible seulement pendant une loterie active.
+- `/lottery start [minutes]` — démarrer une loterie (1 à 1440 minutes), réservé aux administrateurs; annonce globale dans le chat et bannière dans la liste des joueurs.
+- `/lottery draw` — terminer et tirer immédiatement, réservé aux administrateurs.
 
 ### Clans
 - `/clan create <nom>`, `/clan invite <joueur>`, `/clan join <nom>`, `/clan leave`.
@@ -60,6 +63,11 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/vanish`, `/invsee <joueur>`, `/freeze <joueur>`, `/staffchat <message>`.
 - Accès contrôlé par `larpers.staff` et `larpers.admin` (OP par défaut).
 
+## Rangs visibles
+- Les préfixes sont affichés dans le chat et la liste des joueurs: `[ADMIN]`, `[MOD]`, `[VIP]`, `[JOUEUR]`.
+- Admin: OP ou permission `larpers.admin`; modérateur: `larpers.staff` ou `larpers.anticheat.mod`; VIP: `larpers.vip`.
+- Les groupes LuckPerms peuvent attribuer ces permissions; le préfixe visuel est calculé par le plugin.
+
 ## Accès Bedrock et comptes Java non premium
 - Geyser-Spigot et Floodgate sont inclus dans le ZIP généré par GitHub Actions.
 - Après le premier démarrage du serveur, arrête-le avec `stop`, puis lance `CONFIGURER-BEDROCK.bat` et redémarre. Geyser utilisera Floodgate (`auth-type: floodgate`).
@@ -72,6 +80,6 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 Les soldes sont dans `plugins/LarpersCoin/data.yml`; clans, quêtes, quiz et hôtel des ventes sont dans `plugins/LarpersCoin/features.yml`.
 
 ## État et limites à connaître
-Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et achats boutique ont maintenant une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Le menu staff possède deux pages d'actions rapides; le quiz dispose d'une banque configurable et d'un classement. Le menu primes et la recherche AH sont ajoutés dans la version 1.0.2. Geyser/Floodgate/AuthMe sont empaquetés automatiquement; les connexions Bedrock et hors-ligne doivent encore être testées sur le serveur réel.
+Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et achats boutique ont maintenant une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Le menu staff possède deux pages d'actions rapides; le quiz dispose d'une banque configurable et d'un classement. Le menu primes et la recherche AH sont ajoutés dans la version 1.0.2. La version 1.0.3 ajoute le menu de loterie administrable et les préfixes de rang dans le chat et le tab. Geyser/Floodgate/AuthMe sont empaquetés automatiquement; les connexions Bedrock et hors-ligne doivent encore être testées sur le serveur réel.
 
 Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions, [docs/CONFIGURATION.md](docs/CONFIGURATION.md) pour les prix/quiz/permissions et [CHANGELOG.txt](CHANGELOG.txt) pour les changements de la version 1.0.0.
