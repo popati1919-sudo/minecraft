@@ -202,7 +202,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         return true;
                     }
                     data.set("daily." + id, now);
-                    long previousDay = data.getLong("daily." + id, 0L);
+                    long previousDay = previous;
                     int previousStreak = data.getInt("streak." + id, 0);
                     int streak = previousDay > 0 && now - previousDay <= 172_800_000L
                             ? previousStreak + 1 : 1;
