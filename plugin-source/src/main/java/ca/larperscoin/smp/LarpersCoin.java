@@ -196,7 +196,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     int shown = 0;
                     reply(sender, "Historique LPC de " + targetName + " (10 dernières opérations) :");
                     for (int i = records.size() - 1; i >= 0 && shown < 10; i--) {
-                        String[] parts = records.get(i).split("\\\\|");
+                        String[] parts = records.get(i).split("\\|");
                         if (parts.length != 5) continue;
                         if (!parts[2].equals(targetId.toString()) && !parts[3].equals(targetId.toString())) continue;
                         long stamp;
