@@ -304,6 +304,14 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 }
                 else {msg(p,"Choisis deposit ou withdraw.");return true;} save();msg(p,"Opération effectuée.");return true;
             }
+            case "audit" -> {
+                if(own==null||!clanLeaderOrOfficer(p,own)){msg(p,"Consultation réservée au chef et aux officiers.");return true;}
+                List<String> entries=db.getStringList(clanPath(own)+".chest-audit");
+                msg(p,"Journal du coffre — "+Math.min(10,entries.size())+" dernières modifications:");
+                for(int i=Math.max(0,entries.size()-10);i<entries.size();i++)msg(p,entries.get(i));
+                if(entries.isEmpty())msg(p,"Aucune modification enregistrée.");
+                return true;
+            }
             case "chest" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
                 UUID user=clanChestUsers.get(own);
@@ -575,7 +583,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         msg(p,"/ah list | /ah sell <prix> | /ah buy <id>");return true;
     }
     @EventHandler public void onMove(PlayerMoveEvent e) {
-        if(frozen.contains(e.getPlayer().getUniqueId())&&e.getTo()!=null&&(e.getFrom().getX()!=e.getTo().getX()||e.getFrom().getZ()!=e.getTo().getZ()))e.setTo(e.getFrom());
+        if(frozen.contains(e.getPlayer().getUniqueId())&&e.getTo()!=null&&(e.getFrom().getX()!=e.getTo().getX()||e.getFrom().getY()!=e.getTo().getY()||e.getFrom().getZ()!=e.getTo().getZ()))e.setTo(e.getFrom());
     }
     @EventHandler public void onJoin(PlayerJoinEvent e) {
         for(UUID id:vanished){Player v=Bukkit.getPlayer(id);if(v!=null&&!staff(e.getPlayer()))e.getPlayer().hidePlayer(plugin,v);}
@@ -679,7 +687,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) { frozen.remove(e.getPlayer().getUniqueId()); }
     @Override public List<String> onTabComplete(CommandSender s,Command c,String alias,String[] a) {
-        if(c.getName().equalsIgnoreCase("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","stats","leaderboard");
+        if(c.getName().equalsIgnoreCase("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","audit","stats","leaderboard");
         if(c.getName().equalsIgnoreCase("ah")&&a.length==1)return List.of("list","sell","buy");
         if(c.getName().equalsIgnoreCase("shop")&&a.length==1)return List.of("search","buy");
         if(c.getName().equalsIgnoreCase("quiz")&&a.length==1)return List.of("top");
