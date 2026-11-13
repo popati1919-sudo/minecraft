@@ -33,3 +33,5 @@ Not yet complete / not yet verified
 - Automated integration tests and live Paper 26.3 server test.
 - Geyser/Floodgate Java-Bedrock validation.
 - GitHub Actions build succeeded with Java 25 and Paper 26.3 API on commit c081497fdb512fb0be74b798ab088c2638f3b5c5; a live server session is still required.
+
+- Ajout du module anti-triche LPC: détection de vitesse, déplacement aérien suspect et portée de frappe, alertes staff et commandes de diagnostic; aucune sanction automatique.
