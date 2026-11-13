@@ -1,6 +1,6 @@
 # État du projet Larpers Coin SMP 26.3
 
-Dernière mise à jour: 2026-11-13 — version 1.0.3.
+Dernière mise à jour: 2026-11-13 — version 1.0.4.
 
 ## Implémenté dans le dépôt
 - [x] Économie LPC persistante: soldes, paiements, classement, daily, primes, commandes admin et historique des 10 dernières transactions par joueur.
@@ -15,7 +15,7 @@ Dernière mise à jour: 2026-11-13 — version 1.0.3.
 - [x] Quiz Minecraft à choix multiples avec GUI et récompense.
 - [x] Menus GUI pour clans, quêtes, boutique, quiz et loterie; outils staff avec raccourcis invsee, vanish, freeze et staffchat.
 - [x] Rangs [ADMIN], [MOD], [VIP], [JOUEUR] visibles dans le chat et la liste des joueurs.
-- [x] Anti-triche v1.0: seuils configurables, exemptions de mouvement, alertes staff, journal récent, top des violations, commandes status/info/reset/reload et sauvegarde persistante des compteurs. Aucune sanction automatique.
+- [x] Anti-triche v1.1: seuils configurables, exemptions de mouvement, alertes staff, journal récent, top des violations, commandes status/info/reset/reload et sauvegarde persistante des compteurs. Aucune sanction automatique.
 - [x] Workflow GitHub Actions et script de compilation Windows.
 - [ ] Compilation CI de la version 1.0.0 après ajout de l'anti-triche: à confirmer; la dernière compilation confirmée concerne le code antérieur (commit c081497fdb512fb0be74b798ab088c2638f3b5c5).
 
@@ -30,13 +30,13 @@ Dernière mise à jour: 2026-11-13 — version 1.0.3.
 - [ ] Calibrage anti-triche sur serveur réel avec joueurs à latence variable: les seuils sont conservateurs et les alertes doivent être vérifiées par le staff.
 - [ ] Essais fonctionnels en serveur Paper 26.3 réel: le build CI compile et produit le JAR, mais aucune session de jeu réelle n'a été exécutée ici.
 - [ ] Validation Java/Bedrock via Geyser + Floodgate sur serveur dédié (requiert un serveur réel et des clients de test).
-- [ ] Validation des connexions Java non premium avec AuthMe et tests anti-usurpation sur serveur isolé.
+- [ ] Validation de connexion Java premium et Bedrock Floodgate sur serveur réel.
 
 ## Hors périmètre explicite
 - Aucun claim / protection de terrain.
 - Aucun rang VIP.
 - Ne pas remplacer les commandes vanilla ni les sélecteurs vanilla.
-- Geyser, Floodgate et AuthMe sont ajoutés automatiquement au paquet serveur par le workflow; leur configuration finale doit être vérifiée au premier démarrage.
+- Geyser et Floodgate sont ajoutés automatiquement au paquet serveur par le workflow; AuthMe est retiré et online-mode=true; leur configuration finale doit être vérifiée au premier démarrage.
 
 ## Commandes récemment ajoutées
 - /history [joueur] — historique économique (consultation d'un autre joueur réservée au staff).
