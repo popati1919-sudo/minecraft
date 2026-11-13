@@ -163,6 +163,13 @@ jobs:
           EOF
           done
 
+          # Le monde du lobby est généré dans le vide par LarpersCoin.
+          cat > "$ROOT/Lobby/bukkit.yml" <<'EOF'
+          worlds:
+            world:
+              generator: LarpersCoin:empty
+          EOF
+
           mkdir -p "$ROOT/SMP/plugins/LarpersCoin" "$ROOT/Lobby/plugins/LarpersCoin"
           cat > "$ROOT/Lobby/plugins/LarpersCoin/config.yml" <<'EOF'
           network:
