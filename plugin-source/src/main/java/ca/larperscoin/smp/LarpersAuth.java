@@ -58,6 +58,9 @@ final class LarpersAuth implements Listener {
         this.file = new File(plugin.getDataFolder(), "auth.yml");
         this.accounts = YamlConfiguration.loadConfiguration(file);
         plugin.getConfig().addDefault("auth.proxy-authenticated", true);
+        plugin.getConfig().addDefault("auth.remember-ip", false);
+        plugin.getConfig().addDefault("auth.connect-to-smp", false);
+        Bukkit.getMessenger().registerOutgoingPluginChannel(plugin, "BungeeCord");
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
         Bukkit.getPluginManager().registerEvents(this, plugin);
@@ -80,6 +83,14 @@ final class LarpersAuth implements Listener {
                 return;
             }
             String path = accountPath(player.getName());
+            if (plugin.getConfig().getBoolean("auth.remember-ip", false)
+                    && accounts.contains(path + ".ip-hash")
+                    && MessageDigest.isEqual(accounts.getString(path + ".ip-hash", "").getBytes(java.nio.charset.StandardCharsets.US_ASCII),
+                    ipHash(player).getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {
+                markAuthenticated(player);
+                player.sendMessage(ChatColor.GREEN + "Reconnu automatiquement depuis cette adresse IP.");
+                return;
+            }
             if (accounts.contains(path + ".hash")) {
                 player.sendMessage(ChatColor.RED + "Connecte-toi avec /login <motdepasse>.");
             } else {
@@ -123,6 +134,7 @@ final class LarpersAuth implements Listener {
                 accounts.set(path + ".hash", hash(args[0].toCharArray(), salt));
                 accounts.set(path + ".iterations", ITERATIONS);
                 accounts.set(path + ".name", player.getName());
+                rememberIp(player, path);
                 save();
                 markAuthenticated(player);
                 player.sendMessage(ChatColor.GREEN + "Compte créé. Bienvenue sur Larpers Coin !");
@@ -161,6 +173,8 @@ final class LarpersAuth implements Listener {
                         actual.getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {
                     attempts.remove(player.getUniqueId());
                     lockedUntil.remove(player.getUniqueId());
+                    rememberIp(player, path);
+                    save();
                     markAuthenticated(player);
                     player.sendMessage(ChatColor.GREEN + "Connexion réussie. Bon jeu !");
                 } else {
@@ -186,6 +200,38 @@ final class LarpersAuth implements Listener {
         authenticated.put(player.getUniqueId(), true);
         joinLocations.remove(player.getUniqueId());
         attempts.remove(player.getUniqueId());
+        if (plugin.getConfig().getBoolean("auth.connect-to-smp", false)) {
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                if (!player.isOnline()) return;
+                try {
+                    java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+                    java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
+                    out.writeUTF("Connect");
+                    out.writeUTF("smp");
+                    player.sendPluginMessage(plugin, "BungeeCord", bytes.toByteArray());
+                } catch (IOException ex) {
+                    plugin.getLogger().warning("Impossible de transférer " + player.getName() + " vers le SMP: " + ex.getMessage());
+                }
+            });
+        }
+    }
+
+    private void rememberIp(Player player, String path) {
+        if (plugin.getConfig().getBoolean("auth.remember-ip", false)) {
+            accounts.set(path + ".ip-hash", ipHash(player));
+        }
+    }
+
+    private String ipHash(Player player) {
+        try {
+            String ip = player.getAddress() == null || player.getAddress().getAddress() == null
+                    ? "unknown" : player.getAddress().getAddress().getHostAddress();
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest((player.getUniqueId() + "|" + ip).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(digest);
+        } catch (GeneralSecurityException ex) {
+            throw new IllegalStateException("SHA-256 indisponible", ex);
+        }
     }
 
     private String accountPath(String name) {
