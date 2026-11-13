@@ -8,7 +8,12 @@ Added
 - LPC shop purchases with configurable prices stored in plugins/LarpersCoin/features.yml, plus a clickable shop GUI.
 - Clan and quest inventory menus.
 - Persistent transaction history for player payments, daily rewards, bounty, lottery, shop, auction, clan bank, quiz and trades.
-- Multiple-choice Minecraft quiz GUI.
+- Multiple-choice Minecraft quiz GUI with configurable question bank and score leaderboard.
+- Shop categories, page navigation and 1/16/64 quantity controls.
+- Clan leadership transfer (including offline members), confirmed clan dissolution, offline invitations and chest change audit.
+- Two-page staff administration GUI with integrated shortcuts.
+- Configuration guide for shop prices, quiz questions and permissions.
+- Secure trade invitations expire after 60 seconds; either participant can cancel.
 - Clan XP and level progression earned through quest activities.
 - Clan leader/officer/member roles and officer bank withdrawals.
 - Bilateral clan alliances using request and acceptance.
