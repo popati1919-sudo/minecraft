@@ -83,3 +83,15 @@ Les soldes sont dans `plugins/LarpersCoin/data.yml`; clans, quêtes, quiz et hô
 Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et achats boutique ont maintenant une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Le menu staff possède deux pages d'actions rapides; le quiz dispose d'une banque configurable et d'un classement. Le menu primes et la recherche AH sont ajoutés dans la version 1.0.2. La version 1.0.3 ajoute le menu de loterie administrable et les préfixes de rang dans le chat et le tab. Geyser/Floodgate sont empaquetés automatiquement; les connexions Bedrock et hors-ligne doivent encore être testées sur le serveur réel.
 
 Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions, [docs/CONFIGURATION.md](docs/CONFIGURATION.md) pour les prix/quiz/permissions et [CHANGELOG.txt](CHANGELOG.txt) pour les changements de la version 1.0.0.
+
+
+## Authentification intégrée (version de développement)
+
+- Comptes Java crack : `/register <motdepasse> <confirmation>` à la première visite, puis `/login <motdepasse>`.
+- Mots de passe stockés sous forme PBKDF2-HMAC-SHA256 avec sel individuel dans `plugins/LarpersCoin/auth.yml`.
+- Cinq tentatives incorrectes déclenchent un blocage temporaire de 15 minutes.
+- Les commandes et actions de jeu sont bloquées tant que le joueur n'est pas authentifié.
+- Les comptes Java premium sont vérifiés par FastLoginPlus; les comptes Bedrock sont reconnus par Floodgate.
+- Le paquet configuré pour les comptes crack utilise `online-mode=false`; ne l'expose jamais directement derrière un proxy non sécurisé et ne partage pas les ports avec un serveur non fiable.
+
+Cette fonctionnalité doit encore réussir la compilation CI et être testée en jeu avant d'être considérée prête pour la production.

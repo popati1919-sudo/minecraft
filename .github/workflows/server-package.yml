@@ -64,6 +64,19 @@ jobs:
           test -n "$PLUGIN_JAR"
           cp "$PLUGIN_JAR" package/LarpersCoin-Server-Ready/plugins/LarpersCoin.jar
 
+          # FastLoginPlus vérifie les comptes Java premium sur un serveur offline.
+          FLP_META="$(curl -fsSL 'https://api.modrinth.com/v2/project/fastloginplus/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
+          FLP_URL="$(echo "$FLP_META" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
+          test -n "$FLP_URL"
+          curl -fL "$FLP_URL" -o package/LarpersCoin-Server-Ready/plugins/FastLoginPlus.jar
+          test -s package/LarpersCoin-Server-Ready/plugins/FastLoginPlus.jar
+
+          PROTO_META="$(curl -fsSL 'https://api.modrinth.com/v2/project/protocol-lib/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
+          PROTO_URL="$(echo "$PROTO_META" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
+          test -n "$PROTO_URL"
+          curl -fL "$PROTO_URL" -o package/LarpersCoin-Server-Ready/plugins/ProtocolLib.jar
+          test -s package/LarpersCoin-Server-Ready/plugins/ProtocolLib.jar
+
       - name: Ajouter les fichiers de configuration Windows
         shell: bash
         run: |
@@ -82,8 +95,8 @@ jobs:
           difficulty=normal
           hardcore=false
           max-players=30
-          online-mode=true
-          enforce-secure-profile=true
+          online-mode=false
+          enforce-secure-profile=false
           pvp=true
           server-port=25565
           server-ip=
@@ -186,8 +199,9 @@ jobs:
           - Plugin LarpersCoin compile depuis le depot
           - LuckPerms (gestion Admin/Moderateur)
           - Geyser + Floodgate (accès Bedrock)
-          - Authentification Mojang/Microsoft automatique pour Java premium
-          - Floodgate pour authentifier Bedrock sans mot de passe
+          - Authentification automatique Java premium via FastLoginPlus
+          - Authentification Bedrock via Floodgate
+          - Comptes Java crack via /register et /login (mots de passe PBKDF2)
           - Configuration de base et scripts Windows
 
           PREMIER DEMARRAGE:
@@ -199,8 +213,9 @@ jobs:
           6. Lance CONFIGURER-BEDROCK.bat pour régler Geyser sur Floodgate, puis redemarre.
           7. Lance OUVRIR-PORTS-WINDOWS.bat en administrateur; redirige aussi les ports sur le routeur.
           8. Configure les groupes avec CONFIGURER-LES-GROUPES.bat.
-          9. Les comptes Java premium sont verifies automatiquement par Mojang/Microsoft; aucun mot de passe serveur.
-          10. Bedrock passe par Floodgate; aucun mot de passe AuthMe.
+          9. Les comptes Java premium sont verifies par FastLoginPlus; aucun mot de passe serveur.
+          10. Les comptes Java crack utilisent /register <motdepasse> <confirmation>, puis /login <motdepasse>.
+          11. Bedrock passe par Floodgate et est exempté du mot de passe LPC.
 
           RESEAU:
           - Java: TCP 25565.
