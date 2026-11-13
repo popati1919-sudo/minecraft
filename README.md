@@ -32,16 +32,17 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/clan create <nom>`, `/clan invite <joueur>`, `/clan join <nom>`, `/clan leave`.
 - `/clan info`, `/clan stats`, `/clan level`.
 - `/clan bank [deposit|withdraw <montant>]`.
-- `/clan allies [add|remove <clan>]`.
+- `/clan allies request|accept|remove <clan>` — alliances bilatérales.
+- `/clan role <joueur> <officer|member>` — rôle d'officier ou membre.
 - `/clan chest` — coffre partagé.
 - `/clan top`, `/clan leaderboard`.
 
 ### Activités et commerce
-- `/quests`, `/quests claim` — récompense quotidienne.
+- `/quests`, `/quests claim`, `/quests weekly`, `/quests weekly claim` — objectifs automatiques quotidiens et hebdomadaires.
 - `/quiz`, puis `/quiz <réponse>` — question Minecraft et récompense.
-- `/shop search <objet>` — recherche dans le catalogue local.
+- `/shop search <objet>` et `/shop buy <clé> [quantité]` — recherche et achats LPC; prix modifiables dans features.yml.
 - `/ah list`, `/ah sell <prix>`, `/ah buy <id>` — hôtel des ventes persistant.
-- `/trade <joueur>` — demande d'échange; l'interface de transaction sécurisée n'est pas encore livrée.
+- `/trade <joueur>`, `/trade accept`, `/trade item`, `/trade money <montant>`, `/trade confirm`, `/trade cancel` — échange avec double confirmation.
 
 ### Modération
 - `/admin` — menu du staff.
@@ -52,6 +53,6 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 Les soldes sont dans `plugins/LarpersCoin/data.yml`; clans, quêtes, quiz et hôtel des ventes sont dans `plugins/LarpersCoin/features.yml`.
 
 ## État et limites à connaître
-Ce dépôt est une base de plugin en développement, pas encore un serveur SMP complet prêt pour la production. Les systèmes de clans ont les opérations de base, mais il reste à ajouter les niveaux/XP automatiques, les permissions/rôles de clan et les alliances bilatérales. Les quêtes affichent une récompense quotidienne, mais les objectifs automatiques quotidiens/hebdomadaires ne sont pas encore suivis. Le quiz contient un petit ensemble de questions. La recherche boutique interroge un catalogue de référence et ne réalise pas encore d'achats. Le menu staff est une interface de raccourcis. `/trade` n'effectue pas encore le transfert sécurisé. Les tests en serveur Paper réel et la validation Bedrock via Geyser/Floodgate restent nécessaires.
+Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et achats boutique ont maintenant une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Le quiz et le menu staff restent limités. Geyser/Floodgate et la compatibilité Bedrock doivent être testés sur un serveur dédié.
 
 Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions.
