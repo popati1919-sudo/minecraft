@@ -35,6 +35,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class LarpersCoin extends JavaPlugin implements Listener, org.bukkit.command.CommandExecutor, TabCompleter {
     private YamlConfiguration data;
     private LarpersFeatures features;
+    private LarpersAntiCheat antiCheat;
     private File dataFile;
     private final DecimalFormat money = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.CANADA_FRENCH));
 
@@ -55,15 +56,16 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         }
         getServer().getPluginManager().registerEvents(this, this);
         features = new LarpersFeatures(this);
-        new LarpersAntiCheat(this);
+        antiCheat = new LarpersAntiCheat(this);
         long week = 20L * 60L * 60L * 24L * 7L;
         getServer().getScheduler().runTaskTimer(this, this::drawLottery, week, week);
-        getLogger().info("LarpersCoin 0.8.0 actif. Aucun claim ni protection de parcelle n'est enregistré.");
+        getLogger().info("LarpersCoin 1.0.0 actif. Aucun claim ni protection de parcelle n'est enregistré.");
     }
 
     @Override
     public void onDisable() {
         if (features != null) features.shutdown();
+        if (antiCheat != null) antiCheat.shutdown();
         saveData();
     }
 
