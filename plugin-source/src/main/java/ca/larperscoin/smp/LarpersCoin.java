@@ -83,7 +83,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
 
     boolean debit(UUID uuid, double amount) {
         if (!Double.isFinite(amount) || amount <= 0.0 || balance(uuid) + 1.0e-9 < amount) return false;
-        data.set("balances." + key(uuid), balance(uuid) - amount);
+        data.set("balances." + key(uuid), Math.max(0.0,balance(uuid) - amount));
         return true;
     }
 
@@ -181,6 +181,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     return true;
                 }
                 case "history" -> {
+                    if(args.length>1){reply(sender,"Usage : /history [joueur]");return true;}
                     UUID targetId;
                     String targetName;
                     if (args.length == 0) {
