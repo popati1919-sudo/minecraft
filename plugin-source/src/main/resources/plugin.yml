@@ -1,5 +1,5 @@
 name: LarpersCoin
-version: 1.0.2
+version: 1.0.3
 main: ca.larperscoin.smp.LarpersCoin
 api-version: '26.3'
 author: Larpers Coin SMP
@@ -29,8 +29,8 @@ commands:
     usage: /eco <give|take|set> <joueur> <montant>
     permission: larpers.admin
   lottery:
-    description: Loterie LPC
-    usage: /lottery <buy|pot|draw>
+    description: Menu de loterie LPC; démarrage réservé aux administrateurs
+    usage: /lottery [menu|buy [1-10]|start [minutes]|draw]
   clan:
     description: Système de clans
     usage: /clan <create|invite|join|leave|transfer|disband|role|bank|top|allies|level|chest|audit|stats|leaderboard>
