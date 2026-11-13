@@ -20,7 +20,8 @@ Dernière mise à jour: 2026-11-12 — version 0.8.0.
 - [x] Coffre de clan: contenu persistant, verrou contre les ouvertures concurrentes, accès membres et journal des changements consultable par chef/officiers.
 - [x] Quiz: banque de questions modifiable dans features.yml et classement des scores.
 - [x] Menu admin: deux pages paginées avec sélecteurs de joueurs, vanish, freeze, raccourcis économie et loterie.
-- [ ] Sauvegarde transactionnelle résistante à une coupure brutale pendant l'écriture; les échanges sont validés sur le thread serveur mais les données restent en YAML.
+- [x] Écriture atomique de data.yml et features.yml: fichier temporaire, flush disque et remplacement atomique avec repli si le système de fichiers ne le permet pas.
+- [ ] Journal transactionnel commun aux deux fichiers: les écritures individuelles sont protégées, mais une coupure entre deux fichiers distincts peut encore interrompre une opération inter-systèmes.
 - [ ] Essais fonctionnels en serveur Paper 26.3 réel: le build CI compile et produit le JAR, mais aucune session de jeu réelle n'a été exécutée ici.
 - [ ] Validation Java/Bedrock via Geyser + Floodgate sur serveur dédié (requiert un serveur réel et des clients de test).
 
