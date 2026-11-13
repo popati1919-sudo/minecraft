@@ -41,6 +41,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<UUID, Long> lastQuiz = new HashMap<>();
     private final Map<UUID, Long> questClaims = new HashMap<>();
     private final Map<UUID, UUID> pendingBids = new HashMap<>();
+    private final Map<UUID, String> shopCategory = new HashMap<>();
+    private final Map<UUID, Integer> shopPage = new HashMap<>();
+    private final Map<UUID, Integer> adminPage = new HashMap<>();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
     private static final Map<String, Material> SHOP = new LinkedHashMap<>();
     private static final Map<String, Double> SHOP_PRICES = new LinkedHashMap<>();
