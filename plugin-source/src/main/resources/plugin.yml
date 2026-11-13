@@ -3,7 +3,7 @@ version: 1.0.0
 main: ca.larperscoin.smp.LarpersCoin
 api-version: '26.3'
 author: Larpers Coin SMP
-description: Plugin SMP LPC: économie, clans, quêtes, commerce, modération et anti-triche.
+description: "Plugin SMP LPC: économie, clans, quêtes, commerce, modération et anti-triche."
 commands:
   balance:
     description: Affiche ton solde LPC
