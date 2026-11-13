@@ -1,25 +1,26 @@
 # État du projet Larpers Coin SMP 26.3
 
-Dernière mise à jour: 2026-11-12.
+Dernière mise à jour: 2026-11-12 — version de développement 0.8.0.
 
 ## Implémenté dans le dépôt
-- [x] Socle LPC: soldes persistants, paiements, baltop, daily, primes PvP, commandes eco.
-- [x] Loterie: achats de tickets, jackpot persistant et tirage périodique.
-- [x] Clans: création, invitations, adhésion, départ, banque, coffre persistant, alliances simples, statistiques et classement.
+- [x] Économie LPC persistante: soldes, paiements, classement, daily, primes et commandes admin.
+- [x] Loterie: tickets, jackpot persistant et tirage périodique.
+- [x] Hôtel des ventes: mise en vente, liste et achat avec validation d'inventaire et paiement LPC.
+- [x] Boutique LPC: catalogue, recherche et achats de 1 à 64 objets; prix stockés dans features.yml et modifiables.
+- [x] Échanges joueurs: invitations, offres d'objets et de LPC, double confirmation, invalidation des confirmations après modification, contrôle du solde et de l'espace d'inventaire avant transfert. Les objets restent dans l'inventaire avant validation.
+- [x] Quêtes quotidiennes et hebdomadaires: suivi automatique des blocs cassés, cultures mûres récoltées, créatures vaincues et poissons pêchés; récompense unique par période.
+- [x] Clans: création, invitation, adhésion, départ, banque, coffre, XP et niveaux par activité, rôles leader/officer/member, alliances bilatérales sur demande et acceptation, statistiques et classements.
 - [x] Quiz Minecraft simple avec récompense.
-- [x] Quête quotidienne avec récompense temporisée.
-- [x] Recherche dans un catalogue statique /shop search.
-- [x] Hôtel des ventes: mise en vente, liste et achat.
-- [x] Outils staff de base: GUI raccourcis, vanish, invsee, freeze, staffchat.
+- [x] Outils staff de base: GUI raccourcis, vanish, invsee, freeze et staffchat.
 - [x] Workflow GitHub Actions et script de compilation Windows.
 
-## Partiel / à terminer
-- [ ] Objectifs de quêtes suivis automatiquement (blocs, récolte, pêche, combats) et cycle hebdomadaire.
-- [ ] Système de niveaux/XP de clans, rôles, permissions et progression automatique.
-- [ ] Alliances bilatérales avec validation par les deux chefs.
-- [ ] Boutique réellement achetable et configurable par GUI; actuellement la recherche est un catalogue statique.
-- [ ] Échange sécurisé complet: interface d'offre, verrouillage, double confirmation, annulation et anti-duplication. /trade est uniquement une demande préliminaire.
-- [ ] Menu admin avec actions réelles et pagination.
+## Limites restantes
+- [ ] Boutique: les prix sont configurables dans features.yml, mais il n'y a pas encore de GUI de boutique.
+- [ ] Clans: transfert de chef, dissolution, permissions fines par rôle et gestion complète des invitations hors ligne.
+- [ ] Coffre de clan: interface partagée persistante; les permissions par rôle et journal d'audit restent à ajouter.
+- [ ] Quiz: petit ensemble de questions statiques; pas encore de banque de questions configurable ni de classement.
+- [ ] Menu admin: raccourcis, pas encore de véritables pages de gestion avec pagination et actions intégrées.
+- [ ] Sauvegarde transactionnelle résistante à une coupure brutale pendant l'écriture; les échanges sont validés sur le thread serveur mais les données restent en YAML.
 - [ ] Tests automatisés et tests en serveur Paper 26.3 réel.
 - [ ] Validation Java/Bedrock via Geyser + Floodgate sur serveur dédié.
 
@@ -28,3 +29,10 @@ Dernière mise à jour: 2026-11-12.
 - Aucun rang VIP.
 - Ne pas remplacer les commandes vanilla ni les sélecteurs vanilla.
 - Geyser et Floodgate sont des plugins externes à installer séparément.
+
+## Commandes récemment ajoutées
+- /trade <joueur>, /trade accept, /trade item, /trade money <montant>, /trade confirm, /trade cancel.
+- /quests, /quests claim, /quests weekly, /quests weekly claim.
+- /shop search <objet>, /shop buy <clé> [quantité].
+- /clan role <joueur> <officer|member>.
+- /clan allies request|accept|remove <clan>.
