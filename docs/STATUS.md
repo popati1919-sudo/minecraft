@@ -1,19 +1,20 @@
 # État du projet Larpers Coin SMP 26.3
 
-Dernière mise à jour: 2026-11-13 — version 1.0.2.
+Dernière mise à jour: 2026-11-13 — version 1.0.3.
 
 ## Implémenté dans le dépôt
 - [x] Économie LPC persistante: soldes, paiements, classement, daily, primes, commandes admin et historique des 10 dernières transactions par joueur.
 - [x] Menu graphique des primes actives, liste triée, sélection d'une cible en ligne et saisie du montant dans le chat.
 - [x] Hôtel des ventes avec recherche interactive par objet ou vendeur, filtre effaçable et commande `/ah search`.
-- [x] Loterie: tickets, jackpot persistant et tirage périodique.
+- [x] Loterie: menu graphique, achat de tickets pendant une période active, démarrage/arrêt réservé aux admins, annonces globales et affichage de l'événement dans le tab.
 - [x] Hôtel des ventes: mise en vente, liste et achat avec validation d'inventaire et paiement LPC.
 - [x] Boutique LPC: GUI cliquable, catalogue, recherche et achats de 1 à 64 objets; prix stockés dans features.yml et modifiables.
 - [x] Échanges joueurs: invitations, offres d'objets et de LPC, double confirmation, invalidation des confirmations après modification, contrôle du solde et de l'espace d'inventaire avant transfert. Les objets restent dans l'inventaire avant validation.
 - [x] Quêtes quotidiennes et hebdomadaires: suivi automatique des blocs cassés, cultures mûres récoltées, créatures vaincues et poissons pêchés; récompense unique par période.
 - [x] Clans: création, invitation, adhésion, départ, banque, coffre, XP et niveaux par activité, rôles leader/officer/member, alliances bilatérales sur demande et acceptation, statistiques et classements.
 - [x] Quiz Minecraft à choix multiples avec GUI et récompense.
-- [x] Menus GUI pour clans, quêtes, boutique et quiz; outils staff avec raccourcis invsee, vanish, freeze et staffchat.
+- [x] Menus GUI pour clans, quêtes, boutique, quiz et loterie; outils staff avec raccourcis invsee, vanish, freeze et staffchat.
+- [x] Rangs [ADMIN], [MOD], [VIP], [JOUEUR] visibles dans le chat et la liste des joueurs.
 - [x] Anti-triche v1.0: seuils configurables, exemptions de mouvement, alertes staff, journal récent, top des violations, commandes status/info/reset/reload et sauvegarde persistante des compteurs. Aucune sanction automatique.
 - [x] Workflow GitHub Actions et script de compilation Windows.
 - [ ] Compilation CI de la version 1.0.0 après ajout de l'anti-triche: à confirmer; la dernière compilation confirmée concerne le code antérieur (commit c081497fdb512fb0be74b798ab088c2638f3b5c5).
@@ -39,6 +40,7 @@ Dernière mise à jour: 2026-11-13 — version 1.0.2.
 
 ## Commandes récemment ajoutées
 - /history [joueur] — historique économique (consultation d'un autre joueur réservée au staff).
+- /lottery — menu graphique; /lottery start [minutes] et /lottery draw réservés aux admins; /lottery buy [1-10] pour les joueurs pendant la période active.
 - /bounty [list] — menu des primes; /bounty <joueur> <montant> pour placer une prime.
 - /ah search <objet|vendeur> et /ah search clear — filtre de l'hôtel des ventes.
 - /trade <joueur>, /trade accept, /trade item, /trade money <montant>, /trade confirm, /trade cancel.
