@@ -1,0 +1,1 @@
+Temporary CI verification note for the final current main revision of LarpersCoin 0.8.0. Verify Paper 26.3 and Java 25 build before calling this release ready.
