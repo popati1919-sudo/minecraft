@@ -453,14 +453,32 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         return true;
     }
 
-    private void openShop(Player p) {
+    private String shopCategoryFor(String key) {
+        if(List.of("diamant","fer","or","émeraude","redstone","lapis","netherite").contains(key))return "Minerais";
+        if(List.of("obsidienne","bois","pierre","terre").contains(key))return "Construction";
+        if(List.of("pain","pomme").contains(key))return "Nourriture";
+        return "Rares";
+    }
+    private void openShop(Player p) { openShop(p,"Tous",0); }
+    private void openShop(Player p,String category,int page) {
+        List<String> categories=List.of("Tous","Minerais","Construction","Nourriture","Rares");
+        if(!categories.contains(category))category="Tous";
+        List<Map.Entry<String,Material>> entries=SHOP.entrySet().stream()
+            .filter(e->category.equals("Tous")||shopCategoryFor(e.getKey()).equals(category)).toList();
+        int pages=Math.max(1,(entries.size()+35)/36);
+        page=Math.max(0,Math.min(page,pages-1));
+        shopCategory.put(p.getUniqueId(),category);shopPage.put(p.getUniqueId(),page);
         Inventory inv=Bukkit.createInventory(null,54,"LPC | Boutique");
-        int slot=0;
-        for(var entry:SHOP.entrySet()) {
-            if(slot>=54) break;
-            double price=db.getDouble("shop.prices."+entry.getKey(),SHOP_PRICES.get(entry.getKey()));
-            inv.setItem(slot++,item(entry.getValue(),entry.getKey(),"Prix: "+price+" LPC","Clique pour acheter 1"));
+        int[] tabs={0,2,4,6,8};
+        for(int i=0;i<categories.size();i++)inv.setItem(tabs[i],item(Material.BOOK,categories.get(i),category.equals(categories.get(i))?"Catégorie sélectionnée":"Clique pour filtrer"));
+        int start=page*36;
+        for(int i=start;i<Math.min(entries.size(),start+36);i++) {
+            var entry=entries.get(i);double price=db.getDouble("shop.prices."+entry.getKey(),SHOP_PRICES.get(entry.getKey()));
+            inv.setItem(9+(i-start),item(entry.getValue(),entry.getKey(),"Prix: "+price+" LPC/unité","Clic gauche: 1","Clic droit: 16","Maj-clic: 64"));
         }
+        inv.setItem(45,item(Material.ARROW,"Page précédente"));
+        inv.setItem(49,item(Material.PAPER,"Page "+(page+1)+"/"+pages,"Clic droit: 16 objets","Maj-clic: 64 objets"));
+        inv.setItem(53,item(Material.ARROW,"Page suivante"));
         p.openInventory(inv);
     }
     private boolean buyShop(Player p,String key,int amount) {
@@ -563,8 +581,17 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             e.setCancelled(true);
             if(e.getRawSlot()>=e.getView().getTopInventory().getSize()) return;
             if(!(e.getWhoClicked() instanceof Player buyer)||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
+            int slot=e.getRawSlot();String category=shopCategory.getOrDefault(buyer.getUniqueId(),"Tous");int page=shopPage.getOrDefault(buyer.getUniqueId(),0);
+            if(slot==0||slot==2||slot==4||slot==6||slot==8) {
+                String next=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName());
+                openShop(buyer,next,0);return;
+            }
+            if(slot==45){openShop(buyer,category,page-1);return;}
+            if(slot==53){openShop(buyer,category,page+1);return;}
+            if(slot<9||slot>44)return;
             String key=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
-            buyShop(buyer,key,1);
+            int amount=e.isShiftClick()?64:(e.isRightClick()?16:1);
+            buyShop(buyer,key,amount);
         }
         if(title.equals("LPC | Quiz")) {
             e.setCancelled(true);
