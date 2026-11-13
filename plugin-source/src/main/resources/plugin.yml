@@ -73,6 +73,9 @@ permissions:
   larpers.staff:
     description: Accès aux outils du staff LPC
     default: op
+  larpers.anticheat.bypass:
+    description: Exempter un joueur de toutes les détections anti-triche
+    default: op
   larpers.anticheat.alerts:
     description: Recevoir les alertes anti-triche (réservé au staff)
     default: op
