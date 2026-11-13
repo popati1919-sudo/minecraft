@@ -147,13 +147,24 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         inv.setItem(22,item(Material.BARRIER,"Fermer"));
         p.openInventory(inv);
     }
-    private void openAdmin(Player p) {
-        Inventory inv = Bukkit.createInventory(null, 27, "LPC | Administration");
-        inv.setItem(10,item(Material.BOOK,"Gestion des joueurs","/invsee <joueur>"));
-        inv.setItem(12,item(Material.ENDER_EYE,"Vanish","/vanish"));
-        inv.setItem(14,item(Material.ICE,"Freeze","/freeze <joueur>"));
-        inv.setItem(16,item(Material.GOLD_INGOT,"Économie","/eco give|take|set"));
-        inv.setItem(22,item(Material.BARRIER,"Fermer"));
+    private void openAdmin(Player p) { openAdmin(p,0); }
+    private void openAdmin(Player p,int page) {
+        page=Math.max(0,Math.min(1,page));adminPage.put(p.getUniqueId(),page);
+        Inventory inv=Bukkit.createInventory(null,54,"LPC | Administration");
+        if(page==0) {
+            inv.setItem(10,item(Material.BOOK,"Voir inventaire","Sélectionner un joueur"));
+            inv.setItem(12,item(Material.ICE,"Freeze","Sélectionner un joueur"));
+            inv.setItem(14,item(Material.ENDER_EYE,"Vanish","Activer/désactiver"));
+            inv.setItem(16,item(Material.REDSTONE_TORCH,"Staffchat","/staffchat <message>"));
+            inv.setItem(53,item(Material.ARROW,"Page suivante"));
+        } else {
+            inv.setItem(10,item(Material.GOLD_INGOT,"Économie LPC","/eco give|take|set <joueur> <montant>"));
+            inv.setItem(12,item(Material.CHEST,"Jackpot","Afficher /lottery pot"));
+            inv.setItem(14,item(Material.DIAMOND,"Tirage loterie","/lottery draw"));
+            inv.setItem(16,item(Material.EMERALD,"Classement LPC","/baltop"));
+            inv.setItem(45,item(Material.ARROW,"Page précédente"));
+        }
+        inv.setItem(49,item(Material.BARRIER,"Fermer"));
         p.openInventory(inv);
     }
     private void openPlayerSelector(Player viewer,String action) {
@@ -574,12 +585,21 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(title.equals("LPC | Administration")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player p)) return;
-            switch(e.getRawSlot()) {
+            int page=adminPage.getOrDefault(p.getUniqueId(),0),slot=e.getRawSlot();
+            if(slot==49){p.closeInventory();return;}
+            if(slot==53&&page==0){openAdmin(p,1);return;}
+            if(slot==45&&page==1){openAdmin(p,0);return;}
+            if(page==0)switch(slot) {
                 case 10 -> openPlayerSelector(p,"invsee");
-                case 12 -> { p.closeInventory(); p.performCommand("vanish"); }
-                case 14 -> openPlayerSelector(p,"freeze");
-                case 16 -> msg(p,"Économie: /eco give <joueur> <montant>, /eco take <joueur> <montant>, /eco set <joueur> <montant>.");
-                case 22 -> p.closeInventory();
+                case 12 -> openPlayerSelector(p,"freeze");
+                case 14 -> {p.closeInventory();p.performCommand("vanish");}
+                case 16 -> msg(p,"Utilise /staffchat <message> pour parler au staff.");
+                default -> { }
+            } else switch(slot) {
+                case 10 -> msg(p,"Économie: /eco give|take|set <joueur> <montant>.");
+                case 12 -> {p.closeInventory();p.performCommand("lottery pot");}
+                case 14 -> {p.closeInventory();p.performCommand("lottery draw");}
+                case 16 -> {p.closeInventory();p.performCommand("baltop");}
                 default -> { }
             }
             return;
