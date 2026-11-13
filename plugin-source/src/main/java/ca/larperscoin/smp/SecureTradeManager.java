@@ -139,8 +139,18 @@ public final class SecureTradeManager implements Listener {
             }
             case "cancel" -> {
                 Session s = session(p.getUniqueId());
-                if (s == null) { invitations.remove(p.getUniqueId()); msg(p, "Aucun échange actif."); }
-                else cancel(s, p.getName() + " a annulé");
+                if (s != null) { cancel(s, p.getName() + " a annulé"); return true; }
+                boolean removed=false;
+                UUID incoming=invitations.remove(p.getUniqueId());
+                if(incoming!=null){Player requester=Bukkit.getPlayer(incoming);if(requester!=null)msg(requester,p.getName()+" a refusé/annulé l'invitation.");removed=true;}
+                for(UUID target:new ArrayList<>(invitations.keySet())) {
+                    if(p.getUniqueId().equals(invitations.get(target))) {
+                        invitations.remove(target);Player receiver=Bukkit.getPlayer(target);
+                        if(receiver!=null)msg(receiver,"L'invitation de "+p.getName()+" a été annulée.");
+                        removed=true;
+                    }
+                }
+                msg(p,removed?"Invitation annulée.":"Aucun échange ou invitation en attente.");
                 return true;
             }
             default -> {
