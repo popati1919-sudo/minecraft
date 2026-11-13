@@ -47,7 +47,10 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/ah list`, `/ah sell <prix>`, `/ah buy <id>` — hôtel des ventes persistant.
 - `/trade <joueur>`, `/trade accept`, `/trade item`, `/trade money <montant>`, `/trade confirm`, `/trade cancel` — échange avec double confirmation.
 
-### Modération
+### Anti-triche et modération
+- `/ac alerts` — activer/désactiver les alertes anti-triche pour le staff.
+- `/ac info <joueur>` et `/ac reset <joueur>` — consulter ou remettre à zéro les violations observées.
+- Détections conservatrices de vitesse anormale, montée/vol non autorisé et portée de frappe suspecte. Les alertes ne constituent pas une preuve et aucune expulsion/bannissement automatique n'est appliqué.
 - `/admin` — menu du staff.
 - `/vanish`, `/invsee <joueur>`, `/freeze <joueur>`, `/staffchat <message>`.
 - Accès contrôlé par `larpers.staff` et `larpers.admin` (OP par défaut).
