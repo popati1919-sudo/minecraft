@@ -63,9 +63,9 @@ commands:
     description: Hôtel des ventes
     usage: /ah <list|sell|buy>
   ac:
-    description: Alertes et diagnostic anti-triche LPC
-    usage: /ac <alerts|info|reset>
-    permission: larpers.staff
+    description: Outils anti-triche LPC (modérateurs: lecture, admins: gestion)
+    usage: /ac <status|alerts|info|top|log|reset|reload>
+    permission: larpers.anticheat.use
   trade:
     description: Échange sécurisé avec double confirmation
     usage: /trade <joueur>|accept|item|money <montant>|confirm|cancel
@@ -77,8 +77,14 @@ permissions:
     description: Exempter un joueur de toutes les détections anti-triche
     default: op
   larpers.anticheat.alerts:
-    description: Recevoir les alertes anti-triche (réservé au staff)
+    description: Recevoir les alertes anti-triche
     default: op
+  larpers.anticheat.use:
+    description: Accès aux commandes de consultation anti-triche
+    default: op
+  larpers.anticheat.mod:
+    description: Accès modérateur aux commandes de consultation anti-triche
+    default: false
   larpers.admin:
     description: Administration complète LPC
     default: op
