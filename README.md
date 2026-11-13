@@ -58,4 +58,4 @@ Les soldes sont dans `plugins/LarpersCoin/data.yml`; clans, quêtes, quiz et hô
 ## État et limites à connaître
 Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et achats boutique ont maintenant une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Le menu staff possède deux pages d'actions rapides; le quiz dispose d'une banque configurable et d'un classement. Geyser/Floodgate et la compatibilité Bedrock doivent être testés sur un serveur dédié.
 
-Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions et [CHANGELOG.txt](CHANGELOG.txt) pour les changements de la version 0.8.0.
+Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions, [docs/CONFIGURATION.md](docs/CONFIGURATION.md) pour les prix/quiz/permissions et [CHANGELOG.txt](CHANGELOG.txt) pour les changements de la version 0.8.0.
