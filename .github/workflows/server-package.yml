@@ -1,0 +1,178 @@
+name: Package serveur complet Larpers Coin
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/server-package.yml"
+      - "plugin-source/**"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-server:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Installer Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Installer Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.2.1"
+
+      - name: Compiler le plugin
+        working-directory: plugin-source
+        run: gradle --no-daemon clean build
+
+      - name: Préparer le serveur Paper 26.3 et LuckPerms
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p package/LarpersCoin-Server-Ready/plugins
+          PAPER_VERSION="26.3"
+          PAPER_META="$(curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/${PAPER_VERSION}/builds")"
+          PAPER_BUILD="$(echo "$PAPER_META" | jq -r '.builds[-1].build')"
+          PAPER_NAME="$(echo "$PAPER_META" | jq -r --argjson b "$PAPER_BUILD" '.builds[] | select(.build == $b) | .downloads.application.name')"
+          test -n "$PAPER_NAME" && test "$PAPER_NAME" != "null"
+          curl -fL "https://api.papermc.io/v2/projects/paper/versions/${PAPER_VERSION}/builds/${PAPER_BUILD}/downloads/${PAPER_NAME}" -o package/LarpersCoin-Server-Ready/paper.jar
+
+          LP_META="$(curl -fsSL https://api.github.com/repos/LuckPerms/LuckPerms/releases/latest)"
+          LP_URL="$(echo "$LP_META" | jq -r '.assets[] | select(.name | test("^LuckPerms-Bukkit-.*\\.jar$")) | .browser_download_url' | head -n 1)"
+          test -n "$LP_URL" && test "$LP_URL" != "null"
+          curl -fL "$LP_URL" -o package/LarpersCoin-Server-Ready/plugins/LuckPerms.jar
+
+          PLUGIN_JAR="$(find plugin-source/build/libs -maxdepth 1 -type f -name 'LarpersCoin-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
+          test -n "$PLUGIN_JAR"
+          cp "$PLUGIN_JAR" package/LarpersCoin-Server-Ready/plugins/LarpersCoin.jar
+
+      - name: Ajouter les fichiers de configuration Windows
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="package/LarpersCoin-Server-Ready"
+          cat > "$ROOT/eula.txt" <<'EOF'
+          # Lis https://aka.ms/MinecraftEULA puis remplace eula=false par eula=true si tu acceptes.
+          eula=false
+          EOF
+          cat > "$ROOT/server.properties" <<'EOF'
+          enable-jmx-monitoring=false
+          enable-query=false
+          enable-rcon=false
+          level-name=world
+          gamemode=survival
+          difficulty=normal
+          hardcore=false
+          max-players=30
+          online-mode=true
+          pvp=true
+          server-port=25565
+          server-ip=
+          motd=Larpers Coin SMP
+          view-distance=8
+          simulation-distance=6
+          spawn-protection=0
+          allow-flight=false
+          white-list=false
+          enforce-whitelist=false
+          EOF
+          cat > "$ROOT/START-SERVER.bat" <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          title Larpers Coin SMP - Paper 26.3
+          where java >nul 2>nul
+          if errorlevel 1 (
+            echo Java 25 est requis. Installe un JDK 25 puis relance.
+            pause
+            exit /b 1
+          )
+          if not exist "paper.jar" (
+            echo paper.jar est manquant. Retelecharge le ZIP complet depuis GitHub Actions.
+            pause
+            exit /b 1
+          )
+          findstr /i /c:"eula=true" eula.txt >nul
+          if errorlevel 1 (
+            echo.
+            echo Lis et accepte d'abord le contrat Minecraft dans eula.txt.
+            echo Ouvre eula.txt et remplace eula=false par eula=true seulement si tu acceptes.
+            pause
+            exit /b 1
+          )
+          java -Xms2G -Xmx4G -jar paper.jar --nogui
+          pause
+          EOF
+          cat > "$ROOT/CONFIGURER-LES-GROUPES.bat" <<'EOF'
+          @echo off
+          echo Execute ces commandes dans la console du serveur, sans le slash:
+          echo.
+          echo lp creategroup admin
+          echo lp group admin permission set larpers.admin true
+          echo lp group admin permission set larpers.staff true
+          echo lp group admin permission set larpers.anticheat.use true
+          echo lp group admin permission set larpers.anticheat.alerts true
+          echo.
+          echo lp creategroup moderator
+          echo lp group moderator permission set larpers.staff true
+          echo lp group moderator permission set larpers.anticheat.mod true
+          echo lp group moderator permission set larpers.anticheat.use true
+          echo lp group moderator permission set larpers.anticheat.alerts true
+          echo.
+          echo lp user PSEUDO parent set moderator
+          echo lp user PSEUDO parent set admin
+          echo Remplace PSEUDO par le vrai pseudo. Ne donne admin qu'aux personnes de confiance.
+          pause
+          EOF
+          cat > "$ROOT/LISEZ-MOI.txt" <<'EOF'
+          LARPERS COIN SMP - SERVEUR PAPER 26.3
+          =====================================
+          Inclus:
+          - Paper 26.3
+          - Java 25 requis
+          - Plugin LarpersCoin compile depuis le depot
+          - LuckPerms (gestion Admin/Moderateur)
+          - Configuration de base et scripts Windows
+
+          PREMIER DEMARRAGE:
+          1. Installe Java 25 (JDK/JRE).
+          2. Lis https://aka.ms/MinecraftEULA.
+          3. Si tu acceptes, ouvre eula.txt et change eula=false en eula=true.
+          4. Lance START-SERVER.bat.
+          5. Attends la fin du premier demarrage, puis arrete avec stop.
+          6. Configure les groupes avec CONFIGURER-LES-GROUPES.bat (les commandes sont affichees).
+
+          RESEAU:
+          - Java: TCP 25565.
+          - Bedrock: installe Geyser et Floodgate separement, puis ouvre UDP 19132.
+          - Geyser/Floodgate ne sont pas inclus dans ce ZIP.
+          - Garde online-mode=true pour la securite des comptes Java.
+          - Ne partage jamais les acces admin.
+
+          IMPORTANT:
+          Ce paquet est prepare automatiquement. Il n'a pas encore ete valide par un
+          demarrage complet sur ta machine ni par un test de charge/Bedrock.
+          Fais une sauvegarde du dossier world et des fichiers plugins avant chaque mise a jour.
+          EOF
+
+      - name: Creer le ZIP du serveur
+        run: |
+          cd package
+          zip -qr ../LarpersCoin-Server-Ready.zip LarpersCoin-Server-Ready
+
+      - name: Publier le ZIP comme artefact GitHub
+        uses: actions/upload-artifact@v4
+        with:
+          name: LarpersCoin-Server-Ready
+          path: LarpersCoin-Server-Ready.zip
+          if-no-files-found: error
+          retention-days: 90
