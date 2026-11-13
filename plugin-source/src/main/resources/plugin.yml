@@ -5,6 +5,7 @@ load: STARTUP
 api-version: '26.3'
 author: Larpers Coin SMP
 description: "Plugin SMP LPC: économie, clans, quêtes, commerce, modération et anti-triche."
+softdepend: [FastLoginPlus, PlaceholderAPI, floodgate]
 commands:
   register:
     description: Crée un compte joueur
