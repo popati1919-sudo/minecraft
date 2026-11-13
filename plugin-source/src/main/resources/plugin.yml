@@ -33,14 +33,14 @@ commands:
     usage: /lottery <buy|pot|draw>
   clan:
     description: Système de clans
-    usage: /clan <create|invite|join|leave|role|bank|top|allies|level|chest|stats|leaderboard>
+    usage: /clan <create|invite|join|leave|transfer|disband|role|bank|top|allies|level|chest|audit|stats|leaderboard>
   quest:
     description: Quêtes quotidiennes
     aliases: [quests]
     usage: /quests [claim|weekly [claim]]
   quiz:
     description: Quiz de connaissances Minecraft
-    usage: /quiz [réponse]
+    usage: /quiz [top]
   shop:
     description: Recherche et achat LPC dans la boutique
     usage: /shop [search <objet>|buy <clé> [quantité]]
