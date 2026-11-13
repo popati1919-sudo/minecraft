@@ -485,10 +485,10 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             Inventory simulated=Bukkit.createInventory(null,36);
             simulated.setStorageContents(p.getInventory().getStorageContents());
             if(!simulated.addItem(stack.clone()).isEmpty()){msg(p,"Inventaire insuffisant; aucun LPC débité.");return true;}
+            UUID sellerId=UUID.fromString(db.getString(path+".sellerId"));
+            if(!Double.isFinite(core.balance(sellerId)+price)){msg(p,"Le solde du vendeur est saturé; achat refusé.");return true;}
             if(!charge(p,price)){msg(p,"Fonds insuffisants.");return true;}
             p.getInventory().addItem(stack);
-            UUID sellerId=UUID.fromString(db.getString(path+".sellerId"));
-            if(!Double.isFinite(core.balance(sellerId)+price)){give(p,price);msg(p,"Le solde du vendeur est saturé; achat annulé.");return true;}
             core.credit(sellerId,price);core.saveData();
             core.recordTransaction("AH_BUY",p.getUniqueId(),sellerId,price);
             db.set(path,null);save();msg(p,"Achat effectué.");return true;
