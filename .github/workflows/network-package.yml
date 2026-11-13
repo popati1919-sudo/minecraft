@@ -63,6 +63,7 @@ jobs:
           plugin_jar="$(find plugin-source/build/libs -maxdepth 1 -type f -name 'LarpersCoin-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
           test -n "$plugin_jar"
           cp "$plugin_jar" "$ROOT/SMP/plugins/LarpersCoin.jar"
+          cp "$plugin_jar" "$ROOT/Lobby/plugins/LarpersCoin.jar"
 
           curl -fL "https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/velocity" -o "$ROOT/Velocity/plugins/Geyser-Velocity.jar"
           curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/velocity" -o "$ROOT/Velocity/plugins/floodgate-velocity.jar"
@@ -162,10 +163,19 @@ jobs:
           EOF
           done
 
-          mkdir -p "$ROOT/SMP/plugins/LarpersCoin"
+          mkdir -p "$ROOT/SMP/plugins/LarpersCoin" "$ROOT/Lobby/plugins/LarpersCoin"
+          cat > "$ROOT/Lobby/plugins/LarpersCoin/config.yml" <<'EOF'
+          network:
+            auth-only: true
+          auth:
+            proxy-authenticated: false
+            remember-ip: true
+            connect-to-smp: true
+          EOF
           cat > "$ROOT/SMP/plugins/LarpersCoin/config.yml" <<'EOF'
           auth:
             proxy-authenticated: true
+            remember-ip: false
           anticheat:
             enabled: true
             auto-punish:
@@ -218,11 +228,13 @@ jobs:
           =============================
           Contenu:
           - Velocity proxy: port public Java 25565
-          - Lobby Paper separe: 127.0.0.1:25566 (monde vide)
+          - Lobby Paper separe: 127.0.0.1:25566 (authentification uniquement: /register et /login)
           - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
           - Geyser + Floodgate installes sur Velocity pour Bedrock
-          - Java premium authentifie par Velocity (aucun /login ni /register)
-          - Bedrock authentifie par Floodgate (aucun mot de passe LPC)
+          - Lobby: /register et /login uniquement; reconnexion auto si meme compte + meme IP (empreinte SHA-256)
+          - Apres authentification, transfert automatique vers le SMP
+          - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend
+          - Geyser/Floodgate restent a configurer et tester selon le mode de connexion
           - Backend Paper lie a Velocity avec forwarding moderne et secret prive
 
           INSTALLATION:
@@ -237,9 +249,8 @@ jobs:
           9. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
 
           IMPORTANT:
-          - Seuls les comptes Java premium sont acceptes par le proxy en online-mode.
-          - Bedrock passe par Floodgate.
-          - Les comptes Java non premium/crack ne sont pas acceptes dans cette configuration.
+          - Le proxy reste en online-mode=true dans ce paquet; les comptes Java non premium/crack ne seront pas acceptes tant que ce parametre n’est pas adapte.
+          - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
           - Ne change pas online-mode du proxy et ne rends jamais les ports backend publics.
           - Le plugin anticheat utilise des seuils de sanctions progressives configurables; ajuste-les apres tests.
           - Les mondes et donnees existants ne sont pas inclus: ce ZIP est un paquet serveur propre.
