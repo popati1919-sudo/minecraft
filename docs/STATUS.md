@@ -2,39 +2,40 @@
 
 Dernière mise à jour : 2026-11-12
 
-## Phase actuelle : socle économique + compilation
+## Phase 1 — socle économique
 
 - [x] Dépôt GitHub initialisé
-- [x] Structure Gradle
+- [x] Structure Gradle / Java 25
 - [x] Workflow GitHub Actions
-- [x] Script de compilation Windows
-- [x] Déclaration des commandes de base
-- [ ] Compilation Paper 26.3 confirmée par GitHub Actions
-- [ ] Test de démarrage sur un serveur Paper réel
+- [x] Script de compilation Windows avec journal
+- [x] /balance et consultation staff d'un solde hors ligne
+- [x] /pay vers un joueur en ligne
+- [x] /baltop
+- [x] /daily avec délai et série
+- [x] /bounty et versement à la mort PvP
+- [x] /eco give|take|set
+- [x] /lottery buy|pot|draw et tirage hebdomadaire automatique
+- [ ] Compilation de la version contenant le code LPC confirmée
+- [ ] Test de démarrage sur un serveur Paper 26.3
 - [ ] Test Java + Bedrock avec Geyser/Floodgate
 
-## Fonctionnalités
+## Phases suivantes
 
-Les fonctionnalités suivantes sont en cours de développement et ne sont pas considérées comme validées tant que les tests ne sont pas terminés :
+- [ ] Clans : création, invitations, rôles, banque, alliances, coffre, niveau et classements
+- [ ] Quêtes quotidiennes et hebdomadaires configurables
+- [ ] Quiz Minecraft et récompenses anti-double-claim
+- [ ] Boutique LPC avec recherche
+- [ ] Hôtel des ventes sécurisé
+- [ ] Échanges avec double confirmation et annulation sûre
+- [ ] Menus graphiques pour ordinateur et Bedrock/mobile
+- [ ] Outils de modération : vanish, invsee, freeze, staffchat, admin
+- [ ] Audit économique et protections anti-duplication renforcées
 
-- Économie LPC, paiements et classement
-- Récompense quotidienne
-- Primes
-- Loterie
-- Clans et banque de clan
-- Quêtes quotidiennes/hebdomadaires
-- Quiz Minecraft
-- Hôtel des ventes
-- Boutique et recherche
-- Échanges sécurisés
-- Menus GUI
-- Modération et commandes staff
+## Règles permanentes
 
-## Règles non négociables
-
-- Aucun claim et aucune protection par parcelle.
+- Aucun claim et aucune protection de terrain par parcelle.
 - Aucun grade VIP.
 - Les commandes vanilla ne doivent pas être remplacées.
-- Les sélecteurs vanilla (`@a`, `@p`, `@s`) restent gérés par Minecraft/Paper.
-- Les données économiques doivent persister après redémarrage.
+- Les sélecteurs vanilla (@a, @p, @s) restent gérés par Minecraft/Paper.
+- Les données LPC persistent dans plugins/LarpersCoin/data.yml.
 - Aucune fonctionnalité ne sera annoncée comme terminée sans implémentation et test.
