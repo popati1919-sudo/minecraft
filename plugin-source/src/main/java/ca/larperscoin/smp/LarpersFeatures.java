@@ -91,6 +91,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
 
     private void save() {
+        for(var entry:clanChests.entrySet())db.set(clanPath(entry.getKey())+".chest",Arrays.asList(entry.getValue().getContents()));
         try { db.save(file); } catch (IOException e) { plugin.getLogger().severe("features.yml: " + e.getMessage()); }
     }
     private void seedQuizQuestion(String key,String question,String answer,List<String> choices) {
@@ -270,6 +271,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             case "disband" -> {
                 if(own==null||!id(p).equals(db.getString(clanPath(own)+".owner"))){msg(p,"Seul le chef peut dissoudre le clan.");return true;}
                 if(a.length!=2||!a[1].equalsIgnoreCase("confirm")){msg(p,"Action irréversible: /clan disband confirm.");return true;}
+                if(clanChestUsers.containsKey(own)){msg(p,"Ferme d'abord le coffre du clan avant de le dissoudre.");return true;}
                 String path=clanPath(own);List<String> members=db.getStringList(path+".members");
                 for(String member:members)db.set("clan-members."+member,null);
                 for(String ally:db.getStringList(path+".allies")){List<String> list=db.getStringList(clanPath(ally)+".allies");list.remove(own);db.set(clanPath(ally)+".allies",list);}
@@ -576,6 +578,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             simulated.setStorageContents(p.getInventory().getStorageContents());
             if(!simulated.addItem(stack.clone()).isEmpty()){msg(p,"Inventaire insuffisant; aucun LPC débité.");return true;}
             UUID sellerId=UUID.fromString(db.getString(path+".sellerId"));
+            if(sellerId.equals(p.getUniqueId())){msg(p,"Tu ne peux pas acheter ta propre annonce.");return true;}
             if(!Double.isFinite(core.balance(sellerId)+price)){msg(p,"Le solde du vendeur est saturé; achat refusé.");return true;}
             if(!charge(p,price)){msg(p,"Fonds insuffisants.");return true;}
             p.getInventory().addItem(stack);
