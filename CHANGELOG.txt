@@ -7,6 +7,7 @@ Added
 - Daily and weekly quest objectives: block breaking, mature crop harvesting, mob kills and fishing.
 - LPC shop purchases with configurable prices stored in plugins/LarpersCoin/features.yml, plus a clickable shop GUI.
 - Clan and quest inventory menus.
+- Persistent transaction history for player payments, daily rewards, bounty, lottery, shop, auction, clan bank, quiz and trades.
 - Multiple-choice Minecraft quiz GUI.
 - Clan XP and level progression earned through quest activities.
 - Clan leader/officer/member roles and officer bank withdrawals.
