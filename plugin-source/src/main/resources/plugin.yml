@@ -40,7 +40,7 @@ commands:
     usage: /quiz [réponse]
   shop:
     description: Recherche et achat LPC dans la boutique
-    usage: /shop <search <objet>|buy <clé> [quantité]>
+    usage: /shop [search <objet>|buy <clé> [quantité]]
   admin:
     description: Menu graphique du staff
     permission: larpers.staff
