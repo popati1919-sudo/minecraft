@@ -245,7 +245,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 String path=clanPath(own);
                 if(!clanLeaderOrOfficer(p,own)){msg(p,"Chef ou officier requis pour inviter.");return true;}
                 OfflinePlayer target=Bukkit.getOfflinePlayer(a[1]);
-                if(target.getUniqueId()==null||own.equals(db.getString("clan-members."+target.getUniqueId()))){msg(p,"Joueur invalide ou déjà membre.");return true;}
+                String targetClan=db.getString("clan-members."+target.getUniqueId());
+                if(targetClan!=null){msg(p,"Ce joueur appartient déjà à un clan.");return true;}
                 db.set("invites."+target.getUniqueId(),own);save();
                 if(target.isOnline())msg(target.getPlayer(),"Invitation au clan "+db.getString(path+".name")+". Fais /clan join "+own);
                 msg(p,"Invitation enregistrée pour "+a[1]+". Le joueur pourra la rejoindre avec /clan join "+own+".");return true;
