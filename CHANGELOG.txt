@@ -1,0 +1,26 @@
+LARPERS COIN SMP 26.3
+CHANGELOG — 0.8.0
+Date: 2026-11-12
+
+Added
+- Secure player trades with invitation, item offers, LPC offers, two-player confirmation, cancellation and inventory/balance validation.
+- Daily and weekly quest objectives: block breaking, mature crop harvesting, mob kills and fishing.
+- LPC shop purchases with configurable prices stored in plugins/LarpersCoin/features.yml.
+- Clan XP and level progression earned through quest activities.
+- Clan leader/officer/member roles and officer bank withdrawals.
+- Bilateral clan alliances using request and acceptance.
+- Periodic feature-data saves and explicit flush on plugin shutdown.
+
+Improved
+- BUILD-PLUGIN.bat checks that JDK 25 is installed and writes Gradle stack traces to BUILD-PLUGIN.log.
+- README and docs/STATUS.md now describe the implemented commands and remaining limitations.
+- Plugin version bumped to 0.8.0.
+
+Not yet complete / not yet verified
+- Full admin management GUI with real paginated actions.
+- Full clan leadership transfer, dissolution and detailed role permissions.
+- Configurable quiz question bank and quiz leaderboard.
+- Full GUI shop.
+- Automated integration tests and live Paper 26.3 server test.
+- Geyser/Floodgate Java-Bedrock validation.
+- CI build result for this commit has not yet been confirmed.
