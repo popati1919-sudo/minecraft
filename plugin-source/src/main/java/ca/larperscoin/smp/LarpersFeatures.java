@@ -107,6 +107,22 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if (lore.length > 0) meta.setLore(Arrays.stream(lore).map(x -> ChatColor.GRAY+x).toList());
         it.setItemMeta(meta); return it;
     }
+    private void openClanMenu(Player p) {
+        Inventory inv=Bukkit.createInventory(null,27,"LPC | Clan");
+        inv.setItem(10,item(Material.BOOK,"Informations","/clan info"));
+        inv.setItem(12,item(Material.GOLD_INGOT,"Banque","/clan bank"));
+        inv.setItem(14,item(Material.CHEST,"Coffre partagé","/clan chest"));
+        inv.setItem(16,item(Material.EMERALD,"Classement","/clan top"));
+        inv.setItem(22,item(Material.BARRIER,"Fermer"));
+        p.openInventory(inv);
+    }
+    private void openQuestMenu(Player p) {
+        Inventory inv=Bukkit.createInventory(null,27,"LPC | Quêtes");
+        inv.setItem(11,item(Material.CLOCK,"Quête quotidienne","Récompense: 150 LPC","/quests claim"));
+        inv.setItem(15,item(Material.DIAMOND,"Quête hebdomadaire","Récompense: 800 LPC","/quests weekly claim"));
+        inv.setItem(22,item(Material.BARRIER,"Fermer"));
+        p.openInventory(inv);
+    }
     private void openAdmin(Player p) {
         Inventory inv = Bukkit.createInventory(null, 27, "LPC | Administration");
         inv.setItem(10,item(Material.BOOK,"Gestion des joueurs","/invsee <joueur>"));
@@ -173,7 +189,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
 
     private boolean clan(CommandSender s,String[] a) {
         Player p=player(s); if(p==null)return true;
-        if(a.length==0){msg(p,"/clan create <nom>, invite <joueur>, join <nom>, leave, info, role, bank, top, allies, level, chest, stats, leaderboard");return true;}
+        if(a.length==0){openClanMenu(p);return true;}
         String sub=a[0].toLowerCase(Locale.ROOT), own=clanOf(p.getUniqueId());
         switch(sub) {
             case "create" -> {
@@ -308,6 +324,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     private boolean quests(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
+        if(a.length==0){openQuestMenu(p);return true;}
         boolean weekly=a.length>0&&a[0].equalsIgnoreCase("weekly");
         if(a.length>0&&(a[0].equalsIgnoreCase("claim")||weekly&&a.length>1&&a[1].equalsIgnoreCase("claim"))) {
             boolean isWeekly=weekly;
