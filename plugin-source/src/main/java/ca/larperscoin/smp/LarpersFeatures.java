@@ -9,6 +9,10 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.*;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.*;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.block.data.Ageable;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -18,6 +22,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.time.LocalDate;
+import java.time.temporal.WeekFields;
 
 /** Modules sociaux, progression, commerce et modération de LarpersCoin. */
 public final class LarpersFeatures implements CommandExecutor, TabCompleter, Listener {
@@ -26,6 +32,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final YamlConfiguration db;
     private final File file;
     private final Set<UUID> frozen = new HashSet<>();
+    private final Set<String> playerPlacedBlocks = new HashSet<>();
     private final Set<UUID> vanished = new HashSet<>();
     private final SecureTradeManager tradeManager;
     private final Map<UUID, Long> lastQuiz = new HashMap<>();
@@ -211,14 +218,74 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
     }
 
+    private String dailyQuestKey() { return LocalDate.now().toString(); }
+    private String weeklyQuestKey() {
+        LocalDate now=LocalDate.now();
+        WeekFields wf=WeekFields.ISO;
+        return now.get(wf.weekBasedYear())+"-W"+String.format(Locale.ROOT,"%02d",now.get(wf.weekOfWeekBasedYear()));
+    }
+    private String questPath(boolean weekly, Player p, String objective) {
+        return "quests."+(weekly?"weekly."+weeklyQuestKey():"daily."+dailyQuestKey())+"."+id(p)+"."+objective;
+    }
+    private void progressQuest(Player p, String objective) {
+        db.set(questPath(false,p,objective),db.getInt(questPath(false,p,objective),0)+1);
+        db.set(questPath(true,p,objective),db.getInt(questPath(true,p,objective),0)+1);
+        save();
+    }
+    private boolean questReady(Player p, boolean weekly) {
+        String[] names={"blocks","crops","kills","fish"};
+        int[] goals=weekly?new int[]{100,50,25,15}:new int[]{20,10,5,3};
+        for(int i=0;i<names.length;i++) if(db.getInt(questPath(weekly,p,names[i]),0)>=goals[i]) return true;
+        return false;
+    }
     private boolean quests(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
-        if(a.length>0&&a[0].equalsIgnoreCase("claim")) {
-            long now=System.currentTimeMillis(), prev=db.getLong("quest-daily."+id(p),0L);
-            if(now-prev<86_400_000L){msg(p,"Récompense déjà réclamée aujourd'hui.");return true;}
-            db.set("quest-daily."+id(p),now);give(p,150);save();msg(p,"Quête quotidienne validée: +150 LPC. (Les objectifs détaillés seront suivis en jeu dans une prochaine version.)");return true;
+        boolean weekly=a.length>0&&a[0].equalsIgnoreCase("weekly");
+        if(a.length>0&&(a[0].equalsIgnoreCase("claim")||weekly&&a.length>1&&a[1].equalsIgnoreCase("claim"))) {
+            boolean isWeekly=weekly;
+            String period=isWeekly?weeklyQuestKey():dailyQuestKey();
+            String claimPath="quest-claims."+(isWeekly?"weekly":"daily")+"."+period+"."+id(p);
+            if(db.getBoolean(claimPath,false)){msg(p,"Cette récompense a déjà été réclamée pour cette période.");return true;}
+            if(!questReady(p,isWeekly)){msg(p,"Objectifs incomplets. Fais /quests pour voir ta progression.");return true;}
+            db.set(claimPath,true);
+            double reward=isWeekly?800.0:150.0;
+            give(p,reward);save();
+            msg(p,"Quête "+(isWeekly?"hebdomadaire":"quotidienne")+" terminée : +"+reward+" LPC.");
+            return true;
         }
-        msg(p,"Quêtes quotidiennes et hebdomadaires: /quests claim — récompense quotidienne 150 LPC; reset 24 h.");msg(p,"Les objectifs de récolte/combats et le suivi hebdomadaire ne sont pas encore activés.");return true;
+        String period=weekly?weeklyQuestKey():dailyQuestKey();
+        int[] goals=weekly?new int[]{100,50,25,15}:new int[]{20,10,5,3};
+        String[] names={"blocks","crops","kills","fish"};
+        String[] labels={"blocs cassés","cultures récoltées","créatures vaincues","poissons pêchés"};
+        msg(p,(weekly?"Quêtes hebdomadaires ":"Quêtes quotidiennes ")+period+":");
+        for(int i=0;i<names.length;i++) msg(p,labels[i]+": "+Math.min(db.getInt(questPath(weekly,p,names[i]),0),goals[i])+"/"+goals[i]);
+        msg(p,"Récompense: "+(weekly?"800":"150")+" LPC — valide un objectif pour réclamer.");
+        msg(p,weekly?"/quests weekly claim":"/quests claim");
+        return true;
+    }
+
+    @EventHandler public void onQuestBlockPlace(BlockPlaceEvent e) {
+        var b=e.getBlockPlaced();
+        playerPlacedBlocks.add(b.getWorld().getUID()+":"+b.getX()+":"+b.getY()+":"+b.getZ());
+    }
+    @EventHandler public void onQuestBlockBreak(BlockBreakEvent e) {
+        Player p=e.getPlayer();
+        if(p.getGameMode()==org.bukkit.GameMode.CREATIVE) return;
+        var b=e.getBlock();
+        String loc=b.getWorld().getUID()+":"+b.getX()+":"+b.getY()+":"+b.getZ();
+        if(playerPlacedBlocks.remove(loc)) return;
+        if(b.getBlockData() instanceof Ageable age && age.getAge()>=age.getMaximumAge()) {
+            progressQuest(p,"crops");
+        } else if(!b.getType().isAir() && b.getType()!=Material.BEDROCK) {
+            progressQuest(p,"blocks");
+        }
+    }
+    @EventHandler public void onQuestMobKill(EntityDeathEvent e) {
+        Player killer=e.getEntity().getKiller();
+        if(killer!=null) progressQuest(killer,"kills");
+    }
+    @EventHandler public void onQuestFish(PlayerFishEvent e) {
+        if(e.getState()==PlayerFishEvent.State.CAUGHT_FISH) progressQuest(e.getPlayer(),"fish");
     }
     private boolean quiz(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
