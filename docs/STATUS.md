@@ -15,7 +15,8 @@ Dernière mise à jour : 2026-11-12
 - [x] /bounty et versement à la mort PvP
 - [x] /eco give|take|set
 - [x] /lottery buy|pot|draw et tirage hebdomadaire automatique
-- [ ] Compilation de la version contenant le code LPC confirmée
+- [x] Compilation réussie sur GitHub Actions (run 43335120822)
+- [x] Artefact LarpersCoin-0.6.0.jar généré et vérifié dans l'archive de build
 - [ ] Test de démarrage sur un serveur Paper 26.3
 - [ ] Test Java + Bedrock avec Geyser/Floodgate
 
