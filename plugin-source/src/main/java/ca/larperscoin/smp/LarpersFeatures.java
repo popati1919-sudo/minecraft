@@ -40,6 +40,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<UUID, UUID> pendingBids = new HashMap<>();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
     private static final Map<String, Material> SHOP = new LinkedHashMap<>();
+    private static final Map<String, Double> SHOP_PRICES = new LinkedHashMap<>();
+    private boolean saveQueued = false;
 
     static {
         SHOP.put("diamant", Material.DIAMOND); SHOP.put("fer", Material.IRON_INGOT);
@@ -49,6 +51,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         SHOP.put("pomme", Material.APPLE); SHOP.put("bois", Material.OAK_LOG);
         SHOP.put("pierre", Material.STONE); SHOP.put("terre", Material.DIRT);
         SHOP.put("elytra", Material.ELYTRA); SHOP.put("netherite", Material.NETHERITE_INGOT);
+        SHOP_PRICES.put("diamant",250.0); SHOP_PRICES.put("fer",25.0);
+        SHOP_PRICES.put("or",40.0); SHOP_PRICES.put("émeraude",100.0);
+        SHOP_PRICES.put("redstone",10.0); SHOP_PRICES.put("lapis",12.0);
+        SHOP_PRICES.put("obsidienne",35.0); SHOP_PRICES.put("pain",5.0);
+        SHOP_PRICES.put("pomme",4.0); SHOP_PRICES.put("bois",8.0);
+        SHOP_PRICES.put("pierre",2.0); SHOP_PRICES.put("terre",1.0);
+        SHOP_PRICES.put("elytra",5000.0); SHOP_PRICES.put("netherite",1500.0);
     }
 
     public LarpersFeatures(JavaPlugin plugin) {
@@ -58,6 +67,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
         file = new File(plugin.getDataFolder(), "features.yml");
         db = YamlConfiguration.loadConfiguration(file);
+        for (var entry : SHOP_PRICES.entrySet()) {
+            String pricePath="shop.prices."+entry.getKey();
+            if (!db.contains(pricePath)) db.set(pricePath,entry.getValue());
+        }
+        save();
         for (String cmd : List.of("clan","quest","quests","quiz","shop","admin","vanish","invsee","freeze","staffchat","ah","trade")) {
             PluginCommand c = plugin.getCommand(cmd);
             if (c != null) { c.setExecutor(this); c.setTabCompleter(this); }
@@ -230,7 +244,12 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private void progressQuest(Player p, String objective) {
         db.set(questPath(false,p,objective),db.getInt(questPath(false,p,objective),0)+1);
         db.set(questPath(true,p,objective),db.getInt(questPath(true,p,objective),0)+1);
-        save();
+        saveSoon();
+    }
+    private void saveSoon() {
+        if(saveQueued) return;
+        saveQueued=true;
+        Bukkit.getScheduler().runTaskLater(plugin,()->{saveQueued=false;save();},20L);
     }
     private boolean questReady(Player p, boolean weekly) {
         String[] names={"blocks","crops","kills","fish"};
@@ -299,9 +318,27 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         db.set("quiz."+id(p)+".answer",null);save();return true;
     }
     private boolean shop(CommandSender s,String[] a) {
-        if(a.length<2||!a[0].equalsIgnoreCase("search")){msg(s,"Usage: /shop search <objet>");return true;}
+        if(a.length>=2&&a[0].equalsIgnoreCase("buy")) {
+            Player p=player(s);if(p==null)return true;
+            String key=a[1].toLowerCase(Locale.ROOT);
+            if(!SHOP.containsKey(key)) { msg(p,"Objet inconnu. Utilise /shop search <objet>.");return true; }
+            int amount=1;
+            if(a.length>=3) try { amount=Integer.parseInt(a[2]); } catch(NumberFormatException ex) { amount=0; }
+            if(amount<1||amount>64) { msg(p,"Quantité autorisée: 1 à 64.");return true; }
+            Material material=SHOP.get(key);
+            ItemStack purchase=new ItemStack(material,amount);
+            Inventory simulated=Bukkit.createInventory(null,36);
+            simulated.setStorageContents(p.getInventory().getStorageContents());
+            if(!simulated.addItem(purchase.clone()).isEmpty()) { msg(p,"Inventaire insuffisant; aucun LPC débité.");return true; }
+            double price=db.getDouble("shop.prices."+key,SHOP_PRICES.getOrDefault(key,0.0))*amount;
+            if(!Double.isFinite(price)||price<=0||!charge(p,price)) { msg(p,"Fonds LPC insuffisants. Prix: "+price+" LPC.");return true; }
+            p.getInventory().addItem(purchase);
+            msg(p,"Achat effectué: "+amount+" x "+material.name()+" pour "+price+" LPC.");
+            return true;
+        }
+        if(a.length<2||!a[0].equalsIgnoreCase("search")){msg(s,"Usage: /shop search <objet> | /shop buy <clé> [quantité]");return true;}
         String query=String.join(" ",Arrays.copyOfRange(a,1,a.length)).toLowerCase(Locale.ROOT);
-        List<String> found=SHOP.entrySet().stream().filter(e->e.getKey().contains(query)||e.getValue().name().toLowerCase(Locale.ROOT).contains(query)).map(e->e.getKey()+" — "+e.getValue().name()).toList();
+        List<String> found=SHOP.entrySet().stream().filter(e->e.getKey().contains(query)||e.getValue().name().toLowerCase(Locale.ROOT).contains(query)).map(e->e.getKey()+" — "+e.getValue().name()+" ("+db.getDouble("shop.prices."+e.getKey(),SHOP_PRICES.get(e.getKey()))+" LPC/u)").toList();
         msg(s,found.isEmpty()?"Aucun objet correspondant dans le catalogue.":"Résultats: "+String.join(" | ",found));return true;
     }
     private boolean auction(CommandSender s,String[] a) {
