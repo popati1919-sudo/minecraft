@@ -281,6 +281,28 @@ jobs:
           pause
           EOF
 
+          cat > "$ROOT/CONFIGURER-LES-GROUPES.bat" <<'EOF'
+          @echo off
+          echo Entre ces commandes dans la console du SMP, sans slash:
+          echo.
+          echo lp creategroup admin
+          echo lp group admin permission set larpers.admin true
+          echo lp group admin permission set larpers.staff true
+          echo lp group admin permission set larpers.anticheat.use true
+          echo lp group admin permission set larpers.anticheat.alerts true
+          echo.
+          echo lp creategroup moderator
+          echo lp group moderator permission set larpers.staff true
+          echo lp group moderator permission set larpers.anticheat.mod true
+          echo lp group moderator permission set larpers.anticheat.use true
+          echo lp group moderator permission set larpers.anticheat.alerts true
+          echo.
+          echo lp user PSEUDO parent set admin
+          echo lp user PSEUDO parent set moderator
+          echo Remplace PSEUDO par le pseudo exact. Ne donne admin qu'aux personnes de confiance.
+          pause
+          EOF
+
           cat > "$ROOT/OUVRIR-PORTS-WINDOWS.bat" <<'EOF'
           @echo off
           net session >nul 2>&1
@@ -319,7 +341,8 @@ jobs:
           8. Accepter l'EULA dans les deux backends, puis lancer START-NETWORK.bat.
           9. Lancer OUVRIR-PORTS-WINDOWS.bat en administrateur; rediriger TCP 25565 et TCP+UDP 19132 sur le routeur.
           10. Les ports 25566 et 25567 restent locaux: ne pas les exposer sur Internet.
-          11. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
+          11. Execute CONFIGURER-LES-GROUPES.bat et attribue les groupes depuis la console SMP.
+          12. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
 
           IMPORTANT:
           - FastLoginPlus verifie l'identite Java premium sur Velocity. Le statut premium doit etre transmis aux backends par le plugin FastLoginPlus; les joueurs crackes gardent /register et /login LPC.
