@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 /** Modules sociaux, progression, commerce et modération de LarpersCoin. */
 public final class LarpersFeatures implements CommandExecutor, TabCompleter, Listener {
     private final JavaPlugin plugin;
+    private final LarpersCoin core;
     private final YamlConfiguration db;
     private final File file;
     private final Set<UUID> frozen = new HashSet<>();
@@ -45,6 +46,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
 
     public LarpersFeatures(JavaPlugin plugin) {
         this.plugin = plugin;
+        this.core = (LarpersCoin) plugin;
         if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
         file = new File(plugin.getDataFolder(), "features.yml");
         db = YamlConfiguration.loadConfiguration(file);
@@ -67,14 +69,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private String clanPath(String clan) { return "clans."+clan.toLowerCase(Locale.ROOT); }
     private boolean member(Player p) { return clanOf(p.getUniqueId()) != null; }
     private void give(Player p, double amount) {
-        String path = "balances."+id(p);
-        db.set(path, Math.max(0, db.getDouble(path)+amount));
+        core.credit(p.getUniqueId(), amount);
+        core.saveData();
     }
     private boolean charge(Player p, double amount) {
-        String path = "balances."+id(p);
-        double b = db.getDouble(path,0);
-        if (b < amount) return false;
-        db.set(path,b-amount); return true;
+        boolean ok = core.debit(p.getUniqueId(), amount);
+        if (ok) core.saveData();
+        return ok;
     }
     private ItemStack item(Material mat, String name, String... lore) {
         ItemStack it = new ItemStack(mat); ItemMeta meta = it.getItemMeta();
@@ -251,7 +252,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             String path="ah."+a[1];if(!db.contains(path)){msg(p,"Annonce introuvable.");return true;}
             double price=db.getDouble(path+".price");if(!charge(p,price)){msg(p,"Fonds insuffisants.");return true;}
             ItemStack stack=db.getItemStack(path+".stack");if(stack==null||!p.getInventory().addItem(stack).isEmpty()){give(p,price);msg(p,"Inventaire plein ou objet indisponible.");return true;}
-            OfflinePlayer seller=Bukkit.getOfflinePlayer(UUID.fromString(db.getString(path+".sellerId")));db.set("balances."+seller.getUniqueId(),db.getDouble("balances."+seller.getUniqueId())+price);db.set(path,null);save();msg(p,"Achat effectué.");return true;
+            UUID sellerId=UUID.fromString(db.getString(path+".sellerId"));core.credit(sellerId,price);core.saveData();db.set(path,null);save();msg(p,"Achat effectué.");return true;
         }
         msg(p,"/ah list | /ah sell <prix> | /ah buy <id>");return true;
     }
