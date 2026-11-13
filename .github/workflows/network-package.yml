@@ -1,0 +1,259 @@
+name: Package reseau complet Larpers Coin (Velocity + Lobby + SMP)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/network-package.yml"
+      - "plugin-source/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package-network:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Installer Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: gradle
+
+      - name: Installer Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.2.1"
+
+      - name: Compiler LarpersCoin
+        working-directory: plugin-source
+        run: gradle --no-daemon clean build
+
+      - name: Telecharger Paper, Velocity et plugins
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="package/LarpersCoin-Network"
+          mkdir -p "$ROOT/Velocity/plugins" "$ROOT/Lobby" "$ROOT/SMP/plugins"
+
+          paper_meta="$(curl -fsSL -H 'User-Agent: LarpersCoin-Packager/1.0' "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds?channel=STABLE&limit=1")"
+          paper_url="$(echo "$paper_meta" | jq -r '.[0].downloads["server:default"].url // empty')"
+          test -n "$paper_url"
+          curl -fL "$paper_url" -o "$ROOT/Lobby/paper.jar"
+          cp "$ROOT/Lobby/paper.jar" "$ROOT/SMP/paper.jar"
+
+          velocity_versions="$(curl -fsSL -H 'User-Agent: LarpersCoin-Packager/1.0' "https://fill.papermc.io/v3/projects/velocity")"
+          velocity_version="$(echo "$velocity_versions" | jq -r '.versions | last // empty')"
+          test -n "$velocity_version"
+          velocity_meta="$(curl -fsSL -H 'User-Agent: LarpersCoin-Packager/1.0' "https://fill.papermc.io/v3/projects/velocity/versions/$velocity_version/builds?channel=STABLE&limit=1")"
+          velocity_url="$(echo "$velocity_meta" | jq -r '.[0].downloads["server:default"].url // empty')"
+          test -n "$velocity_url"
+          curl -fL "$velocity_url" -o "$ROOT/Velocity/velocity.jar"
+
+          lp_meta="$(curl -fsSL https://metadata.luckperms.net/data/downloads)"
+          lp_url="$(echo "$lp_meta" | jq -r '.downloads.bukkit // empty')"
+          test -n "$lp_url"
+          curl -fL "$lp_url" -o "$ROOT/SMP/plugins/LuckPerms.jar"
+
+          plugin_jar="$(find plugin-source/build/libs -maxdepth 1 -type f -name 'LarpersCoin-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
+          test -n "$plugin_jar"
+          cp "$plugin_jar" "$ROOT/SMP/plugins/LarpersCoin.jar"
+
+          curl -fL "https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/velocity" -o "$ROOT/Velocity/plugins/Geyser-Velocity.jar"
+          curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/velocity" -o "$ROOT/Velocity/plugins/floodgate-velocity.jar"
+          test -s "$ROOT/Velocity/plugins/Geyser-Velocity.jar"
+          test -s "$ROOT/Velocity/plugins/floodgate-velocity.jar"
+
+      - name: Configurer Velocity, lobby et SMP
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="package/LarpersCoin-Network"
+          SECRET="$(openssl rand -hex 32)"
+          printf '%s' "$SECRET" > "$ROOT/Velocity/forwarding.secret"
+
+          cat > "$ROOT/Velocity/velocity.toml" <<EOF
+          config-version = "2.7"
+          bind = "0.0.0.0:25565"
+          motd = "<gold>Larpers Coin Network</gold>"
+          show-max-players = 100
+          online-mode = true
+          force-key-authentication = true
+          player-info-forwarding-mode = "modern"
+          forwarding-secret-file = "forwarding.secret"
+          announce-forge = false
+          kick-existing-players = false
+          ping-passthrough = "DISABLED"
+          sample-players-in-ping = false
+          enable-player-address-logging = true
+
+          [servers]
+          lobby = "127.0.0.1:25566"
+          smp = "127.0.0.1:25567"
+          try = ["lobby"]
+
+          [forced-hosts]
+
+          [advanced]
+          compression-threshold = 256
+          compression-level = -1
+          login-ratelimit = 3000
+          connection-timeout = 5000
+          read-timeout = 30000
+          haproxy-protocol = false
+          tcp-fast-open = false
+          bungee-plugin-message-channel = true
+          show-ping-requests = false
+          failover-on-unexpected-server-disconnect = true
+          announce-proxy-commands = true
+          log-command-executions = false
+          log-player-connections = true
+          accepts-transfers = false
+          enable-reuse-port = false
+
+          [query]
+          enabled = false
+          port = 25565
+          map = "Velocity"
+          show-plugins = false
+          EOF
+
+          for SERVER in Lobby SMP; do
+            PORT=25566
+            if [ "$SERVER" = "SMP" ]; then PORT=25567; fi
+            cat > "$ROOT/$SERVER/eula.txt" <<'EOF'
+          # Lis https://aka.ms/MinecraftEULA. Mets eula=true uniquement si tu acceptes.
+          eula=false
+          EOF
+            cat > "$ROOT/$SERVER/server.properties" <<EOF
+          enable-jmx-monitoring=false
+          enable-query=false
+          enable-rcon=false
+          level-name=world
+          gamemode=survival
+          difficulty=normal
+          hardcore=false
+          max-players=100
+          online-mode=false
+          enforce-secure-profile=false
+          pvp=false
+          server-port=$PORT
+          server-ip=127.0.0.1
+          motd=Larpers Coin $SERVER
+          view-distance=8
+          simulation-distance=6
+          spawn-protection=0
+          allow-flight=true
+          white-list=false
+          EOF
+            mkdir -p "$ROOT/$SERVER/config"
+            cat > "$ROOT/$SERVER/config/paper-global.yml" <<EOF
+          _version: 31
+          proxies:
+            velocity:
+              enabled: true
+              online-mode: true
+              secret: "$SECRET"
+          EOF
+          done
+
+          cat > "$ROOT/SMP/plugins/LarpersCoin/config.yml" <<'EOF'
+          auth:
+            proxy-authenticated: true
+          anticheat:
+            enabled: true
+            auto-punish:
+              enabled: true
+              thresholds:
+                kick: 12
+                ban-1d: 24
+                ban-7d: 36
+                ban-30d: 48
+          EOF
+
+          cat > "$ROOT/START-NETWORK.bat" <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          where java >nul 2>nul
+          if errorlevel 1 (echo Java 25 est requis.& pause & exit /b 1)
+          for %%S in (Lobby SMP) do (
+            findstr /i /c:"eula=true" "%%S\eula.txt" >nul
+            if errorlevel 1 (
+              echo Accepte l'EULA dans %%S\eula.txt avant le demarrage.
+              pause
+              exit /b 1
+            )
+          )
+          start "Larpers Lobby" cmd /k "cd /d ""%~dp0Lobby"" && java -Xms512M -Xmx1G -jar paper.jar --nogui"
+          timeout /t 8 /nobreak >nul
+          start "Larpers SMP" cmd /k "cd /d ""%~dp0SMP"" && java -Xms1G -Xmx4G -jar paper.jar --nogui"
+          timeout /t 8 /nobreak >nul
+          start "Larpers Velocity" cmd /k "cd /d ""%~dp0Velocity"" && java -Xms512M -Xmx1G -jar velocity.jar"
+          echo Reseau demarre. Les joueurs se connectent sur le port Java 25565.
+          echo Bedrock: port UDP 19132 apres configuration Geyser.
+          pause
+          EOF
+
+          cat > "$ROOT/CONFIGURER-BEDROCK.bat" <<'EOF'
+          @echo off
+          cd /d "%~dp0Velocity"
+          if not exist "plugins\Geyser-Velocity\config.yml" (
+            echo Lance Velocity une fois, puis ferme-le avec CTRL+C.
+            pause
+            exit /b 1
+          )
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='plugins\Geyser-Velocity\config.yml'; $s=Get-Content -Raw $p; $s=[regex]::Replace($s,'(?m)^(\s*auth-type\s*:\s*)[^\r\n]+','$1floodgate'); Set-Content -Path $p -Value $s -Encoding utf8"
+          echo Geyser doit utiliser auth-type: floodgate. Verifie aussi le port 19132 UDP.
+          pause
+          EOF
+
+          cat > "$ROOT/LISEZ-MOI.txt" <<'EOF'
+          LARPERS COIN - RESEAU COMPLET
+          =============================
+          Contenu:
+          - Velocity proxy: port public Java 25565
+          - Lobby Paper separe: 127.0.0.1:25566 (monde vide)
+          - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
+          - Geyser + Floodgate installes sur Velocity pour Bedrock
+          - Java premium authentifie par Velocity (aucun /login ni /register)
+          - Bedrock authentifie par Floodgate (aucun mot de passe LPC)
+          - Backend Paper lie a Velocity avec forwarding moderne et secret prive
+
+          INSTALLATION:
+          1. Installer Java 25.
+          2. Lire https://aka.ms/MinecraftEULA et accepter l'EULA dans Lobby/eula.txt et SMP/eula.txt.
+          3. Lancer START-NETWORK.bat.
+          4. Au premier demarrage, arreter les trois processus proprement (commande stop dans chaque console).
+          5. Lancer Velocity une fois pour generer les fichiers Geyser/Floodgate, puis CONFIGURER-BEDROCK.bat.
+          6. Redemarrer avec START-NETWORK.bat.
+          7. Ouvrir/rediriger TCP 25565 (Java) et UDP 19132 (Bedrock) vers le PC.
+          8. Les ports 25566 et 25567 restent locaux: ne pas les exposer sur Internet.
+          9. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
+
+          IMPORTANT:
+          - Seuls les comptes Java premium sont acceptes par le proxy en online-mode.
+          - Bedrock passe par Floodgate.
+          - Les comptes Java non premium/crack ne sont pas acceptes dans cette configuration.
+          - Ne change pas online-mode du proxy et ne rends jamais les ports backend publics.
+          - Le plugin anticheat utilise des seuils de sanctions progressives configurables; ajuste-les apres tests.
+          - Les mondes et donnees existants ne sont pas inclus: ce ZIP est un paquet serveur propre.
+          - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
+          EOF
+
+      - name: Creer le ZIP reseau
+        run: |
+          cd package
+          zip -qr ../LarpersCoin-Network.zip LarpersCoin-Network
+
+      - name: Publier le ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: LarpersCoin-Network
+          path: LarpersCoin-Network.zip
+          if-no-files-found: error
+          retention-days: 90
