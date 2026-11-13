@@ -87,6 +87,12 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             getServer().getScheduler().runTaskLater(this,()->finishLottery(true),Math.max(1L,remaining/50L));
         }
         getServer().getScheduler().runTaskTimer(this,this::updatePlayerTags,40L,40L);
+        getServer().getScheduler().runTaskLater(this, () -> {
+            org.bukkit.World lobby = Bukkit.getWorld("world");
+            if (lobby != null && getConfig().getBoolean("network.auth-only", false)) {
+                lobby.setSpawnLocation(8, 81, 8);
+            }
+        }, 1L);
         getLogger().info("LarpersCoin 1.0.3 actif. Aucun claim ni protection de parcelle n'est enregistré.");
     }
 
