@@ -213,15 +213,15 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private boolean quests(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
         if(a.length>0&&a[0].equalsIgnoreCase("claim")) {
-            long now=System.currentTimeMillis(), prev=questClaims.getOrDefault(p.getUniqueId(),0L);
+            long now=System.currentTimeMillis(), prev=db.getLong("quest-daily."+id(p),0L);
             if(now-prev<86_400_000L){msg(p,"Récompense déjà réclamée aujourd'hui.");return true;}
-            questClaims.put(p.getUniqueId(),now);give(p,150);save();msg(p,"Quête quotidienne validée: +150 LPC. (Les objectifs détaillés seront suivis en jeu dans une prochaine version.)");return true;
+            db.set("quest-daily."+id(p),now);give(p,150);save();msg(p,"Quête quotidienne validée: +150 LPC. (Les objectifs détaillés seront suivis en jeu dans une prochaine version.)");return true;
         }
         msg(p,"Quêtes quotidiennes et hebdomadaires: /quests claim — récompense quotidienne 150 LPC; reset 24 h.");msg(p,"Les objectifs de récolte/combats et le suivi hebdomadaire ne sont pas encore activés.");return true;
     }
     private boolean quiz(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
-        long now=System.currentTimeMillis();if(now-lastQuiz.getOrDefault(p.getUniqueId(),0L)<60_000L){msg(p,"Attends une minute avant un autre quiz.");return true;}
+        long now=System.currentTimeMillis();if(a.length==0&&now-lastQuiz.getOrDefault(p.getUniqueId(),0L)<60_000L){msg(p,"Attends une minute avant un autre quiz.");return true;}
         String[] q={"Quel minerai permet de fabriquer une boussole?","Combien de côtés possède un bloc standard?","Quel mob explose près du joueur?"};
         String[] answers={"fer","6","creeper"};int n=new Random().nextInt(q.length);
         if(a.length==0){msg(p,"Quiz Minecraft: "+q[n]);msg(p,"Réponds avec /quiz <réponse>.");db.set("quiz."+id(p)+".answer",answers[n]);db.set("quiz."+id(p)+".time",now);save();lastQuiz.put(p.getUniqueId(),now);return true;}
@@ -260,7 +260,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         Player p=player(s);if(p==null)return true;
         if(a.length!=1){msg(p,"Usage: /trade <joueur> — demande d'échange (confirmation des deux joueurs requise).");return true;}
         Player t=Bukkit.getPlayerExact(a[0]);if(t==null||t.equals(p)){msg(p,"Joueur invalide.");return true;}
-        tradeInvites.put(t.getUniqueId(),p.getUniqueId());msg(t,p.getName()+" souhaite échanger. Accepte avec /trade "+p.getName());msg(p,"Demande envoyée. Le transfert d'objets sécurisé n'est pas encore activé.");return true;
+        tradeInvites.put(t.getUniqueId(),p.getUniqueId());msg(t,p.getName()+" souhaite échanger. Réponds avec /trade "+p.getName()+" pour indiquer ton intérêt.");msg(p,"Demande envoyée. Le transfert sécurisé n'est pas encore disponible dans cette version.");return true;
     }
 
     @EventHandler public void onMove(PlayerMoveEvent e) {
