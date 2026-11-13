@@ -710,7 +710,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 case 14 -> {p.closeInventory();p.performCommand("lottery draw");}
                 case 16 -> {p.closeInventory();p.performCommand("baltop");}
                 default -> { }
-            } else if(page==2&&slot==10) openPlayerSelector(p,"op/deop")
+            } else if(page==2&&slot==10) openPlayerSelector(p,"op/deop");
             return;
         }
         if(title.equals("LPC | Sélection invsee")||title.equals("LPC | Sélection freeze")||title.equals("LPC | Sélection op/deop")) {
