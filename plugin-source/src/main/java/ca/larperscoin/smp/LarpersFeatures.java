@@ -118,8 +118,18 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     private void openQuestMenu(Player p) {
         Inventory inv=Bukkit.createInventory(null,27,"LPC | Quêtes");
-        inv.setItem(11,item(Material.CLOCK,"Quête quotidienne","Récompense: 150 LPC","/quests claim"));
-        inv.setItem(15,item(Material.DIAMOND,"Quête hebdomadaire","Récompense: 800 LPC","/quests weekly claim"));
+        inv.setItem(11,item(Material.CLOCK,"Quête quotidienne",
+            "Blocs: "+db.getInt(questPath(false,p,"blocks"),0)+"/20",
+            "Cultures: "+db.getInt(questPath(false,p,"crops"),0)+"/10",
+            "Combats: "+db.getInt(questPath(false,p,"kills"),0)+"/5",
+            "Pêche: "+db.getInt(questPath(false,p,"fish"),0)+"/3",
+            "Récompense: 150 LPC","Clique pour réclamer"));
+        inv.setItem(15,item(Material.DIAMOND,"Quête hebdomadaire",
+            "Blocs: "+db.getInt(questPath(true,p,"blocks"),0)+"/100",
+            "Cultures: "+db.getInt(questPath(true,p,"crops"),0)+"/50",
+            "Combats: "+db.getInt(questPath(true,p,"kills"),0)+"/25",
+            "Pêche: "+db.getInt(questPath(true,p,"fish"),0)+"/15",
+            "Récompense: 800 LPC","Clique pour réclamer"));
         inv.setItem(22,item(Material.BARRIER,"Fermer"));
         p.openInventory(inv);
     }
