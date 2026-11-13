@@ -54,6 +54,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<UUID, Integer> adminPage = new HashMap<>();
     private final Map<UUID, Integer> ahPage = new HashMap<>();
     private final Map<UUID, Map<Integer, String>> ahSlots = new HashMap<>();
+    private final Map<UUID, String> ahSearch = new HashMap<>();
+    private final Set<UUID> awaitingAhSearch = new HashSet<>();
+    private final Map<UUID, UUID> pendingBountyTarget = new HashMap<>();
     private final Map<UUID, UUID> pendingOpTarget = new HashMap<>();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
     private static final Map<String, Material> SHOP = new LinkedHashMap<>();
@@ -203,6 +206,16 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         List<String> keys=new ArrayList<>();
         var section=db.getConfigurationSection("ah");
         if(section!=null) keys.addAll(section.getKeys(false));
+        String query=ahSearch.getOrDefault(p.getUniqueId(),"").toLowerCase(Locale.ROOT).trim();
+        if(!query.isEmpty()) keys.removeIf(k -> {
+            String path="ah."+k;
+            ItemStack stack=db.getItemStack(path+".stack");
+            String seller=db.getString(path+".seller","");
+            String material=stack==null?"":stack.getType().name();
+            String display=stack!=null&&stack.hasItemMeta()&&stack.getItemMeta().hasDisplayName()?ChatColor.stripColor(stack.getItemMeta().getDisplayName()):"";
+            return !(k.toLowerCase(Locale.ROOT).contains(query)||seller.toLowerCase(Locale.ROOT).contains(query)
+                ||material.toLowerCase(Locale.ROOT).contains(query)||display.toLowerCase(Locale.ROOT).contains(query));
+        });
         keys.sort(Comparator.comparingLong(k->db.getLong("ah."+k+".created",0L)));
         Collections.reverse(keys);
         int maxPage=Math.max(0,(keys.size()-1)/45);
@@ -228,11 +241,42 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
         ahSlots.put(p.getUniqueId(),slots);
         inv.setItem(45,item(Material.EMERALD,"Vendre l'objet en main","Clique puis choisis un prix"));
+        inv.setItem(46,item(Material.COMPASS,"Rechercher","Clique puis écris un objet ou un vendeur dans le chat","Recherche actuelle: "+(query.isEmpty()?"aucune":query)));
+        inv.setItem(47,item(Material.MILK_BUCKET,"Effacer la recherche","Retirer le filtre actuel"));
         if(page>0)inv.setItem(48,item(Material.ARROW,"Page précédente"));
         inv.setItem(49,item(Material.BARRIER,"Fermer"));
         if(page<maxPage)inv.setItem(50,item(Material.ARROW,"Page suivante"));
         inv.setItem(53,item(Material.SUNFLOWER,"Actualiser",keys.size()+" annonce(s)"));
         p.openInventory(inv);
+    }
+    public void openBountyMenu(CommandSender sender) {
+        Player viewer=player(sender);
+        if(viewer==null)return;
+        Inventory inv=Bukkit.createInventory(null,54,"LPC | Primes");
+        List<Map.Entry<UUID,Double>> entries=core.bountyLeaderboard().entrySet().stream()
+            .sorted(Map.Entry.<UUID,Double>comparingByValue().reversed()).toList();
+        int slot=0;
+        for(Map.Entry<UUID,Double> entry:entries) {
+            if(slot>=45)break;
+            OfflinePlayer target=Bukkit.getOfflinePlayer(entry.getKey());
+            String name=target.getName()==null?entry.getKey().toString().substring(0,8):target.getName();
+            inv.setItem(slot++,item(Material.GOLD_INGOT,name,"Prime active: "+entry.getValue()+" LPC",target.isOnline()?"En ligne":"Hors ligne"));
+        }
+        if(entries.isEmpty())inv.setItem(22,item(Material.PAPER,"Aucune prime active","Place une prime sur un joueur en ligne."));
+        inv.setItem(45,item(Material.TARGET,"Placer une prime","Choisir un joueur en ligne"));
+        inv.setItem(49,item(Material.BARRIER,"Fermer"));
+        inv.setItem(53,item(Material.SUNFLOWER,"Actualiser",entries.size()+" prime(s) active(s)"));
+        viewer.openInventory(inv);
+    }
+    private void openBountyTargets(Player viewer) {
+        Inventory inv=Bukkit.createInventory(null,54,"LPC | Choisir une cible");
+        int slot=0;
+        for(Player target:Bukkit.getOnlinePlayers()) {
+            if(target.equals(viewer)||slot>=45)continue;
+            inv.setItem(slot++,item(Material.PLAYER_HEAD,target.getName(),"Prime actuelle: "+core.bountyAmount(target.getUniqueId())+" LPC","Clique pour choisir"));
+        }
+        inv.setItem(49,item(Material.ARROW,"Retour aux primes"));
+        viewer.openInventory(inv);
     }
     private void openAuctionSell(Player p) {
         Inventory inv=Bukkit.createInventory(null,27,"LPC | Prix de vente");
@@ -658,6 +702,12 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private boolean auction(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
         if(a.length==0||a[0].equalsIgnoreCase("list")) { openAuction(p,0);return true; }
+        if(a[0].equalsIgnoreCase("search")) {
+            if(a.length<2){msg(p,"Usage: /ah search <objet|vendeur> ou /ah search clear");return true;}
+            if(a[1].equalsIgnoreCase("clear"))ahSearch.remove(p.getUniqueId());
+            else ahSearch.put(p.getUniqueId(),String.join(" ",Arrays.copyOfRange(a,1,a.length)));
+            openAuction(p,0);return true;
+        }
         if(a[0].equalsIgnoreCase("sell")) {
             if(a.length!=2){msg(p,"Usage: /ah sell <prix>");return true;}
             double price=Double.parseDouble(a[1]);ItemStack hand=p.getInventory().getItemInMainHand();
@@ -739,6 +789,28 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             msg(target,"Ton statut OP a été "+(target.isOp()?"activé":"retiré")+" par le staff.");
             plugin.getLogger().warning(staffPlayer.getName()+" a "+(target.isOp()?"donné":"retiré")+" OP à "+target.getName()+".");
         }
+        if(title.equals("LPC | Primes")) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player viewer))return;
+            int slot=e.getRawSlot();
+            if(slot==49){viewer.closeInventory();return;}
+            if(slot==45){openBountyTargets(viewer);return;}
+            if(slot==53){openBountyMenu(viewer);return;}
+            return;
+        }
+        if(title.equals("LPC | Choisir une cible")) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player viewer))return;
+            if(e.getRawSlot()==49){openBountyMenu(viewer);return;}
+            if(e.getRawSlot()<0||e.getRawSlot()>=45||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta())return;
+            String targetName=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName());
+            Player target=Bukkit.getPlayerExact(targetName);
+            if(target==null){msg(viewer,"Cette cible n'est plus en ligne.");openBountyTargets(viewer);return;}
+            pendingBountyTarget.put(viewer.getUniqueId(),target.getUniqueId());
+            viewer.closeInventory();
+            msg(viewer,"Écris dans le chat le montant de la prime pour "+target.getName()+" (ou 'annuler').");
+            return;
+        }
         if(title.equals("LPC | Hôtel des ventes")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player buyer))return;
@@ -763,6 +835,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 return;
             }
             if(slot==45){openAuctionSell(buyer);return;}
+            if(slot==46){awaitingAhSearch.add(buyer.getUniqueId());buyer.closeInventory();msg(buyer,"Écris un objet, un vendeur ou un nom d'annonce dans le chat (ou 'annuler').");return;}
+            if(slot==47){ahSearch.remove(buyer.getUniqueId());openAuction(buyer,0);return;}
             if(slot==48){openAuction(buyer,ahPage.getOrDefault(buyer.getUniqueId(),0)-1);return;}
             if(slot==49){buyer.closeInventory();return;}
             if(slot==50){openAuction(buyer,ahPage.getOrDefault(buyer.getUniqueId(),0)+1);return;}
@@ -838,10 +912,39 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
         clanChestUsers.remove(clan);save();
     }
-    @EventHandler public void onQuit(PlayerQuitEvent e) { frozen.remove(e.getPlayer().getUniqueId()); }
+    @EventHandler public void onQuit(PlayerQuitEvent e) {
+        UUID id=e.getPlayer().getUniqueId();
+        frozen.remove(id);awaitingAhSearch.remove(id);pendingBountyTarget.remove(id);
+    }
+    @EventHandler public void onChatSearch(org.bukkit.event.player.AsyncPlayerChatEvent e) {
+        Player sender=e.getPlayer();
+        UUID senderId=sender.getUniqueId();
+        if(awaitingAhSearch.remove(senderId)) {
+            e.setCancelled(true);
+            String query=e.getMessage().trim();
+            Bukkit.getScheduler().runTask(plugin,()->{
+                if(query.equalsIgnoreCase("annuler")){msg(sender,"Recherche annulée.");return;}
+                ahSearch.put(senderId,query);openAuction(sender,0);
+            });
+            return;
+        }
+        UUID targetId=pendingBountyTarget.remove(senderId);
+        if(targetId!=null) {
+            e.setCancelled(true);
+            String amount=e.getMessage().trim();
+            Bukkit.getScheduler().runTask(plugin,()->{
+                if(amount.equalsIgnoreCase("annuler")){msg(sender,"Placement de prime annulé.");openBountyMenu(sender);return;}
+                Player target=Bukkit.getPlayer(targetId);
+                if(target==null){msg(sender,"La cible s'est déconnectée; recommence.");openBountyMenu(sender);return;}
+                sender.performCommand("bounty "+target.getName()+" "+amount);
+                openBountyMenu(sender);
+            });
+        }
+    }
     @Override public List<String> onTabComplete(CommandSender s,Command c,String alias,String[] a) {
         if(c.getName().equalsIgnoreCase("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","audit","stats","leaderboard");
-        if(c.getName().equalsIgnoreCase("ah")&&a.length==1)return List.of("list","sell","buy");
+        if(c.getName().equalsIgnoreCase("ah")&&a.length==1)return List.of("list","search","sell","buy");
+        if(c.getName().equalsIgnoreCase("ah")&&a.length==2&&a[0].equalsIgnoreCase("search"))return List.of("clear");
         if(c.getName().equalsIgnoreCase("shop")&&a.length==1)return List.of("search","buy");
         if(c.getName().equalsIgnoreCase("quiz")&&a.length==1)return List.of("top");
         return List.of();
