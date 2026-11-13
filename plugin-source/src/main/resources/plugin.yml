@@ -63,7 +63,7 @@ commands:
     description: Hôtel des ventes
     usage: /ah <list|sell|buy>
   ac:
-    description: Outils anti-triche LPC (modérateurs: lecture, admins: gestion)
+    description: "Outils anti-triche LPC (modérateurs: lecture, admins: gestion)"
     usage: /ac <status|alerts|info|top|log|reset|reload>
   trade:
     description: Échange sécurisé avec double confirmation
