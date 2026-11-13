@@ -15,6 +15,14 @@ import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.ArrayList;
@@ -59,10 +67,20 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     }
 
     void saveData() {
+        Path target=dataFile.toPath();
+        Path temporary=target.resolveSibling(target.getFileName()+".tmp");
         try {
-            data.save(dataFile);
-        } catch (IOException ex) {
-            getLogger().severe("Échec de sauvegarde de data.yml: " + ex.getMessage());
+            byte[] bytes=data.saveToString().getBytes(StandardCharsets.UTF_8);
+            try(FileChannel channel=FileChannel.open(temporary,StandardOpenOption.CREATE,StandardOpenOption.TRUNCATE_EXISTING,StandardOpenOption.WRITE)) {
+                ByteBuffer buffer=ByteBuffer.wrap(bytes);
+                while(buffer.hasRemaining())channel.write(buffer);
+                channel.force(true);
+            }
+            try { Files.move(temporary,target,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING); }
+            catch(AtomicMoveNotSupportedException ex) { Files.move(temporary,target,StandardCopyOption.REPLACE_EXISTING); }
+        } catch(IOException ex) {
+            getLogger().severe("Échec de sauvegarde atomique de data.yml: "+ex.getMessage());
+            try { Files.deleteIfExists(temporary); } catch(IOException ignored) { }
         }
     }
 
