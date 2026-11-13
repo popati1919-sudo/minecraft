@@ -238,6 +238,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     }
                     data.set("bounties." + targetId, nextBounty);
                     saveData();
+                    recordTransaction("BOUNTY_PLACE", player.getUniqueId(), target.getUniqueId(), amount);
                     Bukkit.broadcastMessage(ChatColor.GOLD + "[LPC] " + player.getName() + " place une prime de " + format(amount) + " sur " + target.getName() + " !");
                     return true;
                 }
@@ -256,16 +257,31 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         reply(sender, "Montant invalide.");
                         return true;
                     }
+                    double oldBalance = balance(target.getUniqueId());
+                    double recordedAmount = amount;
+                    UUID systemAccount = new UUID(0L,0L);
                     switch (args[0].toLowerCase(Locale.ROOT)) {
                         case "give" -> credit(target.getUniqueId(), amount);
-                        case "take" -> data.set("balances." + key(target.getUniqueId()), Math.max(0.0, balance(target.getUniqueId()) - amount));
-                        case "set" -> data.set("balances." + key(target.getUniqueId()), amount);
+                        case "take" -> {
+                            recordedAmount = Math.min(oldBalance, amount);
+                            data.set("balances." + key(target.getUniqueId()), oldBalance - recordedAmount);
+                        }
+                        case "set" -> {
+                            recordedAmount = Math.abs(amount - oldBalance);
+                            data.set("balances." + key(target.getUniqueId()), amount);
+                        }
                         default -> {
                             reply(sender, "Action invalide : give, take ou set.");
                             return true;
                         }
                     }
                     saveData();
+                    if (recordedAmount > 0) {
+                        String action = args[0].toUpperCase(Locale.ROOT);
+                        if (action.equals("TAKE") || action.equals("SET") && amount < oldBalance)
+                            recordTransaction("ECO_" + action, target.getUniqueId(), systemAccount, recordedAmount);
+                        else recordTransaction("ECO_" + action, systemAccount, target.getUniqueId(), recordedAmount);
+                    }
                     reply(sender, "Solde de " + args[1] + " : " + format(balance(target.getUniqueId())));
                     return true;
                 }
@@ -293,6 +309,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         data.set("lottery.tickets", tickets);
                         data.set("lottery.pot", data.getDouble("lottery.pot", 0.0) + cost);
                         saveData();
+                        recordTransaction("LOTTERY_BUY", player.getUniqueId(), new UUID(0L,0L), cost);
                         reply(sender, "Tickets achetés : " + count + ". Jackpot : " + format(data.getDouble("lottery.pot")));
                         return true;
                     }
@@ -332,6 +349,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         data.set("lottery.tickets", new ArrayList<String>());
         data.set("lottery.pot", 0.0);
         saveData();
+        recordTransaction("LOTTERY_WIN", new UUID(0L,0L), winnerUuid, jackpot);
         OfflinePlayer winner = Bukkit.getOfflinePlayer(UUID.fromString(winnerId));
         Bukkit.broadcastMessage(ChatColor.GOLD + "[LPC] " + (winner.getName() == null ? "Un joueur" : winner.getName()) + " remporte la loterie : " + format(jackpot) + " !");
     }
@@ -350,6 +368,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         data.set("bounties." + victimId, 0.0);
         credit(killer.getUniqueId(), bounty);
         saveData();
+        recordTransaction("BOUNTY_WIN", new UUID(0L,0L), killer.getUniqueId(), bounty);
         Bukkit.broadcastMessage(ChatColor.GOLD + "[LPC] " + killer.getName() + " a récupéré la prime de " + format(bounty) + " sur " + event.getEntity().getName() + " !");
     }
 
