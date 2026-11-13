@@ -10,6 +10,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -57,9 +59,13 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         getServer().getPluginManager().registerEvents(this, this);
         features = new LarpersFeatures(this);
         antiCheat = new LarpersAntiCheat(this);
-        long week = 20L * 60L * 60L * 24L * 7L;
-        getServer().getScheduler().runTaskTimer(this, this::drawLottery, week, week);
-        getLogger().info("LarpersCoin 1.0.2 actif. Aucun claim ni protection de parcelle n'est enregistré.");
+        long lotteryEnd=data.getLong("lottery.ends-at",0L);
+        if(data.getBoolean("lottery.active",false)) {
+            long remaining=Math.max(1L,lotteryEnd-System.currentTimeMillis());
+            getServer().getScheduler().runTaskLater(this,()->finishLottery(true),Math.max(1L,remaining/50L));
+        }
+        getServer().getScheduler().runTaskTimer(this,this::updatePlayerTags,40L,40L);
+        getLogger().info("LarpersCoin 1.0.3 actif. Aucun claim ni protection de parcelle n'est enregistré.");
     }
 
     @Override
@@ -381,45 +387,36 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     return true;
                 }
                 case "lottery" -> {
-                    if (args.length == 0 || args[0].equalsIgnoreCase("pot")) {
-                        reply(sender, "Jackpot actuel : " + format(data.getDouble("lottery.pot", 0.0)));
-                        reply(sender, "Un ticket coûte 25 LPC. /lottery buy [1-10]");
+                    if(args.length==0||args[0].equalsIgnoreCase("menu")||args[0].equalsIgnoreCase("pot")) {
+                        Player viewer=requirePlayer(sender);if(viewer!=null)features.openLotteryMenu(viewer);return true;
+                    }
+                    if(args[0].equalsIgnoreCase("buy")) {
+                        Player player=requirePlayer(sender);if(player==null)return true;
+                        if(!lotteryActive()){reply(sender,"Aucune loterie en cours. Attends l'annonce d'un administrateur.");return true;}
+                        int count=args.length>=2?Integer.parseInt(args[1]):1;
+                        if(count<1||count>10){reply(sender,"Tu peux acheter de 1 à 10 tickets.");return true;}
+                        double cost=count*25.0,nextPot=lotteryPot()+cost;
+                        if(!Double.isFinite(nextPot)){reply(sender,"Le jackpot dépasserait la limite numérique.");return true;}
+                        if(!debit(player.getUniqueId(),cost)){reply(sender,"Fonds insuffisants : "+format(cost)+".");return true;}
+                        List<String> tickets=data.getStringList("lottery.tickets");for(int i=0;i<count;i++)tickets.add(key(player.getUniqueId()));
+                        data.set("lottery.tickets",tickets);data.set("lottery.pot",nextPot);saveData();
+                        recordTransaction("LOTTERY_BUY",player.getUniqueId(),new UUID(0L,0L),cost);
+                        reply(sender,"Tickets achetés : "+count+". Jackpot : "+format(nextPot));
+                        Bukkit.broadcastMessage(ChatColor.LIGHT_PURPLE+"[LOTERIE] "+player.getName()+" vient d'acheter "+count+" ticket(s)!");
                         return true;
                     }
-                    if (args[0].equalsIgnoreCase("buy")) {
-                        Player player = requirePlayer(sender);
-                        if (player == null) return true;
-                        int count = args.length >= 2 ? Integer.parseInt(args[1]) : 1;
-                        if (count < 1 || count > 10) {
-                            reply(sender, "Tu peux acheter de 1 à 10 tickets.");
-                            return true;
-                        }
-                        double cost = count * 25.0;
-                        double nextPot = data.getDouble("lottery.pot",0.0) + cost;
-                        if (!Double.isFinite(nextPot)) {
-                            reply(sender, "Le jackpot dépasserait la limite numérique.");
-                            return true;
-                        }
-                        if (!debit(player.getUniqueId(), cost)) {
-                            reply(sender, "Fonds insuffisants : " + format(cost) + ".");
-                            return true;
-                        }
-                        List<String> tickets = data.getStringList("lottery.tickets");
-                        for (int i = 0; i < count; i++) tickets.add(key(player.getUniqueId()));
-                        data.set("lottery.tickets", tickets);
-                        data.set("lottery.pot", nextPot);
-                        saveData();
-                        recordTransaction("LOTTERY_BUY", player.getUniqueId(), new UUID(0L,0L), cost);
-                        reply(sender, "Tickets achetés : " + count + ". Jackpot : " + format(data.getDouble("lottery.pot")));
-                        return true;
+                    if(args[0].equalsIgnoreCase("start")) {
+                        if(!isLpcAdminSender(sender)){reply(sender,"Seuls les administrateurs peuvent démarrer une loterie.");return true;}
+                        int minutes=args.length>=2?Integer.parseInt(args[1]):10;
+                        if(minutes<1||minutes>1440){reply(sender,"Durée autorisée : 1 à 1440 minutes.");return true;}
+                        if(lotteryActive()){reply(sender,"Une loterie est déjà en cours.");return true;}
+                        startLottery(minutes,sender.getName());return true;
                     }
-                    if (args[0].equalsIgnoreCase("draw") && isStaff(sender)) {
-                        drawLottery();
-                        reply(sender, "Tirage effectué.");
-                        return true;
+                    if(args[0].equalsIgnoreCase("draw")||args[0].equalsIgnoreCase("stop")) {
+                        if(!isLpcAdminSender(sender)){reply(sender,"Seuls les administrateurs peuvent terminer une loterie.");return true;}
+                        finishLottery(false);reply(sender,"La loterie a été terminée.");return true;
                     }
-                    reply(sender, "Usage : /lottery buy [1-10] | pot | draw (staff)");
-                    return true;
+                    reply(sender,"Usage : /lottery [menu] | buy [1-10] | start [minutes] (admin) | draw (admin)");return true;
                 }
                 default -> {
                     return false;
@@ -433,6 +430,54 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             reply(sender, "Une erreur est survenue. Consulte la console.");
             return true;
         }
+    }
+
+    public double lotteryPot(){return Math.max(0.0,data.getDouble("lottery.pot",0.0));}
+    public int lotteryTicketCount(){return data.getStringList("lottery.tickets").size();}
+    public boolean lotteryActive(){return data.getBoolean("lottery.active",false);}
+    public long lotteryEndsAt(){return data.getLong("lottery.ends-at",0L);}
+    private boolean isLpcAdminSender(CommandSender sender){return sender.isOp()||sender.hasPermission("larpers.admin");}
+    public boolean isLpcAdmin(Player player){return isLpcAdminSender(player);}
+
+    private void startLottery(int minutes,String starter) {
+        long end=System.currentTimeMillis()+minutes*60_000L;
+        data.set("lottery.active",true);data.set("lottery.ends-at",end);saveData();
+        Bukkit.broadcastMessage(ChatColor.LIGHT_PURPLE+"§l✦ LOTERIE LARPERS COIN ✦");
+        Bukkit.broadcastMessage(ChatColor.YELLOW+"Une nouvelle loterie vient de commencer!");
+        Bukkit.broadcastMessage(ChatColor.GREEN+"Ticket: 25 LPC | Durée: "+minutes+" minute(s) | Jackpot: "+format(lotteryPot()));
+        Bukkit.broadcastMessage(ChatColor.AQUA+"Ouvre /lottery pour acheter tes tickets!");
+        Bukkit.broadcastMessage(ChatColor.GRAY+"Lancée par "+starter+".");
+        getServer().getScheduler().runTaskLater(this,()->finishLottery(true),minutes*60L*20L);
+    }
+    private void finishLottery(boolean automatic) {
+        if(!lotteryActive())return;
+        data.set("lottery.active",false);data.set("lottery.ends-at",0L);saveData();
+        List<String> tickets=data.getStringList("lottery.tickets");
+        if(tickets.isEmpty()) {
+            Bukkit.broadcastMessage(ChatColor.LIGHT_PURPLE+"[LOTERIE] Fin du tirage: aucun ticket vendu. Le jackpot est conservé.");
+            return;
+        }
+        drawLottery();
+    }
+    private String rankPrefix(Player p) {
+        if(isLpcAdmin(p))return ChatColor.RED+"[ADMIN] ";
+        if(p.hasPermission("larpers.staff")||p.hasPermission("larpers.anticheat.mod"))return ChatColor.GOLD+"[MOD] ";
+        if(p.hasPermission("larpers.vip"))return ChatColor.AQUA+"[VIP] ";
+        return ChatColor.GRAY+"[JOUEUR] ";
+    }
+    private void updatePlayerTags() {
+        for(Player p:Bukkit.getOnlinePlayers()) {
+            p.setPlayerListName(rankPrefix(p)+ChatColor.WHITE+p.getName());
+            if(lotteryActive())p.setPlayerListHeaderFooter(ChatColor.LIGHT_PURPLE+"✦ LOTERIE LPC EN COURS ✦",ChatColor.YELLOW+"/lottery • Jackpot: "+format(lotteryPot()));
+            else p.setPlayerListHeaderFooter(ChatColor.GOLD+"Larpers Coin SMP",ChatColor.GRAY+"Bonne chance et bon jeu!");
+        }
+    }
+    @EventHandler public void onPlayerJoin(PlayerJoinEvent e) {
+        Bukkit.getScheduler().runTask(this,()->updatePlayerTags());
+        e.getPlayer().sendMessage(ChatColor.GOLD+"Bienvenue sur Larpers Coin SMP!");
+    }
+    @EventHandler public void onPlayerChat(AsyncPlayerChatEvent e) {
+        e.setFormat(rankPrefix(e.getPlayer())+ChatColor.WHITE+"%1$s"+ChatColor.DARK_GRAY+" » "+ChatColor.RESET+"%2$s");
     }
 
     private void drawLottery() {
@@ -477,8 +522,9 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         if (command.getName().equalsIgnoreCase("eco") && args.length == 1 && sender.hasPermission("larpers.admin")) {
             return List.of("give", "take", "set").stream().filter(s -> s.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
         }
-        if (command.getName().equalsIgnoreCase("lottery") && args.length == 1) {
-            return List.of("buy", "pot", "draw").stream().filter(s -> s.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
+        if(command.getName().equalsIgnoreCase("lottery")&&args.length==1) {
+            List<String> choices=isLpcAdminSender(sender)?List.of("menu","buy","start","draw"):List.of("menu","buy");
+            return choices.stream().filter(s->s.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
         }
         return List.of();
     }
