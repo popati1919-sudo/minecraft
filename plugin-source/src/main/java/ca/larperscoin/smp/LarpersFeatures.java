@@ -55,8 +55,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<UUID, Integer> ahPage = new HashMap<>();
     private final Map<UUID, Map<Integer, String>> ahSlots = new HashMap<>();
     private final Map<UUID, String> ahSearch = new HashMap<>();
-    private final Set<UUID> awaitingAhSearch = new HashSet<>();
-    private final Map<UUID, UUID> pendingBountyTarget = new HashMap<>();
+    private final Set<UUID> awaitingAhSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Map<UUID, UUID> pendingBountyTarget = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<UUID, UUID> pendingOpTarget = new HashMap<>();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
     private static final Map<String, Material> SHOP = new LinkedHashMap<>();
