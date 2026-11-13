@@ -1,6 +1,6 @@
 # État du projet Larpers Coin SMP 26.3
 
-Dernière mise à jour: 2026-11-12 — version 0.9.0.
+Dernière mise à jour: 2026-11-13 — version 0.9.0.
 
 ## Implémenté dans le dépôt
 - [x] Économie LPC persistante: soldes, paiements, classement, daily, primes, commandes admin et historique des 10 dernières transactions par joueur.
@@ -13,7 +13,8 @@ Dernière mise à jour: 2026-11-12 — version 0.9.0.
 - [x] Quiz Minecraft à choix multiples avec GUI et récompense.
 - [x] Menus GUI pour clans, quêtes, boutique et quiz; outils staff avec raccourcis invsee, vanish, freeze et staffchat.
 - [x] Anti-triche initial: alertes staff pour vitesse anormale, vol/montée suspecte et portée de frappe; exemptions de téléportation/impulsion; compteurs de violations temporaires. Aucune sanction automatique.
-- [x] Workflow GitHub Actions et script de compilation Windows; compilation Paper 26.3 / Java 25 réussie sur le commit c081497fdb512fb0be74b798ab088c2638f3b5c5.
+- [x] Workflow GitHub Actions et script de compilation Windows.
+- [ ] Compilation CI de la version 0.9.0 après ajout de l'anti-triche: à confirmer; la dernière compilation confirmée concerne le code antérieur (commit c081497fdb512fb0be74b798ab088c2638f3b5c5).
 
 ## Limites restantes
 - [x] Boutique: GUI par catégories, navigation paginée, quantités par clic, prix configurables et contrôle de capacité d'inventaire. Stock illimité (pas de gestion de stock).
