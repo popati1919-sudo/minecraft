@@ -1,39 +1,57 @@
 # Larpers Coin SMP 26.3
 
-Plugin Paper SMP avec une économie unique **Larpers Coin (LPC)**.
+Plugin Paper pour le serveur **Larpers Coin SMP**, avec monnaie LPC et systèmes communautaires. Le dépôt contient le code source, les ressources, le script Windows et le workflow GitHub Actions.
 
-## Cible technique
-- Paper Minecraft 26.3
-- Java 25
-- Gradle 9.2.1
-- Bedrock visé via Geyser + Floodgate (tests de compatibilité à faire)
+## Cible
+- Minecraft Java avec Paper 26.3 / Java 25.
+- Compatibilité Bedrock prévue par **Geyser + Floodgate** installés séparément sur Paper; ce dépôt ne contient pas ces projets tiers.
+- Gradle 9.2.1.
+- Aucune protection de terrain, aucun claim, aucun système VIP. Les commandes vanilla et sélecteurs vanilla ne sont pas remplacés.
 
 ## Compilation Windows
 1. Installer un JDK 25.
-2. Télécharger ou cloner ce dépôt.
-3. Lancer `BUILD-PLUGIN.bat`.
-4. Le JAR compilé est copié dans `plugins/LarpersCoin.jar`.
-5. Le journal est enregistré dans `BUILD-PLUGIN.log`.
+2. Cloner ou télécharger ce dépôt.
+3. Exécuter `BUILD-PLUGIN.bat`.
+4. Le JAR est copié dans `plugins/LarpersCoin.jar`; le journal est dans `BUILD-PLUGIN.log`.
 
-## Compilation GitHub
-Ouvrir l'onglet **Actions**, lancer ou consulter **Build LarpersCoin**, puis télécharger l'artefact `LarpersCoin-Paper-26.3`.
+## Compilation automatique
+Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `LarpersCoin-Paper-26.3`.
 
-## Commandes du socle actuellement implémentées
-- `/balance [joueur]` — consulter son solde; consulter un autre joueur nécessite les permissions staff.
-- `/pay <joueur> <montant>` — transfert vers un joueur en ligne.
-- `/baltop` — classement des 10 plus grosses fortunes.
+## Commandes incluses
+
+### Économie
+- `/balance [joueur]` (`/bal`) — solde.
+- `/pay <joueur> <montant>` — paiement entre joueurs connectés.
+- `/baltop` — classement des fortunes.
 - `/daily` — récompense quotidienne avec série.
-- `/bounty <joueur> <montant>` — prime sur un joueur en ligne, payée au tueur.
-- `/lottery buy [1-10]`, `/lottery pot`, `/lottery draw` — tickets et jackpot.
-- `/eco give|take|set <joueur> <montant>` — administration (OP ou permission admin).
+- `/bounty <joueur> <montant>` — prime payée au joueur qui élimine la cible.
+- `/eco give|take|set <joueur> <montant>` — administration.
+- `/lottery buy [1-10]`, `/lottery pot`, `/lottery draw` — tickets, jackpot et tirage hebdomadaire.
 
-## Installation
-1. Installer le serveur Paper correspondant à la version ciblée.
-2. Compiler et placer `LarpersCoin.jar` dans le dossier `plugins/`.
-3. Démarrer le serveur et vérifier la console.
-4. Les données sont conservées dans `plugins/LarpersCoin/data.yml`.
+### Clans
+- `/clan create <nom>`, `/clan invite <joueur>`, `/clan join <nom>`, `/clan leave`.
+- `/clan info`, `/clan stats`, `/clan level`.
+- `/clan bank [deposit|withdraw <montant>]`.
+- `/clan allies [add|remove <clan>]`.
+- `/clan chest` — coffre partagé.
+- `/clan top`, `/clan leaderboard`.
 
-## Portée actuelle
-Le dépôt contient le premier socle économique. Les clans, les quêtes avancées, le quiz, l'hôtel des ventes, les menus graphiques et les outils de modération restent à développer. Consultez [docs/STATUS.md](docs/STATUS.md).
+### Activités et commerce
+- `/quests`, `/quests claim` — récompense quotidienne.
+- `/quiz`, puis `/quiz <réponse>` — question Minecraft et récompense.
+- `/shop search <objet>` — recherche dans le catalogue local.
+- `/ah list`, `/ah sell <prix>`, `/ah buy <id>` — hôtel des ventes persistant.
+- `/trade <joueur>` — demande d'échange; l'interface de transaction sécurisée n'est pas encore livrée.
 
-**Règles du projet :** aucun claim, aucune protection de terrain par parcelle, aucun VIP. Les commandes vanilla ne sont pas remplacées.
+### Modération
+- `/admin` — menu du staff.
+- `/vanish`, `/invsee <joueur>`, `/freeze <joueur>`, `/staffchat <message>`.
+- Accès contrôlé par `larpers.staff` et `larpers.admin` (OP par défaut).
+
+## Données
+Les soldes sont dans `plugins/LarpersCoin/data.yml`; clans, quêtes, quiz et hôtel des ventes sont dans `plugins/LarpersCoin/features.yml`.
+
+## État et limites à connaître
+Ce dépôt est une base de plugin en développement, pas encore un serveur SMP complet prêt pour la production. Les systèmes de clans ont les opérations de base, mais il reste à ajouter les niveaux/XP automatiques, les permissions/rôles de clan et les alliances bilatérales. Les quêtes affichent une récompense quotidienne, mais les objectifs automatiques quotidiens/hebdomadaires ne sont pas encore suivis. Le quiz contient un petit ensemble de questions. La recherche boutique interroge un catalogue de référence et ne réalise pas encore d'achats. Le menu staff est une interface de raccourcis. `/trade` n'effectue pas encore le transfert sécurisé. Les tests en serveur Paper réel et la validation Bedrock via Geyser/Floodgate restent nécessaires.
+
+Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions.
