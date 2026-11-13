@@ -76,6 +76,23 @@ jobs:
           test -s "$ROOT/Lobby/plugins/floodgate-paper.jar"
           test -s "$ROOT/SMP/plugins/floodgate-paper.jar"
 
+          # Dependances Paper requises par FastLoginPlus.
+          papi_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/placeholderapi/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
+          papi_url="$(echo "$papi_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
+          test -n "$papi_url"
+          curl -fL "$papi_url" -o "$ROOT/Lobby/plugins/PlaceholderAPI.jar"
+          cp "$ROOT/Lobby/plugins/PlaceholderAPI.jar" "$ROOT/SMP/plugins/PlaceholderAPI.jar"
+
+          protocollib_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/protocollib/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
+          protocollib_url="$(echo "$protocollib_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
+          test -n "$protocollib_url"
+          curl -fL "$protocollib_url" -o "$ROOT/Lobby/plugins/ProtocolLib.jar"
+          cp "$ROOT/Lobby/plugins/ProtocolLib.jar" "$ROOT/SMP/plugins/ProtocolLib.jar"
+          test -s "$ROOT/Lobby/plugins/PlaceholderAPI.jar"
+          test -s "$ROOT/SMP/plugins/PlaceholderAPI.jar"
+          test -s "$ROOT/Lobby/plugins/ProtocolLib.jar"
+          test -s "$ROOT/SMP/plugins/ProtocolLib.jar"
+
           # FastLoginPlus: verification premium sur Velocity et transmission du statut aux backends.
           flp_proxy_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/fastloginplus/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22velocity%22%5D')"
           flp_proxy_url="$(echo "$flp_proxy_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
@@ -149,8 +166,8 @@ jobs:
             PORT=25566
             if [ "$SERVER" = "SMP" ]; then PORT=25567; fi
             cat > "$ROOT/$SERVER/eula.txt" <<'EOF'
-          # Lis https://aka.ms/MinecraftEULA. Mets eula=true uniquement si tu acceptes.
-          eula=false
+          # EULA acceptee a la demande de l'administrateur. Conditions: https://aka.ms/MinecraftEULA
+          eula=true
           EOF
             cat > "$ROOT/$SERVER/server.properties" <<EOF
           enable-jmx-monitoring=false
