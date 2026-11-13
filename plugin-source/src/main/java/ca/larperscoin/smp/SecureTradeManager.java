@@ -221,6 +221,8 @@ public final class SecureTradeManager implements Listener {
         for (ItemStack item : s.a.items.values()) b.getInventory().addItem(item.clone());
         for (ItemStack item : s.b.items.values()) a.getInventory().addItem(item.clone());
         economy.saveData();
+        if (s.a.money > 0) economy.recordTransaction("TRADE",a.getUniqueId(),b.getUniqueId(),s.a.money);
+        if (s.b.money > 0) economy.recordTransaction("TRADE",b.getUniqueId(),a.getUniqueId(),s.b.money);
         clear(s);
         msg(a, "Échange terminé avec " + b.getName() + ".");
         msg(b, "Échange terminé avec " + a.getName() + ".");
