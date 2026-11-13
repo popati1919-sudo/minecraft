@@ -20,6 +20,14 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.time.LocalDate;
@@ -92,7 +100,20 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
 
     private void save() {
         for(var entry:clanChests.entrySet())db.set(clanPath(entry.getKey())+".chest",Arrays.asList(entry.getValue().getContents()));
-        try { db.save(file); } catch (IOException e) { plugin.getLogger().severe("features.yml: " + e.getMessage()); }
+        Path target=file.toPath(),temporary=target.resolveSibling(target.getFileName()+".tmp");
+        try {
+            byte[] bytes=db.saveToString().getBytes(StandardCharsets.UTF_8);
+            try(FileChannel channel=FileChannel.open(temporary,StandardOpenOption.CREATE,StandardOpenOption.TRUNCATE_EXISTING,StandardOpenOption.WRITE)) {
+                ByteBuffer buffer=ByteBuffer.wrap(bytes);
+                while(buffer.hasRemaining())channel.write(buffer);
+                channel.force(true);
+            }
+            try { Files.move(temporary,target,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING); }
+            catch(AtomicMoveNotSupportedException ex) { Files.move(temporary,target,StandardCopyOption.REPLACE_EXISTING); }
+        } catch(IOException ex) {
+            plugin.getLogger().severe("Échec de sauvegarde atomique de features.yml: "+ex.getMessage());
+            try { Files.deleteIfExists(temporary); } catch(IOException ignored) { }
+        }
     }
     private void seedQuizQuestion(String key,String question,String answer,List<String> choices) {
         String path="quiz-bank."+key;
