@@ -1,6 +1,7 @@
 name: LarpersCoin
 version: 1.0.4
 main: ca.larperscoin.smp.LarpersCoin
+load: STARTUP
 api-version: '26.3'
 author: Larpers Coin SMP
 description: "Plugin SMP LPC: économie, clans, quêtes, commerce, modération et anti-triche."
