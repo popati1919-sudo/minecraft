@@ -73,6 +73,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             String pricePath="shop.prices."+entry.getKey();
             if (!db.contains(pricePath)) db.set(pricePath,entry.getValue());
         }
+        seedQuizQuestion("compass","Quel minerai permet de fabriquer une boussole?","fer",List.of("fer","cuivre","or"));
+        seedQuizQuestion("faces","Combien de faces possède un bloc standard?","6",List.of("4","6","8"));
+        seedQuizQuestion("creeper","Quel mob explose près du joueur?","creeper",List.of("creeper","zombie","squelette"));
         save();
         for (String cmd : List.of("clan","quest","quests","quiz","shop","admin","vanish","invsee","freeze","staffchat","ah","trade")) {
             PluginCommand c = plugin.getCommand(cmd);
@@ -85,6 +88,14 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
 
     private void save() {
         try { db.save(file); } catch (IOException e) { plugin.getLogger().severe("features.yml: " + e.getMessage()); }
+    }
+    private void seedQuizQuestion(String key,String question,String answer,List<String> choices) {
+        String path="quiz-bank."+key;
+        if(!db.contains(path+".question")) {
+            db.set(path+".question",question);
+            db.set(path+".answer",answer);
+            db.set(path+".choices",choices);
+        }
     }
     public void shutdown() { save(); }
     private void msg(CommandSender s, String m) { s.sendMessage(PREFIX + m); }
@@ -403,30 +414,45 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private void openQuiz(Player p,String question,String[] choices) {
         Inventory inv=Bukkit.createInventory(null,27,"LPC | Quiz");
         inv.setItem(4,item(Material.BOOK,"Question",question,"Choisis une réponse ci-dessous."));
-        inv.setItem(11,item(Material.PAPER,choices[0],"Réponse A"));
-        inv.setItem(13,item(Material.PAPER,choices[1],"Réponse B"));
-        inv.setItem(15,item(Material.PAPER,choices[2],"Réponse C"));
+        int[] slots={11,13,15,17,20,22};
+        for(int i=0;i<Math.min(choices.length,slots.length);i++)inv.setItem(slots[i],item(Material.PAPER,choices[i],"Réponse "+(char)('A'+i)));
         p.openInventory(inv);
     }
     private boolean quiz(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
+        if(a.length>0&&a[0].equalsIgnoreCase("top")) {
+            var section=db.getConfigurationSection("quiz-scores");
+            if(section==null){msg(p,"Aucun score enregistré.");return true;}
+            List<String> ids=new ArrayList<>(section.getKeys(false));
+            ids.sort(Comparator.comparingInt((String x)->db.getInt("quiz-scores."+x)).reversed());
+            msg(p,"Classement du quiz Minecraft:");
+            for(int i=0;i<Math.min(10,ids.size());i++) {
+                OfflinePlayer who=Bukkit.getOfflinePlayer(UUID.fromString(ids.get(i)));
+                msg(p,(i+1)+". "+(who.getName()==null?ids.get(i):who.getName())+" — "+db.getInt("quiz-scores."+ids.get(i))+" points");
+            }
+            return true;
+        }
         long now=System.currentTimeMillis();
         long previous=db.getLong("quiz."+id(p)+".time",0L);
         if(a.length==0&&now-previous<60_000L){msg(p,"Attends une minute avant un autre quiz.");return true;}
-        String[] q={"Quel minerai permet de fabriquer une boussole?","Combien de faces possède un bloc standard?","Quel mob explose près du joueur?"};
-        String[] answers={"fer","6","creeper"};
-        String[][] choices={{"fer","cuivre","or"},{"4","6","8"},{"creeper","zombie","squelette"}};
+        var section=db.getConfigurationSection("quiz-bank");
+        if(section==null||section.getKeys(false).isEmpty()){msg(p,"La banque de questions est vide. Configure quiz-bank dans features.yml.");return true;}
+        List<String> keys=new ArrayList<>(section.getKeys(false));
         if(a.length==0) {
-            int n=new Random().nextInt(q.length);
-            db.set("quiz."+id(p)+".answer",answers[n]);db.set("quiz."+id(p)+".time",now);save();
-            openQuiz(p,q[n],choices[n]);return true;
+            String key=keys.get(new Random().nextInt(keys.size()));
+            String path="quiz-bank."+key;
+            String question=db.getString(path+".question","");
+            String answer=db.getString(path+".answer","");
+            List<String> choices=db.getStringList(path+".choices");
+            if(question.isBlank()||answer.isBlank()||choices.size()<2){msg(p,"Question mal configurée: "+key);return true;}
+            db.set("quiz."+id(p)+".answer",answer);
+            db.set("quiz."+id(p)+".time",now);
+            save();openQuiz(p,question,choices.toArray(String[]::new));return true;
         }
-        String expected=db.getString("quiz."+id(p)+".answer","");
-        if(expected.isEmpty()){msg(p,"Commence par /quiz.");return true;}
-        if(String.join(" ",a).equalsIgnoreCase(expected)){if(!Double.isFinite(core.balance(p.getUniqueId())+50)){msg(p,"Ton solde ne peut pas recevoir la récompense.");return true;}give(p,50);core.recordTransaction("QUIZ",new UUID(0L,0L),p.getUniqueId(),50);msg(p,"Bonne réponse! +50 LPC.");}
-        else msg(p,"Pas cette fois. Réponse: "+expected);
-        db.set("quiz."+id(p)+".answer",null);save();return true;
+        msg(p,"Utilise /quiz pour une question ou /quiz top pour le classement.");
+        return true;
     }
+
     private void openShop(Player p) {
         Inventory inv=Bukkit.createInventory(null,54,"LPC | Boutique");
         int slot=0;
