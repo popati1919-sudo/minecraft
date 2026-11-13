@@ -349,6 +349,11 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                             return true;
                         }
                         double cost = count * 25.0;
+                        double nextPot = data.getDouble("lottery.pot",0.0) + cost;
+                        if (!Double.isFinite(nextPot)) {
+                            reply(sender, "Le jackpot dépasserait la limite numérique.");
+                            return true;
+                        }
                         if (!debit(player.getUniqueId(), cost)) {
                             reply(sender, "Fonds insuffisants : " + format(cost) + ".");
                             return true;
@@ -356,7 +361,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         List<String> tickets = data.getStringList("lottery.tickets");
                         for (int i = 0; i < count; i++) tickets.add(key(player.getUniqueId()));
                         data.set("lottery.tickets", tickets);
-                        data.set("lottery.pot", data.getDouble("lottery.pot", 0.0) + cost);
+                        data.set("lottery.pot", nextPot);
                         saveData();
                         recordTransaction("LOTTERY_BUY", player.getUniqueId(), new UUID(0L,0L), cost);
                         reply(sender, "Tickets achetés : " + count + ". Jackpot : " + format(data.getDouble("lottery.pot")));
