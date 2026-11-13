@@ -15,6 +15,20 @@ Plugin Paper pour le serveur **Larpers Coin SMP**, avec monnaie LPC et systèmes
 3. Exécuter `BUILD-PLUGIN.bat`.
 4. Le JAR est copié dans `plugins/LarpersCoin.jar`; le journal est dans `BUILD-PLUGIN.log`.
 
+## Pack réseau prêt à générer (Velocity + Lobby + SMP)
+
+Le workflow **Package reseau complet Larpers Coin (Velocity + Lobby + SMP)** produit un ZIP séparé avec:
+- Velocity public sur TCP 25565.
+- Lobby Paper privé sur 127.0.0.1:25566.
+- SMP Paper privé sur 127.0.0.1:25567.
+- FastLoginPlus sur Velocity et les backends pour distinguer les comptes Java premium des comptes non premium.
+- Geyser + Floodgate sur Velocity, Floodgate sur les backends.
+- Clé de forwarding Velocity, scripts Windows de démarrage, configuration Bedrock et ouverture du pare-feu.
+
+Dans GitHub, ouvre **Actions** puis **Package reseau complet Larpers Coin (Velocity + Lobby + SMP)** et télécharge l'artefact `LarpersCoin-Network`. Suis impérativement `LISEZ-MOI.txt` et exécute `CONFIGURER-RESEAU.bat` après le premier démarrage de Velocity. Les ports backend 25566/25567 ne doivent jamais être exposés à Internet.
+
+Le pack est un déploiement initial: accepte l'EULA toi-même, configure la redirection des ports du routeur et teste une connexion Java premium, Java non premium et Bedrock avant l'ouverture publique.
+
 ## Compilation automatique
 Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `LarpersCoin-Paper-26.3`.
 
