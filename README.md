@@ -23,6 +23,7 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/balance [joueur]` (`/bal`) — solde.
 - `/pay <joueur> <montant>` — paiement entre joueurs connectés.
 - `/baltop` — classement des fortunes.
+- `/history` — tes 10 dernières transactions; `/history <joueur>` est réservé au staff.
 - `/daily` — récompense quotidienne avec série.
 - `/bounty <joueur> <montant>` — prime payée au joueur qui élimine la cible.
 - `/eco give|take|set <joueur> <montant>` — administration.
