@@ -241,13 +241,17 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         reply(sender, "Tu as déjà réclamé ta récompense. Reviens dans environ " + hours + " h.");
                         return true;
                     }
-                    data.set("daily." + id, now);
                     long previousDay = previous;
                     int previousStreak = data.getInt("streak." + id, 0);
                     int streak = previousDay > 0 && now - previousDay <= 172_800_000L
                             ? previousStreak + 1 : 1;
-                    data.set("streak." + id, streak);
                     double reward = 100.0 + Math.min(streak, 7) * 20.0;
+                    if (!Double.isFinite(balance(player.getUniqueId()) + reward)) {
+                        reply(sender, "Ton solde ne peut pas recevoir cette récompense.");
+                        return true;
+                    }
+                    data.set("daily." + id, now);
+                    data.set("streak." + id, streak);
                     credit(player.getUniqueId(), reward);
                     saveData();
                     recordTransaction("DAILY", new UUID(0L,0L), player.getUniqueId(), reward);
@@ -279,7 +283,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     }
                     data.set("bounties." + targetId, nextBounty);
                     saveData();
-                    recordTransaction("BOUNTY_PLACE", player.getUniqueId(), target.getUniqueId(), amount);
+                    recordTransaction("BOUNTY_PLACE", player.getUniqueId(), new UUID(0L,0L), amount);
                     Bukkit.broadcastMessage(ChatColor.GOLD + "[LPC] " + player.getName() + " place une prime de " + format(amount) + " sur " + target.getName() + " !");
                     return true;
                 }
@@ -299,6 +303,10 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         return true;
                     }
                     double oldBalance = balance(target.getUniqueId());
+                    if (args[0].equalsIgnoreCase("give") && !Double.isFinite(oldBalance + amount)) {
+                        reply(sender, "Le solde du joueur dépasserait la limite numérique.");
+                        return true;
+                    }
                     double recordedAmount = amount;
                     UUID systemAccount = new UUID(0L,0L);
                     switch (args[0].toLowerCase(Locale.ROOT)) {
