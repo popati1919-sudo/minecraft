@@ -89,6 +89,7 @@ jobs:
           hardcore=false
           max-players=30
           online-mode=false
+          enforce-secure-profile=false
           pvp=true
           server-port=25565
           server-ip=
@@ -146,6 +147,21 @@ jobs:
           echo Redemarre le serveur. Ouvre le port 19132 en TCP et UDP.
           pause
           EOF
+          cat > "$ROOT/OUVRIR-PORTS-WINDOWS.bat" <<'EOF'
+          @echo off
+          net session >nul 2>&1
+          if errorlevel 1 (
+            echo Clique droit sur ce fichier puis Executer en tant qu'administrateur.
+            pause
+            exit /b 1
+          )
+          netsh advfirewall firewall add rule name="LarpersCoin Java TCP 25565" dir=in action=allow protocol=TCP localport=25565
+          netsh advfirewall firewall add rule name="LarpersCoin Bedrock TCP 19132" dir=in action=allow protocol=TCP localport=19132
+          netsh advfirewall firewall add rule name="LarpersCoin Bedrock UDP 19132" dir=in action=allow protocol=UDP localport=19132
+          echo Regles du pare-feu Windows ajoutees.
+          echo Il faut aussi rediriger TCP 25565 et TCP+UDP 19132 sur le routeur.
+          pause
+          EOF
           cat > "$ROOT/CONFIGURER-LES-GROUPES.bat" <<'EOF'
           @echo off
           echo Execute ces commandes dans la console du serveur, sans le slash:
@@ -186,8 +202,9 @@ jobs:
           4. Lance START-SERVER.bat.
           5. Au premier demarrage, Geyser et Floodgate generent leur configuration; arrete avec stop.
           6. Lance CONFIGURER-BEDROCK.bat pour régler Geyser sur Floodgate, puis redemarre.
-          7. Configure les groupes avec CONFIGURER-LES-GROUPES.bat.
-          8. Comptes Java non premium: AuthMe demande /register motdepasse motdepasse puis /login motdepasse.
+          7. Lance OUVRIR-PORTS-WINDOWS.bat en administrateur; redirige aussi les ports sur le routeur.
+          8. Configure les groupes avec CONFIGURER-LES-GROUPES.bat.
+          9. Comptes Java non premium: AuthMe demande /register motdepasse motdepasse puis /login motdepasse.
              Ne reutilise jamais un mot de passe personnel ou un mot de passe d'un autre service.
 
           RESEAU:
