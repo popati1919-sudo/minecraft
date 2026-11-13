@@ -227,7 +227,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             }
             case "invite" -> {
                 if(a.length!=2||own==null){msg(p,"Usage : /clan invite <joueur> (dans un clan)");return true;}
-                String path=clanPath(own); if(!id(p).equals(db.getString(path+".owner"))){msg(p,"Seul le chef peut inviter.");return true;}
+                String path=clanPath(own);
                 if(!clanLeaderOrOfficer(p,own)){msg(p,"Chef ou officier requis pour inviter.");return true;}
                 OfflinePlayer target=Bukkit.getOfflinePlayer(a[1]);
                 if(target.getUniqueId()==null||own.equals(db.getString("clan-members."+target.getUniqueId()))){msg(p,"Joueur invalide ou déjà membre.");return true;}
@@ -666,9 +666,10 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) { frozen.remove(e.getPlayer().getUniqueId()); }
     @Override public List<String> onTabComplete(CommandSender s,Command c,String alias,String[] a) {
-        if(c.getName().equalsIgnoreCase("clan")&&a.length==1)return List.of("create","invite","join","leave","info","role","bank","top","allies","level","chest","stats","leaderboard");
+        if(c.getName().equalsIgnoreCase("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","stats","leaderboard");
         if(c.getName().equalsIgnoreCase("ah")&&a.length==1)return List.of("list","sell","buy");
         if(c.getName().equalsIgnoreCase("shop")&&a.length==1)return List.of("search","buy");
+        if(c.getName().equalsIgnoreCase("quiz")&&a.length==1)return List.of("top");
         return List.of();
     }
 }
