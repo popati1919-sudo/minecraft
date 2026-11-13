@@ -9,7 +9,7 @@ echo.
 where java >nul 2>nul
 if errorlevel 1 (echo ERREUR : Java est introuvable. Installe un JDK 25. & goto :fail)
 java -version
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$v = (& java -XshowSettings:properties -version 2>&1 | Select-String 'java.specification.version'); if ($v -notmatch '=\\s*25') { Write-Host 'ERREUR : un JDK 25 est requis.'; exit 1 }"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$v = (& java -XshowSettings:properties -version 2>&1 | Select-String 'java.specification.version'); if ($v -notmatch '=\s*25') { Write-Host 'ERREUR : un JDK 25 est requis.'; exit 1 }"
 if errorlevel 1 (echo ERREUR : installe un JDK 25 et configure JAVA_HOME. & goto :fail)
 if not exist "plugin-source\build.gradle" (echo ERREUR : plugin-source\build.gradle introuvable. & goto :fail)
 where gradle >nul 2>nul
