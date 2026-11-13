@@ -94,19 +94,12 @@ jobs:
           curl -fL "$papi_url" -o "$ROOT/Lobby/plugins/PlaceholderAPI.jar"
           cp "$ROOT/Lobby/plugins/PlaceholderAPI.jar" "$ROOT/SMP/plugins/PlaceholderAPI.jar"
 
-          protocollib_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/protocollib/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
-          protocollib_url="$(echo "$protocollib_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
-          test -n "$protocollib_url"
-          curl -fL "$protocollib_url" -o "$ROOT/Lobby/plugins/ProtocolLib.jar"
-          cp "$ROOT/Lobby/plugins/ProtocolLib.jar" "$ROOT/SMP/plugins/ProtocolLib.jar"
 
           test -s "$ROOT/Velocity/plugins/FastLoginPlus.jar"
           test -s "$ROOT/Lobby/plugins/FastLoginPlus.jar"
           test -s "$ROOT/SMP/plugins/FastLoginPlus.jar"
           test -s "$ROOT/Lobby/plugins/PlaceholderAPI.jar"
           test -s "$ROOT/SMP/plugins/PlaceholderAPI.jar"
-          test -s "$ROOT/Lobby/plugins/ProtocolLib.jar"
-          test -s "$ROOT/SMP/plugins/ProtocolLib.jar"
 
       - name: Configurer Velocity, lobby et SMP
         shell: bash
