@@ -36,6 +36,12 @@ Not yet complete / not yet verified
 
 - Ajout du module anti-triche LPC: détection de vitesse, déplacement aérien suspect et portée de frappe, alertes staff et commandes de diagnostic; aucune sanction automatique.
 
+## 1.0.0 — Anti-triche v1
+- Ajout de réglages anticheat dans config.yml pour activer le module et ajuster les seuils Speed, Fly et Reach.
+- Sauvegarde périodique et à l'arrêt des compteurs de violations dans anticheat-violations.yml.
+- Ajout des commandes /ac status, /ac top, /ac log et /ac reload; journal récent limité et alertes staff.
+- Aucune sanction automatique; les détections doivent être vérifiées par le staff.
+
 ## 0.9.0 — Anti-triche initiale
 - Ajout de détections conservatrices de vitesse, vol/montée suspecte et portée de frappe.
 - Ajout des alertes staff `/ac alerts`, du diagnostic `/ac info` et de la remise à zéro `/ac reset`.
