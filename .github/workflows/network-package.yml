@@ -83,8 +83,8 @@ jobs:
           bind = "0.0.0.0:25565"
           motd = "<gold>Larpers Coin Network</gold>"
           show-max-players = 100
-          online-mode = true
-          force-key-authentication = true
+          online-mode = false
+          force-key-authentication = false
           player-info-forwarding-mode = "modern"
           forwarding-secret-file = "forwarding.secret"
           announce-forge = false
@@ -249,7 +249,7 @@ jobs:
           9. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
 
           IMPORTANT:
-          - Le proxy reste en online-mode=true dans ce paquet; les comptes Java non premium/crack ne seront pas acceptes tant que ce parametre n’est pas adapte.
+          - Le proxy accepte Java non premium/crack; /register et /login protegent les comptes. Les comptes premium peuvent aussi utiliser ce systeme.
           - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
           - Ne change pas online-mode du proxy et ne rends jamais les ports backend publics.
           - Le plugin anticheat utilise des seuils de sanctions progressives configurables; ajuste-les apres tests.
