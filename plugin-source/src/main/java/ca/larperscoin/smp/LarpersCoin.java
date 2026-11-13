@@ -323,7 +323,12 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         if (tickets.isEmpty()) return;
         String winnerId = tickets.get(ThreadLocalRandom.current().nextInt(tickets.size()));
         double jackpot = data.getDouble("lottery.pot", 0.0);
-        credit(UUID.fromString(winnerId), jackpot);
+        UUID winnerUuid = UUID.fromString(winnerId);
+        if (!Double.isFinite(jackpot) || jackpot <= 0.0 || !Double.isFinite(balance(winnerUuid) + jackpot)) {
+            getLogger().severe("Tirage annulé: jackpot ou solde du gagnant invalide.");
+            return;
+        }
+        credit(winnerUuid, jackpot);
         data.set("lottery.tickets", new ArrayList<String>());
         data.set("lottery.pot", 0.0);
         saveData();
@@ -337,7 +342,11 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         if (killer == null) return;
         String victimId = key(event.getEntity().getUniqueId());
         double bounty = data.getDouble("bounties." + victimId, 0.0);
-        if (bounty <= 0.0) return;
+        if (!Double.isFinite(bounty) || bounty <= 0.0) return;
+        if (!Double.isFinite(balance(killer.getUniqueId()) + bounty)) {
+            getLogger().warning("Prime conservée: solde maximal atteint pour " + killer.getName());
+            return;
+        }
         data.set("bounties." + victimId, 0.0);
         credit(killer.getUniqueId(), bounty);
         saveData();
