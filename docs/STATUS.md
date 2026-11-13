@@ -12,7 +12,7 @@ Dernière mise à jour: 2026-11-12 — version 0.8.0.
 - [x] Clans: création, invitation, adhésion, départ, banque, coffre, XP et niveaux par activité, rôles leader/officer/member, alliances bilatérales sur demande et acceptation, statistiques et classements.
 - [x] Quiz Minecraft à choix multiples avec GUI et récompense.
 - [x] Menus GUI pour clans, quêtes, boutique et quiz; outils staff avec raccourcis invsee, vanish, freeze et staffchat.
-- [x] Workflow GitHub Actions et script de compilation Windows; compilation Paper 26.3 / Java 25 réussie sur le commit bbb7342284e87f5eafdf7f8ee9dbbc6d3635725b.
+- [x] Workflow GitHub Actions et script de compilation Windows; compilation Paper 26.3 / Java 25 réussie sur le commit c081497fdb512fb0be74b798ab088c2638f3b5c5.
 
 ## Limites restantes
 - [x] Boutique: GUI par catégories, navigation paginée, quantités par clic, prix configurables et contrôle de capacité d'inventaire. Stock illimité (pas de gestion de stock).
