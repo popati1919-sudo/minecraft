@@ -77,12 +77,14 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if (c != null) { c.setExecutor(this); c.setTabCompleter(this); }
         }
         Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getScheduler().runTaskTimer(plugin,this::save,1200L,1200L);
         plugin.getLogger().info("Modules clans, quêtes, quiz, boutique et modération chargés.");
     }
 
     private void save() {
         try { db.save(file); } catch (IOException e) { plugin.getLogger().severe("features.yml: " + e.getMessage()); }
     }
+    public void shutdown() { save(); }
     private void msg(CommandSender s, String m) { s.sendMessage(PREFIX + m); }
     private boolean staff(CommandSender s) { return s.isOp() || s.hasPermission("larpers.staff") || s.hasPermission("larpers.admin"); }
     private Player player(CommandSender s) { if (s instanceof Player p) return p; msg(s,"Commande réservée aux joueurs."); return null; }
@@ -161,7 +163,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
 
     private boolean clan(CommandSender s,String[] a) {
         Player p=player(s); if(p==null)return true;
-        if(a.length==0){msg(p,"/clan create <nom>, invite <joueur>, join <nom>, leave, info, bank, top, allies, level, chest, stats, leaderboard");return true;}
+        if(a.length==0){msg(p,"/clan create <nom>, invite <joueur>, join <nom>, leave, info, role, bank, top, allies, level, chest, stats, leaderboard");return true;}
         String sub=a[0].toLowerCase(Locale.ROOT), own=clanOf(p.getUniqueId());
         switch(sub) {
             case "create" -> {
@@ -183,7 +185,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 if(a.length!=2||own!=null){msg(p,"Usage : /clan join <nom> (sans clan)");return true;}
                 String n=a[1].toLowerCase(Locale.ROOT);
                 if(!n.equals(db.getString("invites."+id(p)))||!db.contains(clanPath(n))){msg(p,"Aucune invitation valide pour ce clan.");return true;}
-                List<String> m=db.getStringList(clanPath(n)+".members");m.add(id(p));db.set(clanPath(n)+".members",m);db.set("clan-members."+id(p),n);db.set("invites."+id(p),null);save();msg(p,"Tu as rejoint le clan.");return true;
+                List<String> m=db.getStringList(clanPath(n)+".members");m.add(id(p));db.set(clanPath(n)+".members",m);db.set("clan-members."+id(p),n);db.set(clanPath(n)+".roles."+id(p),"member");db.set("invites."+id(p),null);save();msg(p,"Tu as rejoint le clan.");return true;
             }
             case "leave" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
@@ -427,9 +429,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) { frozen.remove(e.getPlayer().getUniqueId()); }
     @Override public List<String> onTabComplete(CommandSender s,Command c,String alias,String[] a) {
-        if(c.getName().equalsIgnoreCase("clan")&&a.length==1)return List.of("create","invite","join","leave","info","bank","top","allies","level","chest","stats","leaderboard");
+        if(c.getName().equalsIgnoreCase("clan")&&a.length==1)return List.of("create","invite","join","leave","info","role","bank","top","allies","level","chest","stats","leaderboard");
         if(c.getName().equalsIgnoreCase("ah")&&a.length==1)return List.of("list","sell","buy");
-        if(c.getName().equalsIgnoreCase("shop")&&a.length==1)return List.of("search");
+        if(c.getName().equalsIgnoreCase("shop")&&a.length==1)return List.of("search","buy");
         return List.of();
     }
 }
