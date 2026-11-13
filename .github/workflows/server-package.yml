@@ -60,12 +60,6 @@ jobs:
           test -s package/LarpersCoin-Server-Ready/plugins/Geyser-Spigot.jar
           test -s package/LarpersCoin-Server-Ready/plugins/floodgate-spigot.jar
 
-          AUTH_META="$(curl -fsSL https://api.github.com/repos/AuthMe/AuthMeReloaded/releases/latest)"
-          AUTH_URL="$(echo "$AUTH_META" | jq -r '[.assets[] | select(.name | endswith("-Paper.jar"))][0].browser_download_url // empty')"
-          test -n "$AUTH_URL"
-          curl -fL "$AUTH_URL" -o package/LarpersCoin-Server-Ready/plugins/AuthMe.jar
-          test -s package/LarpersCoin-Server-Ready/plugins/AuthMe.jar
-
           PLUGIN_JAR="$(find plugin-source/build/libs -maxdepth 1 -type f -name 'LarpersCoin-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
           test -n "$PLUGIN_JAR"
           cp "$PLUGIN_JAR" package/LarpersCoin-Server-Ready/plugins/LarpersCoin.jar
@@ -88,8 +82,8 @@ jobs:
           difficulty=normal
           hardcore=false
           max-players=30
-          online-mode=false
-          enforce-secure-profile=false
+          online-mode=true
+          enforce-secure-profile=true
           pvp=true
           server-port=25565
           server-ip=
@@ -192,7 +186,8 @@ jobs:
           - Plugin LarpersCoin compile depuis le depot
           - LuckPerms (gestion Admin/Moderateur)
           - Geyser + Floodgate (accès Bedrock)
-          - AuthMe (authentification des comptes Java hors-ligne)
+          - Authentification Mojang/Microsoft automatique pour Java premium
+          - Floodgate pour authentifier Bedrock sans mot de passe
           - Configuration de base et scripts Windows
 
           PREMIER DEMARRAGE:
@@ -204,15 +199,15 @@ jobs:
           6. Lance CONFIGURER-BEDROCK.bat pour régler Geyser sur Floodgate, puis redemarre.
           7. Lance OUVRIR-PORTS-WINDOWS.bat en administrateur; redirige aussi les ports sur le routeur.
           8. Configure les groupes avec CONFIGURER-LES-GROUPES.bat.
-          9. Comptes Java non premium: AuthMe demande /register motdepasse motdepasse puis /login motdepasse.
-             Ne reutilise jamais un mot de passe personnel ou un mot de passe d'un autre service.
+          9. Les comptes Java premium sont verifies automatiquement par Mojang/Microsoft; aucun mot de passe serveur.
+          10. Bedrock passe par Floodgate; aucun mot de passe AuthMe.
 
           RESEAU:
           - Java: TCP 25565.
           - Bedrock: TCP + UDP 19132 (routeur et pare-feu Windows).
-          - online-mode=false est active pour les comptes Java non premium; AuthMe est donc obligatoire.
-          - Les noms Java hors-ligne ne sont pas verifies par Mojang: un joueur peut usurper un pseudo non protege.
-          - Conserve AuthMe, impose des mots de passe uniques et donne OP uniquement apres verification.
+          - online-mode=true: seuls les comptes Java premium authentifies par Mojang/Microsoft peuvent entrer.
+          - Les comptes Java crackes/non premium sont refuses; ne desactive pas cette protection.
+          - Floodgate authentifie Bedrock sans mot de passe AuthMe.
           - Ne partage jamais les acces admin.
 
           IMPORTANT:
