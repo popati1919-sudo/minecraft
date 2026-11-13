@@ -1,42 +1,30 @@
 # État du projet Larpers Coin SMP 26.3
 
-Dernière mise à jour : 2026-11-12
+Dernière mise à jour: 2026-11-12.
 
-## Phase 1 — socle économique
+## Implémenté dans le dépôt
+- [x] Socle LPC: soldes persistants, paiements, baltop, daily, primes PvP, commandes eco.
+- [x] Loterie: achats de tickets, jackpot persistant et tirage périodique.
+- [x] Clans: création, invitations, adhésion, départ, banque, coffre persistant, alliances simples, statistiques et classement.
+- [x] Quiz Minecraft simple avec récompense.
+- [x] Quête quotidienne avec récompense temporisée.
+- [x] Recherche dans un catalogue statique /shop search.
+- [x] Hôtel des ventes: mise en vente, liste et achat.
+- [x] Outils staff de base: GUI raccourcis, vanish, invsee, freeze, staffchat.
+- [x] Workflow GitHub Actions et script de compilation Windows.
 
-- [x] Dépôt GitHub initialisé
-- [x] Structure Gradle / Java 25
-- [x] Workflow GitHub Actions
-- [x] Script de compilation Windows avec journal
-- [x] /balance et consultation staff d'un solde hors ligne
-- [x] /pay vers un joueur en ligne
-- [x] /baltop
-- [x] /daily avec délai et série
-- [x] /bounty et versement à la mort PvP
-- [x] /eco give|take|set
-- [x] /lottery buy|pot|draw et tirage hebdomadaire automatique
-- [x] Compilation réussie sur GitHub Actions (run 43335120822)
-- [x] Artefact LarpersCoin-0.6.0.jar généré et vérifié dans l'archive de build
-- [ ] Test de démarrage sur un serveur Paper 26.3
-- [ ] Test Java + Bedrock avec Geyser/Floodgate
+## Partiel / à terminer
+- [ ] Objectifs de quêtes suivis automatiquement (blocs, récolte, pêche, combats) et cycle hebdomadaire.
+- [ ] Système de niveaux/XP de clans, rôles, permissions et progression automatique.
+- [ ] Alliances bilatérales avec validation par les deux chefs.
+- [ ] Boutique réellement achetable et configurable par GUI; actuellement la recherche est un catalogue statique.
+- [ ] Échange sécurisé complet: interface d'offre, verrouillage, double confirmation, annulation et anti-duplication. /trade est uniquement une demande préliminaire.
+- [ ] Menu admin avec actions réelles et pagination.
+- [ ] Tests automatisés et tests en serveur Paper 26.3 réel.
+- [ ] Validation Java/Bedrock via Geyser + Floodgate sur serveur dédié.
 
-## Phases suivantes
-
-- [ ] Clans : création, invitations, rôles, banque, alliances, coffre, niveau et classements
-- [ ] Quêtes quotidiennes et hebdomadaires configurables
-- [ ] Quiz Minecraft et récompenses anti-double-claim
-- [ ] Boutique LPC avec recherche
-- [ ] Hôtel des ventes sécurisé
-- [ ] Échanges avec double confirmation et annulation sûre
-- [ ] Menus graphiques pour ordinateur et Bedrock/mobile
-- [ ] Outils de modération : vanish, invsee, freeze, staffchat, admin
-- [ ] Audit économique et protections anti-duplication renforcées
-
-## Règles permanentes
-
-- Aucun claim et aucune protection de terrain par parcelle.
-- Aucun grade VIP.
-- Les commandes vanilla ne doivent pas être remplacées.
-- Les sélecteurs vanilla (@a, @p, @s) restent gérés par Minecraft/Paper.
-- Les données LPC persistent dans plugins/LarpersCoin/data.yml.
-- Aucune fonctionnalité ne sera annoncée comme terminée sans implémentation et test.
+## Hors périmètre explicite
+- Aucun claim / protection de terrain.
+- Aucun rang VIP.
+- Ne pas remplacer les commandes vanilla ni les sélecteurs vanilla.
+- Geyser et Floodgate sont des plugins externes à installer séparément.
