@@ -35,6 +35,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Set<String> playerPlacedBlocks = new HashSet<>();
     private final Map<String, Inventory> clanChests = new HashMap<>();
     private final Map<String, UUID> clanChestUsers = new HashMap<>();
+    private final Map<String, ItemStack[]> clanChestSnapshots = new HashMap<>();
     private final Set<UUID> vanished = new HashSet<>();
     private final SecureTradeManager tradeManager;
     private final Map<UUID, Long> lastQuiz = new HashMap<>();
@@ -227,8 +228,12 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             case "invite" -> {
                 if(a.length!=2||own==null){msg(p,"Usage : /clan invite <joueur> (dans un clan)");return true;}
                 String path=clanPath(own); if(!id(p).equals(db.getString(path+".owner"))){msg(p,"Seul le chef peut inviter.");return true;}
-                Player t=Bukkit.getPlayerExact(a[1]); if(t==null){msg(p,"Joueur introuvable.");return true;}
-                db.set("invites."+id(t),own); save(); msg(t,"Invitation au clan "+db.getString(path+".name")+". Fais /clan join "+own); msg(p,"Invitation envoyée."); return true;
+                if(!clanLeaderOrOfficer(p,own)){msg(p,"Chef ou officier requis pour inviter.");return true;}
+                OfflinePlayer target=Bukkit.getOfflinePlayer(a[1]);
+                if(target.getUniqueId()==null||own.equals(db.getString("clan-members."+target.getUniqueId()))){msg(p,"Joueur invalide ou déjà membre.");return true;}
+                db.set("invites."+target.getUniqueId(),own);save();
+                if(target.isOnline())msg(target.getPlayer(),"Invitation au clan "+db.getString(path+".name")+". Fais /clan join "+own);
+                msg(p,"Invitation enregistrée pour "+a[1]+". Le joueur pourra la rejoindre avec /clan join "+own+".");return true;
             }
             case "join" -> {
                 if(a.length!=2||own!=null){msg(p,"Usage : /clan join <nom> (sans clan)");return true;}
@@ -238,8 +243,24 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             }
             case "leave" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
-                String path=clanPath(own); if(id(p).equals(db.getString(path+".owner"))){msg(p,"Le chef doit transférer le rôle ou supprimer le clan (fonction staff).");return true;}
+                String path=clanPath(own);if(id(p).equals(db.getString(path+".owner"))){msg(p,"Transfère le rôle avec /clan transfer <joueur> ou dissous le clan avec /clan disband confirm.");return true;}
                 List<String> m=db.getStringList(path+".members");m.remove(id(p));db.set(path+".members",m);db.set(path+".roles."+id(p),null);db.set("clan-members."+id(p),null);save();msg(p,"Tu as quitté le clan.");return true;
+            }
+            case "transfer" -> {
+                if(own==null||a.length!=2||!id(p).equals(db.getString(clanPath(own)+".owner"))){msg(p,"Chef seulement: /clan transfer <joueur>.");return true;}
+                Player target=Bukkit.getPlayerExact(a[1]);
+                if(target==null||!own.equals(clanOf(target.getUniqueId()))||target.equals(p)){msg(p,"Le nouveau chef doit être un autre membre connecté du clan.");return true;}
+                String path=clanPath(own);db.set(path+".owner",id(target));db.set(path+".roles."+id(target),"leader");db.set(path+".roles."+id(p),"officer");save();
+                msg(p,"Tu as transféré le leadership à "+target.getName()+".");msg(target,"Tu es maintenant chef du clan "+db.getString(path+".name")+".");return true;
+            }
+            case "disband" -> {
+                if(own==null||!id(p).equals(db.getString(clanPath(own)+".owner"))){msg(p,"Seul le chef peut dissoudre le clan.");return true;}
+                if(a.length!=2||!a[1].equalsIgnoreCase("confirm")){msg(p,"Action irréversible: /clan disband confirm.");return true;}
+                String path=clanPath(own);List<String> members=db.getStringList(path+".members");
+                for(String member:members)db.set("clan-members."+member,null);
+                for(String ally:db.getStringList(path+".allies")){List<String> list=db.getStringList(clanPath(ally)+".allies");list.remove(own);db.set(clanPath(ally)+".allies",list);}
+                var invites=db.getConfigurationSection("invites");if(invites!=null)for(String key:new ArrayList<>(invites.getKeys(false)))if(own.equals(db.getString("invites."+key)))db.set("invites."+key,null);
+                db.set(path,null);clanChests.remove(own);clanChestUsers.remove(own);clanChestSnapshots.remove(own);save();msg(p,"Clan dissous. Les membres ont été retirés.");return true;
             }
             case "info","stats","level" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
@@ -276,6 +297,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
                 UUID user=clanChestUsers.get(own);
                 if(user!=null&&!user.equals(p.getUniqueId())){msg(p,"Le coffre du clan est déjà utilisé par un autre membre.");return true;}
+                if(!db.getStringList(clanPath(own)+".members").contains(id(p))){msg(p,"Accès réservé aux membres du clan.");return true;}
                 Inventory inv=clanChests.get(own);
                 if(inv==null) {
                     inv=Bukkit.createInventory(null,54,"Coffre clan: "+own);
@@ -284,7 +306,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     clanChests.put(own,inv);
                 }
                 clanChestUsers.put(own,p.getUniqueId());
-                p.openInventory(inv);msg(p,"Coffre partagé ouvert. Un seul membre peut l'utiliser à la fois.");return true;
+                clanChestSnapshots.put(own,Arrays.stream(inv.getContents()).map(x->x==null?null:x.clone()).toArray(ItemStack[]::new));
+                p.openInventory(inv);msg(p,"Coffre partagé ouvert. Les changements sont enregistrés et audités à la fermeture.");return true;
             }
             case "allies" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
@@ -627,9 +650,19 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(!title.startsWith("Coffre clan:"))return;
         String clan=title.substring("Coffre clan:".length());
         if(!Objects.equals(clanChestUsers.get(clan),e.getPlayer().getUniqueId()))return;
-        db.set(clanPath(clan)+".chest",Arrays.asList(e.getInventory().getContents()));
-        clanChestUsers.remove(clan);
-        save();
+        ItemStack[] before=clanChestSnapshots.remove(clan),after=e.getInventory().getContents();
+        db.set(clanPath(clan)+".chest",Arrays.asList(after));
+        if(before!=null) {
+            List<String> audit=db.getStringList(clanPath(clan)+".chest-audit");
+            for(int slot=0;slot<after.length;slot++) {
+                ItemStack a=before[slot],b=after[slot];
+                if(Objects.equals(a,b))continue;
+                audit.add(System.currentTimeMillis()+"|"+e.getPlayer().getUniqueId()+"|slot="+slot+"|"+(a==null?"vide":a.serialize().toString())+" -> "+(b==null?"vide":b.serialize().toString()));
+            }
+            if(audit.size()>500)audit=new ArrayList<>(audit.subList(audit.size()-500,audit.size()));
+            db.set(clanPath(clan)+".chest-audit",audit);
+        }
+        clanChestUsers.remove(clan);save();
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) { frozen.remove(e.getPlayer().getUniqueId()); }
     @Override public List<String> onTabComplete(CommandSender s,Command c,String alias,String[] a) {
