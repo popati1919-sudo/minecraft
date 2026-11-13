@@ -423,7 +423,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
         String expected=db.getString("quiz."+id(p)+".answer","");
         if(expected.isEmpty()){msg(p,"Commence par /quiz.");return true;}
-        if(String.join(" ",a).equalsIgnoreCase(expected)){give(p,50);msg(p,"Bonne réponse! +50 LPC.");}
+        if(String.join(" ",a).equalsIgnoreCase(expected)){if(!Double.isFinite(core.balance(p.getUniqueId())+50)){msg(p,"Ton solde ne peut pas recevoir la récompense.");return true;}give(p,50);core.recordTransaction("QUIZ",new UUID(0L,0L),p.getUniqueId(),50);msg(p,"Bonne réponse! +50 LPC.");}
         else msg(p,"Pas cette fois. Réponse: "+expected);
         db.set("quiz."+id(p)+".answer",null);save();return true;
     }
@@ -548,7 +548,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             String expected=db.getString("quiz."+id(p)+".answer","");
             String selected=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
             if(expected.isEmpty()){msg(p,"Cette question est expirée. Fais /quiz.");p.closeInventory();return;}
-            if(selected.equalsIgnoreCase(expected)){give(p,50);core.recordTransaction("QUIZ",new UUID(0L,0L),p.getUniqueId(),50);msg(p,"Bonne réponse! +50 LPC.");}
+            if(selected.equalsIgnoreCase(expected)){if(!Double.isFinite(core.balance(p.getUniqueId())+50)){msg(p,"Ton solde ne peut pas recevoir la récompense.");}else{give(p,50);core.recordTransaction("QUIZ",new UUID(0L,0L),p.getUniqueId(),50);msg(p,"Bonne réponse! +50 LPC.");}}
             else msg(p,"Mauvaise réponse. La bonne réponse était: "+expected+".");
             db.set("quiz."+id(p)+".answer",null);save();p.closeInventory();
             return;
