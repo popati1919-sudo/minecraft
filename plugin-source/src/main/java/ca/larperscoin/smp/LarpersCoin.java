@@ -183,6 +183,10 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String name = command.getName().toLowerCase(Locale.ROOT);
+        if (getConfig().getBoolean("network.auth-only", false) && !name.equals("register") && !name.equals("login")) {
+            reply(sender, "Le lobby sert uniquement à l’authentification. Connecte-toi pour rejoindre le SMP.");
+            return true;
+        }
         try {
             switch (name) {
                 case "register", "login" -> {
