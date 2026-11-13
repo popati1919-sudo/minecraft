@@ -116,6 +116,16 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         inv.setItem(22,item(Material.BARRIER,"Fermer"));
         p.openInventory(inv);
     }
+    private void openPlayerSelector(Player viewer,String action) {
+        Inventory inv=Bukkit.createInventory(null,54,"LPC | Sélection "+action);
+        int slot=0;
+        for(Player target:Bukkit.getOnlinePlayers()) {
+            if(target.equals(viewer) || slot>=54) continue;
+            inv.setItem(slot++,item(Material.PAPER,target.getName(),"Clique pour "+action));
+        }
+        if(slot==0) msg(viewer,"Aucun autre joueur en ligne.");
+        else viewer.openInventory(inv);
+    }
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] a) {
         String c = command.getName().toLowerCase(Locale.ROOT);
@@ -416,9 +426,28 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         for(UUID id:vanished){Player v=Bukkit.getPlayer(id);if(v!=null&&!staff(e.getPlayer()))e.getPlayer().hidePlayer(plugin,v);}
     }
     @EventHandler public void onInvClick(InventoryClickEvent e) {
-        if(e.getView().getTitle().equals("LPC | Administration")) {
+        String title=e.getView().getTitle();
+        if(title.equals("LPC | Administration")) {
             e.setCancelled(true);
-            if(e.getCurrentItem()!=null&&e.getCurrentItem().getType()==Material.BARRIER)e.getWhoClicked().closeInventory();
+            if(!(e.getWhoClicked() instanceof Player p)) return;
+            switch(e.getRawSlot()) {
+                case 10 -> openPlayerSelector(p,"invsee");
+                case 12 -> { p.closeInventory(); p.performCommand("vanish"); }
+                case 14 -> openPlayerSelector(p,"freeze");
+                case 16 -> msg(p,"Économie: /eco give <joueur> <montant>, /eco take <joueur> <montant>, /eco set <joueur> <montant>.");
+                case 22 -> p.closeInventory();
+                default -> { }
+            }
+            return;
+        }
+        if(title.equals("LPC | Sélection invsee")||title.equals("LPC | Sélection freeze")) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player viewer)||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
+            String targetName=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName());
+            Player target=Bukkit.getPlayerExact(targetName);
+            if(target==null) { msg(viewer,"Ce joueur n'est plus en ligne.");viewer.closeInventory();return; }
+            if(title.endsWith("invsee")) viewer.openInventory(target.getInventory());
+            else { viewer.closeInventory();viewer.performCommand("freeze "+target.getName()); }
         }
     }
     @EventHandler public void onChestClose(org.bukkit.event.inventory.InventoryCloseEvent e) {
