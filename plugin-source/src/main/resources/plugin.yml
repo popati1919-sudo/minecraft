@@ -1,0 +1,37 @@
+name: LarpersCoin
+version: 0.6.0
+main: ca.larperscoin.smp.LarpersCoin
+api-version: '26.3'
+author: Larpers Coin SMP
+description: Base LPC economy for Paper. No land claims or plot protection.
+commands:
+  balance:
+    description: Affiche ton solde LPC
+    aliases: [bal]
+    usage: /balance [joueur]
+  pay:
+    description: Envoie des LPC à un joueur
+    usage: /pay <joueur> <montant>
+  baltop:
+    description: Classement des fortunes LPC
+    usage: /baltop
+  daily:
+    description: Réclame ta récompense quotidienne
+    usage: /daily
+  bounty:
+    description: Place une prime sur un joueur
+    usage: /bounty <joueur> <montant>
+  eco:
+    description: Administration des soldes LPC
+    usage: /eco <give|take|set> <joueur> <montant>
+    permission: larpers.admin
+  lottery:
+    description: Loterie LPC
+    usage: /lottery <buy|pot>
+permissions:
+  larpers.staff:
+    description: Accès aux outils du staff LPC
+    default: op
+  larpers.admin:
+    description: Administration économique LPC
+    default: op
