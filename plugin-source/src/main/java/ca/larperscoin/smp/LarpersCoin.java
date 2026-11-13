@@ -57,7 +57,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         saveData();
     }
 
-    private void saveData() {
+    void saveData() {
         try {
             data.save(dataFile);
         } catch (IOException ex) {
@@ -69,7 +69,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         return uuid.toString();
     }
 
-    private double balance(UUID uuid) {
+    double balance(UUID uuid) {
         return data.getDouble("balances." + key(uuid), 0.0);
     }
 
@@ -78,13 +78,13 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         saveData();
     }
 
-    private boolean debit(UUID uuid, double amount) {
+    boolean debit(UUID uuid, double amount) {
         if (!Double.isFinite(amount) || amount <= 0.0 || balance(uuid) + 1.0e-9 < amount) return false;
         data.set("balances." + key(uuid), balance(uuid) - amount);
         return true;
     }
 
-    private void credit(UUID uuid, double amount) {
+    void credit(UUID uuid, double amount) {
         if (Double.isFinite(amount) && amount > 0.0) {
             data.set("balances." + key(uuid), balance(uuid) + amount);
         }
