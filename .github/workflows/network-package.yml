@@ -162,6 +162,7 @@ jobs:
           EOF
           done
 
+          mkdir -p "$ROOT/SMP/plugins/LarpersCoin"
           cat > "$ROOT/SMP/plugins/LarpersCoin/config.yml" <<'EOF'
           auth:
             proxy-authenticated: true
