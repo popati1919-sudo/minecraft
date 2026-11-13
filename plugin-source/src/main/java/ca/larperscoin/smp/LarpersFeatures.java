@@ -188,7 +188,18 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 if(contents!=null)for(int i=0;i<Math.min(54,contents.size());i++)inv.setItem(i,contents.get(i));
                 p.openInventory(inv);msg(p,"Coffre partagé: sauvegarde du contenu à la fermeture.");return true;
             }
-            case "allies" -> { if(own==null){msg(p,"Tu n'as pas de clan.");return true;}msg(p,"Alliés: "+String.join(", ",db.getStringList(clanPath(own)+".allies"))+" (gestion avancée à venir).");return true; }
+            case "allies" -> {
+                if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
+                String ap=clanPath(own)+".allies";
+                if(a.length==1){msg(p,"Alliés: "+String.join(", ",db.getStringList(ap)));return true;}
+                if(!id(p).equals(db.getString(clanPath(own)+".owner"))||a.length!=3){msg(p,"Chef: /clan allies add|remove <clan>");return true;}
+                String other=a[2].toLowerCase(Locale.ROOT);if(!db.contains(clanPath(other))||other.equals(own)){msg(p,"Clan invalide.");return true;}
+                List<String> allies=db.getStringList(ap);
+                if(a[1].equalsIgnoreCase("add")){if(!allies.contains(other))allies.add(other);}
+                else if(a[1].equalsIgnoreCase("remove"))allies.remove(other);
+                else {msg(p,"Choisis add ou remove.");return true;}
+                db.set(ap,allies);save();msg(p,"Alliances mises à jour.");return true;
+            }
             case "top","leaderboard" -> {
                 var sec=db.getConfigurationSection("clans");if(sec==null){msg(p,"Aucun clan.");return true;}
                 List<String> names=new ArrayList<>(sec.getKeys(false));names.sort(Comparator.comparingDouble((String n)->db.getDouble(clanPath(n)+".bank")).reversed());
@@ -262,6 +273,12 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             e.setCancelled(true);
             if(e.getCurrentItem()!=null&&e.getCurrentItem().getType()==Material.BARRIER)e.getWhoClicked().closeInventory();
         }
+    }
+    @EventHandler public void onChestClose(org.bukkit.event.inventory.InventoryCloseEvent e) {
+        String title=e.getView().getTitle();
+        if(!title.startsWith("Coffre clan:"))return;
+        String clan=title.substring("Coffre clan:".length());
+        db.set(clanPath(clan)+".chest",Arrays.asList(e.getInventory().getContents()));save();
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) { frozen.remove(e.getPlayer().getUniqueId()); }
     @Override public List<String> onTabComplete(CommandSender s,Command c,String alias,String[] a) {
