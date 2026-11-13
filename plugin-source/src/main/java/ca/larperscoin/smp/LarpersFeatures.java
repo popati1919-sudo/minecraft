@@ -152,6 +152,25 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if (lore.length > 0) meta.setLore(Arrays.stream(lore).map(x -> ChatColor.GRAY+x).toList());
         it.setItemMeta(meta); return it;
     }
+    public void openLotteryMenu(Player p) {
+        Inventory inv=Bukkit.createInventory(null,27,"LPC | Loterie");
+        boolean active=core.lotteryActive();
+        inv.setItem(10,item(Material.PAPER,"Acheter 1 ticket","Prix: 25 LPC","Clique pour acheter"));
+        inv.setItem(12,item(Material.GOLD_INGOT,"Acheter 5 tickets","Prix: 125 LPC","Clique pour acheter"));
+        inv.setItem(14,item(Material.EMERALD,"Jackpot: "+core.lotteryPot()+" LPC",
+            "Tickets vendus: "+core.lotteryTicketCount(),
+            active?"Loterie en cours":"Aucune loterie en cours"));
+        inv.setItem(16,item(Material.CLOCK,active?"Loterie en cours":"En attente d'un admin",
+            active?"Fin: "+new java.text.SimpleDateFormat("HH:mm:ss").format(new java.util.Date(core.lotteryEndsAt())):"Un administrateur doit la démarrer"));
+        if(core.isLpcAdmin(p)) {
+            inv.setItem(22,item(Material.COMMAND_BLOCK,active?"Tirage / terminer":"Démarrer la loterie",
+                active?"Clique pour terminer maintenant":"Démarre une loterie de 10 minutes",
+                "Annonce envoyée à tout le serveur"));
+        } else inv.setItem(22,item(Material.BARRIER,"Action réservée aux admins","Les joueurs peuvent acheter des tickets"));
+        inv.setItem(26,item(Material.BARRIER,"Fermer"));
+        p.openInventory(inv);
+    }
+
     private void openClanMenu(Player p) {
         Inventory inv=Bukkit.createInventory(null,27,"LPC | Clan");
         inv.setItem(10,item(Material.BOOK,"Informations","/clan info"));
@@ -741,6 +760,23 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onInvClick(InventoryClickEvent e) {
         String title=e.getView().getTitle();
+        if(title.equals("LPC | Loterie")) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player p)||e.getRawSlot()<0||e.getRawSlot()>=e.getView().getTopInventory().getSize())return;
+            switch(e.getRawSlot()) {
+                case 10 -> {p.closeInventory();p.performCommand("lottery buy 1");Bukkit.getScheduler().runTaskLater(plugin,()->openLotteryMenu(p),2L);}
+                case 12 -> {p.closeInventory();p.performCommand("lottery buy 5");Bukkit.getScheduler().runTaskLater(plugin,()->openLotteryMenu(p),2L);}
+                case 22 -> {
+                    if(!core.isLpcAdmin(p)){msg(p,"Seuls les administrateurs peuvent démarrer ou terminer une loterie.");return;}
+                    p.closeInventory();
+                    if(core.lotteryActive())p.performCommand("lottery draw");else p.performCommand("lottery start 10");
+                    Bukkit.getScheduler().runTaskLater(plugin,()->openLotteryMenu(p),3L);
+                }
+                case 26 -> p.closeInventory();
+                default -> { }
+            }
+            return;
+        }
         if(title.equals("LPC | Administration")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player p)) return;
