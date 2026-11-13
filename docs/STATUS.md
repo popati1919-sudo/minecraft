@@ -12,6 +12,7 @@ Dernière mise à jour: 2026-11-12 — version 0.8.0.
 - [x] Clans: création, invitation, adhésion, départ, banque, coffre, XP et niveaux par activité, rôles leader/officer/member, alliances bilatérales sur demande et acceptation, statistiques et classements.
 - [x] Quiz Minecraft à choix multiples avec GUI et récompense.
 - [x] Menus GUI pour clans, quêtes, boutique et quiz; outils staff avec raccourcis invsee, vanish, freeze et staffchat.
+- [x] Anti-triche initial: alertes staff pour vitesse anormale, vol/montée suspecte et portée de frappe; exemptions de téléportation/impulsion; compteurs de violations temporaires. Aucune sanction automatique.
 - [x] Workflow GitHub Actions et script de compilation Windows; compilation Paper 26.3 / Java 25 réussie sur le commit c081497fdb512fb0be74b798ab088c2638f3b5c5.
 
 ## Limites restantes
@@ -22,6 +23,7 @@ Dernière mise à jour: 2026-11-12 — version 0.8.0.
 - [x] Menu admin: deux pages paginées avec sélecteurs de joueurs, vanish, freeze, raccourcis économie et loterie.
 - [x] Écriture atomique de data.yml et features.yml: fichier temporaire, flush disque et remplacement atomique avec repli si le système de fichiers ne le permet pas.
 - [ ] Journal transactionnel commun aux deux fichiers: les écritures individuelles sont protégées, mais une coupure entre deux fichiers distincts peut encore interrompre une opération inter-systèmes.
+- [ ] Calibrage anti-triche sur serveur réel avec joueurs à latence variable: les seuils sont conservateurs et les alertes doivent être vérifiées par le staff.
 - [ ] Essais fonctionnels en serveur Paper 26.3 réel: le build CI compile et produit le JAR, mais aucune session de jeu réelle n'a été exécutée ici.
 - [ ] Validation Java/Bedrock via Geyser + Floodgate sur serveur dédié (requiert un serveur réel et des clients de test).
 
@@ -39,4 +41,5 @@ Dernière mise à jour: 2026-11-12 — version 0.8.0.
 - /clan role <joueur> <officer|member>.
 - /clan transfer <joueur>, /clan disband confirm, /clan audit.
 - /quiz top.
+- /ac alerts, /ac info <joueur>, /ac reset <joueur> — diagnostic anti-triche réservé au staff.
 - /clan allies request|accept|remove <clan>.
