@@ -55,6 +55,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         }
         getServer().getPluginManager().registerEvents(this, this);
         features = new LarpersFeatures(this);
+        new LarpersAntiCheat(this);
         long week = 20L * 60L * 60L * 24L * 7L;
         getServer().getScheduler().runTaskTimer(this, this::drawLottery, week, week);
         getLogger().info("LarpersCoin 0.8.0 actif. Aucun claim ni protection de parcelle n'est enregistré.");
