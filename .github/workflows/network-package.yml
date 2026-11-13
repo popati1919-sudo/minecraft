@@ -67,8 +67,14 @@ jobs:
 
           curl -fL "https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/velocity" -o "$ROOT/Velocity/plugins/Geyser-Velocity.jar"
           curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/velocity" -o "$ROOT/Velocity/plugins/floodgate-velocity.jar"
+          # Floodgate doit aussi etre present sur les backends Paper pour que
+          # l'API isFloodgatePlayer(UUID) reconnaisse les joueurs Bedrock au lobby.
+          curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/paper" -o "$ROOT/Lobby/plugins/floodgate-paper.jar"
+          curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/paper" -o "$ROOT/SMP/plugins/floodgate-paper.jar"
           test -s "$ROOT/Velocity/plugins/Geyser-Velocity.jar"
           test -s "$ROOT/Velocity/plugins/floodgate-velocity.jar"
+          test -s "$ROOT/Lobby/plugins/floodgate-paper.jar"
+          test -s "$ROOT/SMP/plugins/floodgate-paper.jar"
 
       - name: Configurer Velocity, lobby et SMP
         shell: bash
@@ -237,11 +243,11 @@ jobs:
           - Velocity proxy: port public Java 25565
           - Lobby Paper separe: 127.0.0.1:25566 (authentification uniquement: /register et /login)
           - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
-          - Geyser + Floodgate installes sur Velocity pour Bedrock
-          - Lobby: /register et /login uniquement; reconnexion auto si meme compte + meme IP (empreinte SHA-256)
+          - Geyser + Floodgate installes sur Velocity, Floodgate aussi sur Lobby et SMP pour reconnaitre les joueurs Bedrock
+          - Lobby: Java cracke utilise /register et /login; Java premium verifie et Bedrock via Floodgate sont exempts de mot de passe
           - Apres authentification, transfert automatique vers le SMP
           - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend
-          - Geyser/Floodgate restent a configurer et tester selon le mode de connexion
+          - Geyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login
           - Backend Paper lie a Velocity avec forwarding moderne et secret prive
 
           INSTALLATION:
@@ -256,7 +262,7 @@ jobs:
           9. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
 
           IMPORTANT:
-          - Le proxy accepte Java non premium/crack; /register et /login protegent les comptes. Les comptes premium peuvent aussi utiliser ce systeme.
+          - Le proxy accepte Java cracke; ces joueurs utilisent /register et /login. Java premium necessite une authentification premium reelle cote proxy avant d'etre exempte. Bedrock doit passer par Geyser auth-type floodgate et Floodgate sur les deux backends.
           - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
           - Ne change pas online-mode du proxy et ne rends jamais les ports backend publics.
           - Le plugin anticheat utilise des seuils de sanctions progressives configurables; ajuste-les apres tests.
