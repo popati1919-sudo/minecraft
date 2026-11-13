@@ -54,6 +54,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
 
     @Override
     public void onDisable() {
+        if (features != null) features.shutdown();
         saveData();
     }
 
