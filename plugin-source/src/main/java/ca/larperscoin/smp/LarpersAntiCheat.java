@@ -38,7 +38,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Larpers Coin AntiCheat v1.0.
+ * Larpers Coin AntiCheat v1.1.
  * Conservative detection and staff alerts only. No automatic punishments.
  */
 public final class LarpersAntiCheat implements Listener, CommandExecutor {
@@ -53,6 +53,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     private final Map<UUID, Integer> upwardTicks = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> airTicks = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> lastMovementTick = new ConcurrentHashMap<>();
+    private final Map<UUID, Double> horizontalDistanceThisTick = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> violations = new ConcurrentHashMap<>();
     private final Map<String, Long> lastAlert = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> alertsEnabled = new ConcurrentHashMap<>();
@@ -75,12 +76,12 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         var config = plugin.getConfig();
         config.addDefault("anticheat.enabled", true);
         config.addDefault("anticheat.checks.speed.enabled", true);
-        config.addDefault("anticheat.checks.speed.max-ground-blocks-per-tick", 1.35D);
+        config.addDefault("anticheat.checks.speed.max-ground-blocks-per-tick", 0.65D);
         config.addDefault("anticheat.checks.fly.enabled", true);
         config.addDefault("anticheat.checks.fly.upward-limit-per-tick", 0.72D);
         config.addDefault("anticheat.checks.fly.repeated-upward-ticks", 4);
         config.addDefault("anticheat.checks.reach.enabled", true);
-        config.addDefault("anticheat.checks.reach.max-distance", 4.45D);
+        config.addDefault("anticheat.checks.reach.max-distance", 3.75D);
         config.addDefault("anticheat.alert-cooldown-seconds", 4);
         config.addDefault("anticheat.evidence-limit", MAX_EVIDENCE);
         config.options().copyDefaults(true);
@@ -130,6 +131,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         upwardTicks.remove(player.getUniqueId());
         airTicks.remove(player.getUniqueId());
         lastMovementTick.remove(player.getUniqueId());
+        horizontalDistanceThisTick.remove(player.getUniqueId());
     }
 
     private boolean inGrace(Player player) {
@@ -174,6 +176,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         upwardTicks.remove(id);
         airTicks.remove(id);
         lastMovementTick.remove(id);
+        horizontalDistanceThisTick.remove(id);
         graceUntil.remove(id);
         alertsEnabled.remove(id);
     }
@@ -197,17 +200,18 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         }
         int currentTick = player.getTicksLived();
         Integer previousTick = lastMovementTick.put(id, currentTick);
-        if (previousTick != null && previousTick == currentTick) return;
+        if (previousTick == null || previousTick != currentTick) horizontalDistanceThisTick.put(id, 0.0D);
 
         if (plugin.getConfig().getBoolean("anticheat.checks.speed.enabled", true)
                 && player.isOnGround()) {
             double dx = to.getX() - from.getX();
             double dz = to.getZ() - from.getZ();
-            double horizontal = Math.sqrt(dx * dx + dz * dz);
-            double limit = plugin.getConfig().getDouble("anticheat.checks.speed.max-ground-blocks-per-tick", 1.35D);
-            if (player.isSprinting()) limit += 0.15D;
+            double segment = Math.sqrt(dx * dx + dz * dz);
+            double horizontal = horizontalDistanceThisTick.merge(id, segment, Double::sum);
+            double limit = plugin.getConfig().getDouble("anticheat.checks.speed.max-ground-blocks-per-tick", 0.65D);
+            if (player.isSprinting()) limit += 0.12D;
             PotionEffect speed = player.getPotionEffect(PotionEffectType.SPEED);
-            if (speed != null) limit += 0.20D * (speed.getAmplifier() + 1);
+            if (speed != null) limit += 0.18D * (speed.getAmplifier() + 1);
             if (horizontal > limit) {
                 flag(player, "SPEED", String.format(Locale.ROOT, "%.2f blocs/tick (seuil %.2f)", horizontal, limit));
             }
@@ -216,6 +220,8 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         if (plugin.getConfig().getBoolean("anticheat.checks.fly.enabled", true)) {
             double dy = to.getY() - from.getY();
             double upLimit = plugin.getConfig().getDouble("anticheat.checks.fly.upward-limit-per-tick", 0.72D);
+            PotionEffect jump = player.getPotionEffect(PotionEffectType.JUMP_BOOST);
+            if (jump != null) upLimit += 0.12D * (jump.getAmplifier() + 1);
             int required = Math.max(2, plugin.getConfig().getInt("anticheat.checks.fly.repeated-upward-ticks", 4));
             if (!player.isOnGround() && dy > upLimit) {
                 int count = upwardTicks.merge(id, 1, Integer::sum);
