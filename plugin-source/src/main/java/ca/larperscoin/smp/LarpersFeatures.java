@@ -248,7 +248,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 String path=clanPath(own)+".bank";
                 if(a.length==1){msg(p,"Banque du clan: "+db.getDouble(path)+" LPC. /clan bank deposit|withdraw <montant>");return true;}
                 if(a.length!=3){msg(p,"Usage: /clan bank deposit|withdraw <montant>");return true;}
-                double v=Double.parseDouble(a[2]);if(v<=0){msg(p,"Montant invalide.");return true;}
+                double v=Double.parseDouble(a[2]);if(!Double.isFinite(v)||v<=0){msg(p,"Montant invalide.");return true;}
                 if(a[1].equalsIgnoreCase("deposit")){if(!charge(p,v)){msg(p,"Fonds insuffisants.");return true;}db.set(path,db.getDouble(path)+v);}
                 else if(a[1].equalsIgnoreCase("withdraw")){if(!clanLeaderOrOfficer(p,own)||db.getDouble(path)<v){msg(p,"Retrait refusé (chef/officier seulement ou fonds insuffisants).");return true;}db.set(path,db.getDouble(path)-v);give(p,v);}
                 else {msg(p,"Choisis deposit ou withdraw.");return true;} save();msg(p,"Opération effectuée.");return true;
@@ -464,15 +464,19 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(a[0].equalsIgnoreCase("sell")) {
             if(a.length!=2){msg(p,"Usage: /ah sell <prix>");return true;}
             double price=Double.parseDouble(a[1]);ItemStack hand=p.getInventory().getItemInMainHand();
-            if(price<=0||hand.getType()==Material.AIR){msg(p,"Prix invalide ou main vide.");return true;}
+            if(!Double.isFinite(price)||price<=0||hand.getType()==Material.AIR){msg(p,"Prix invalide ou main vide.");return true;}
             String key=UUID.randomUUID().toString().substring(0,8);db.set("ah."+key+".seller",p.getName());db.set("ah."+key+".sellerId",id(p));db.set("ah."+key+".item",hand.getType().name());db.set("ah."+key+".amount",hand.getAmount());db.set("ah."+key+".price",price);db.set("ah."+key+".stack",hand.clone());p.getInventory().setItemInMainHand(null);save();msg(p,"Annonce créée: /ah buy "+key);return true;
         }
         if(a[0].equalsIgnoreCase("buy")&&a.length==2) {
             String path="ah."+a[1];if(!db.contains(path)){msg(p,"Annonce introuvable.");return true;}
-            double price=db.getDouble(path+".price");if(!charge(p,price)){msg(p,"Fonds insuffisants.");return true;}
-            ItemStack stack=db.getItemStack(path+".stack");int empty=p.getInventory().firstEmpty();
-            if(stack==null||empty<0){give(p,price);msg(p,"Il faut un emplacement libre; achat annulé.");return true;}
-            p.getInventory().setItem(empty,stack);
+            double price=db.getDouble(path+".price");
+            ItemStack stack=db.getItemStack(path+".stack");
+            if(!Double.isFinite(price)||price<=0||stack==null){msg(p,"Annonce invalide; achat refusé.");return true;}
+            Inventory simulated=Bukkit.createInventory(null,36);
+            simulated.setStorageContents(p.getInventory().getStorageContents());
+            if(!simulated.addItem(stack.clone()).isEmpty()){msg(p,"Inventaire insuffisant; aucun LPC débité.");return true;}
+            if(!charge(p,price)){msg(p,"Fonds insuffisants.");return true;}
+            p.getInventory().addItem(stack);
             UUID sellerId=UUID.fromString(db.getString(path+".sellerId"));core.credit(sellerId,price);core.saveData();db.set(path,null);save();msg(p,"Achat effectué.");return true;
         }
         msg(p,"/ah list | /ah sell <prix> | /ah buy <id>");return true;
