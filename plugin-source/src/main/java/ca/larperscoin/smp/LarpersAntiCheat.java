@@ -74,6 +74,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
                 || player.isRiptiding()
                 || player.hasPotionEffect(PotionEffectType.LEVITATION)
                 || player.hasPotionEffect(PotionEffectType.SLOW_FALLING)
+                || player.hasPermission("larpers.anticheat.bypass")
                 || inGrace(player);
     }
 
@@ -139,7 +140,8 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         if (!(event.getDamager() instanceof Player attacker)) return;
         Entity target = event.getEntity();
         if (!(target instanceof Player victim)) return;
-        if (attacker.getWorld() != victim.getWorld() || inGrace(attacker)) return;
+        if (attacker.getWorld() != victim.getWorld() || inGrace(attacker)
+                || attacker.hasPermission("larpers.anticheat.bypass")) return;
 
         // Eye-to-eye distance is deliberately conservative; this only raises a staff alert.
         double distance = attacker.getEyeLocation().distance(victim.getEyeLocation());
