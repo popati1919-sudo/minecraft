@@ -35,6 +35,26 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class LarpersCoin extends JavaPlugin implements Listener, org.bukkit.command.CommandExecutor, TabCompleter {
+    @Override
+    public org.bukkit.generator.ChunkGenerator getDefaultWorldGenerator(String worldName, String id) {
+        if (!"empty".equalsIgnoreCase(id)) return null;
+        return new org.bukkit.generator.ChunkGenerator() {
+            @Override
+            public org.bukkit.generator.ChunkGenerator.ChunkData generateChunkData(
+                    org.bukkit.World world, java.util.Random random, int chunkX, int chunkZ, BiomeGrid biome) {
+                ChunkData data = createChunkData(world);
+                // Petite plateforme de départ au centre; tous les autres blocs restent dans le vide.
+                if (chunkX == 0 && chunkZ == 0) {
+                    for (int x = 3; x <= 12; x++) {
+                        for (int z = 3; z <= 12; z++) {
+                            data.setBlock(x, 80, z, org.bukkit.Material.SMOOTH_STONE);
+                        }
+                    }
+                }
+                return data;
+            }
+        };
+    }
     private YamlConfiguration data;
     private LarpersFeatures features;
     private LarpersAntiCheat antiCheat;
