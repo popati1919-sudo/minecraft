@@ -30,7 +30,7 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 
 ### Clans
 - `/clan create <nom>`, `/clan invite <joueur>`, `/clan join <nom>`, `/clan leave`.
-- `/clan info`, `/clan stats`, `/clan level`.
+- `/clan` ouvre le menu graphique; `/clan info`, `/clan stats`, `/clan level`.
 - `/clan bank [deposit|withdraw <montant>]`.
 - `/clan allies request|accept|remove <clan>` — alliances bilatérales.
 - `/clan role <joueur> <officer|member>` — rôle d'officier ou membre.
@@ -38,9 +38,9 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/clan top`, `/clan leaderboard`.
 
 ### Activités et commerce
-- `/quests`, `/quests claim`, `/quests weekly`, `/quests weekly claim` — objectifs automatiques quotidiens et hebdomadaires.
-- `/quiz`, puis `/quiz <réponse>` — question Minecraft et récompense.
-- `/shop search <objet>` et `/shop buy <clé> [quantité]` — recherche et achats LPC; prix modifiables dans features.yml.
+- `/quests` ouvre le menu des objectifs; `/quests claim`, `/quests weekly`, `/quests weekly claim` — objectifs automatiques quotidiens et hebdomadaires.
+- `/quiz` — quiz Minecraft à choix multiples dans un menu interactif.
+- `/shop` ouvre la boutique graphique; `/shop search <objet>` et `/shop buy <clé> [quantité]` — recherche et achats LPC; prix modifiables dans features.yml.
 - `/ah list`, `/ah sell <prix>`, `/ah buy <id>` — hôtel des ventes persistant.
 - `/trade <joueur>`, `/trade accept`, `/trade item`, `/trade money <montant>`, `/trade confirm`, `/trade cancel` — échange avec double confirmation.
 
