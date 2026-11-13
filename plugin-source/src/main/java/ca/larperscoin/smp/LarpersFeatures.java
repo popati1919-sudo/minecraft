@@ -263,10 +263,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             }
             case "transfer" -> {
                 if(own==null||a.length!=2||!id(p).equals(db.getString(clanPath(own)+".owner"))){msg(p,"Chef seulement: /clan transfer <joueur>.");return true;}
-                Player target=Bukkit.getPlayerExact(a[1]);
-                if(target==null||!own.equals(clanOf(target.getUniqueId()))||target.equals(p)){msg(p,"Le nouveau chef doit être un autre membre connecté du clan.");return true;}
-                String path=clanPath(own);db.set(path+".owner",id(target));db.set(path+".roles."+id(target),"leader");db.set(path+".roles."+id(p),"officer");save();
-                msg(p,"Tu as transféré le leadership à "+target.getName()+".");msg(target,"Tu es maintenant chef du clan "+db.getString(path+".name")+".");return true;
+                OfflinePlayer target=Bukkit.getOfflinePlayer(a[1]);
+                String targetId=target.getUniqueId().toString();
+                if(targetId.equals(id(p))||!db.getStringList(clanPath(own)+".members").contains(targetId)){msg(p,"Le nouveau chef doit déjà être un autre membre du clan.");return true;}
+                String path=clanPath(own);db.set(path+".owner",targetId);db.set(path+".roles."+targetId,"leader");db.set(path+".roles."+id(p),"officer");save();
+                msg(p,"Tu as transféré le leadership à "+(target.getName()==null?a[1]:target.getName())+".");
+                if(target.isOnline())msg(target.getPlayer(),"Tu es maintenant chef du clan "+db.getString(path+".name")+".");
+                return true;
             }
             case "disband" -> {
                 if(own==null||!id(p).equals(db.getString(clanPath(own)+".owner"))){msg(p,"Seul le chef peut dissoudre le clan.");return true;}
