@@ -1,5 +1,5 @@
 name: LarpersCoin
-version: 1.0.3
+version: 1.0.4
 main: ca.larperscoin.smp.LarpersCoin
 api-version: '26.3'
 author: Larpers Coin SMP
@@ -74,7 +74,7 @@ permissions:
     default: op
   larpers.anticheat.bypass:
     description: Exempter un joueur de toutes les détections anti-triche
-    default: op
+    default: false
   larpers.anticheat.alerts:
     description: Recevoir les alertes anti-triche
     default: op
