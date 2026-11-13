@@ -1,6 +1,6 @@
 # État du projet Larpers Coin SMP 26.3
 
-Dernière mise à jour: 2026-11-12 — version de développement 0.8.0.
+Dernière mise à jour: 2026-11-12 — version 0.8.0.
 
 ## Implémenté dans le dépôt
 - [x] Économie LPC persistante: soldes, paiements, classement, daily, primes, commandes admin et historique des 10 dernières transactions par joueur.
@@ -12,7 +12,7 @@ Dernière mise à jour: 2026-11-12 — version de développement 0.8.0.
 - [x] Clans: création, invitation, adhésion, départ, banque, coffre, XP et niveaux par activité, rôles leader/officer/member, alliances bilatérales sur demande et acceptation, statistiques et classements.
 - [x] Quiz Minecraft à choix multiples avec GUI et récompense.
 - [x] Menus GUI pour clans, quêtes, boutique et quiz; outils staff avec raccourcis invsee, vanish, freeze et staffchat.
-- [x] Workflow GitHub Actions et script de compilation Windows.
+- [x] Workflow GitHub Actions et script de compilation Windows; compilation Paper 26.3 / Java 25 réussie sur le commit bbb7342284e87f5eafdf7f8ee9dbbc6d3635725b.
 
 ## Limites restantes
 - [x] Boutique: GUI par catégories, navigation paginée, quantités par clic, prix configurables et contrôle de capacité d'inventaire. Stock illimité (pas de gestion de stock).
@@ -21,7 +21,7 @@ Dernière mise à jour: 2026-11-12 — version de développement 0.8.0.
 - [x] Quiz: banque de questions modifiable dans features.yml et classement des scores.
 - [x] Menu admin: deux pages paginées avec sélecteurs de joueurs, vanish, freeze, raccourcis économie et loterie.
 - [ ] Sauvegarde transactionnelle résistante à une coupure brutale pendant l'écriture; les échanges sont validés sur le thread serveur mais les données restent en YAML.
-- [ ] Tests automatisés et essais en serveur Paper 26.3 réel (la compilation CI doit réussir avant publication).
+- [ ] Essais fonctionnels en serveur Paper 26.3 réel: le build CI compile et produit le JAR, mais aucune session de jeu réelle n'a été exécutée ici.
 - [ ] Validation Java/Bedrock via Geyser + Floodgate sur serveur dédié (requiert un serveur réel et des clients de test).
 
 ## Hors périmètre explicite
