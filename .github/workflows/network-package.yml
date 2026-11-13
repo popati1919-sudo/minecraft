@@ -238,6 +238,18 @@ jobs:
           pause
           EOF
 
+          cat > "$ROOT/DEMARRER-VELOCITY-INITIAL.bat" <<'EOF'
+          @echo off
+          cd /d "%~dp0Velocity"
+          where java >nul 2>nul
+          if errorlevel 1 (echo Java 25 est requis.& pause & exit /b 1)
+          if not exist "velocity.jar" (echo velocity.jar introuvable.& pause & exit /b 1)
+          echo Premier lancement: attends que Geyser, Floodgate et FastLoginPlus generent leurs fichiers.
+          echo Quand Velocity est pret, tape CTRL+C dans cette fenetre pour l'arreter.
+          java -Xms512M -Xmx1G -jar velocity.jar
+          pause
+          EOF
+
           cat > "$ROOT/CONFIGURER-BEDROCK.bat" <<'EOF'
           @echo off
           cd /d "%~dp0Velocity"
@@ -333,16 +345,14 @@ jobs:
           INSTALLATION:
           1. Installer Java 25.
           2. Lire https://aka.ms/MinecraftEULA et accepter l'EULA dans Lobby/eula.txt et SMP/eula.txt.
-          3. Lancer START-NETWORK.bat.
-          4. Au premier demarrage, arreter les trois processus proprement (commande stop dans chaque console).
-          5. Demarrer Velocity une fois, puis l'arreter proprement pour generer les fichiers Geyser/Floodgate/FastLoginPlus.
-          6. Lancer CONFIGURER-RESEAU.bat pour partager la cle Floodgate et autoriser le proxy FastLoginPlus sur Lobby/SMP.
-          7. Lancer CONFIGURER-BEDROCK.bat (auth-type floodgate + transport nethernet).
-          8. Accepter l'EULA dans les deux backends, puis lancer START-NETWORK.bat.
-          9. Lancer OUVRIR-PORTS-WINDOWS.bat en administrateur; rediriger TCP 25565 et TCP+UDP 19132 sur le routeur.
-          10. Les ports 25566 et 25567 restent locaux: ne pas les exposer sur Internet.
-          11. Execute CONFIGURER-LES-GROUPES.bat et attribue les groupes depuis la console SMP.
-          12. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
+          3. Lancer DEMARRER-VELOCITY-INITIAL.bat une seule fois; attendre la generation des fichiers, puis arreter Velocity avec CTRL+C.
+          4. Lancer CONFIGURER-RESEAU.bat pour partager la cle Floodgate et autoriser le proxy FastLoginPlus sur Lobby/SMP.
+          5. Lancer CONFIGURER-BEDROCK.bat (auth-type floodgate + transport nethernet).
+          6. Lancer START-NETWORK.bat: il demarre Lobby, SMP, puis Velocity.
+          7. Lancer OUVRIR-PORTS-WINDOWS.bat en administrateur; rediriger TCP 25565 et TCP+UDP 19132 sur le routeur.
+          8. Les ports 25566 et 25567 restent locaux: ne pas les exposer sur Internet.
+          9. Execute CONFIGURER-LES-GROUPES.bat et attribue les groupes depuis la console SMP.
+          10. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
 
           IMPORTANT:
           - FastLoginPlus verifie l'identite Java premium sur Velocity. Le statut premium doit etre transmis aux backends par le plugin FastLoginPlus; les joueurs crackes gardent /register et /login LPC.
