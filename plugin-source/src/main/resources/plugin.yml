@@ -5,6 +5,12 @@ api-version: '26.3'
 author: Larpers Coin SMP
 description: "Plugin SMP LPC: économie, clans, quêtes, commerce, modération et anti-triche."
 commands:
+  register:
+    description: Crée un compte joueur
+    usage: /register <motdepasse> <confirmation>
+  login:
+    description: Connecte un compte joueur
+    usage: /login <motdepasse>
   balance:
     description: Affiche ton solde LPC
     aliases: [bal]
