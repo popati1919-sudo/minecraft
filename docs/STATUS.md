@@ -1,6 +1,6 @@
 # État du projet Larpers Coin SMP 26.3
 
-Dernière mise à jour: 2026-11-12 — version 0.8.0.
+Dernière mise à jour: 2026-11-12 — version 0.9.0.
 
 ## Implémenté dans le dépôt
 - [x] Économie LPC persistante: soldes, paiements, classement, daily, primes, commandes admin et historique des 10 dernières transactions par joueur.
