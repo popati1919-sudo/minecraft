@@ -48,7 +48,7 @@ jobs:
           cp "$ROOT/Lobby/paper.jar" "$ROOT/SMP/paper.jar"
 
           velocity_versions="$(curl -fsSL -H 'User-Agent: LarpersCoin-Packager/1.0' "https://fill.papermc.io/v3/projects/velocity")"
-          velocity_version="$(echo "$velocity_versions" | jq -r '[.versions[] | .[]] | map(select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))) | first // empty')"
+          velocity_version="$(echo "$velocity_versions" | jq -r '[.versions[] | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))] | first // empty')"
           test -n "$velocity_version"
           velocity_meta="$(curl -fsSL -H 'User-Agent: LarpersCoin-Packager/1.0' "https://fill.papermc.io/v3/projects/velocity/versions/$velocity_version/builds?channel=STABLE&limit=1")"
           velocity_url="$(echo "$velocity_meta" | jq -r '.[0].downloads["server:default"].url // empty')"
@@ -75,6 +75,21 @@ jobs:
           test -s "$ROOT/Velocity/plugins/floodgate-velocity.jar"
           test -s "$ROOT/Lobby/plugins/floodgate-paper.jar"
           test -s "$ROOT/SMP/plugins/floodgate-paper.jar"
+
+          # FastLoginPlus: verification premium sur Velocity et transmission du statut aux backends.
+          flp_proxy_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/fastloginplus/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22velocity%22%5D')"
+          flp_proxy_url="$(echo "$flp_proxy_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
+          test -n "$flp_proxy_url"
+          curl -fL "$flp_proxy_url" -o "$ROOT/Velocity/plugins/FastLoginPlus.jar"
+
+          flp_paper_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/fastloginplus/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
+          flp_paper_url="$(echo "$flp_paper_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
+          test -n "$flp_paper_url"
+          curl -fL "$flp_paper_url" -o "$ROOT/Lobby/plugins/FastLoginPlus.jar"
+          cp "$ROOT/Lobby/plugins/FastLoginPlus.jar" "$ROOT/SMP/plugins/FastLoginPlus.jar"
+          test -s "$ROOT/Velocity/plugins/FastLoginPlus.jar"
+          test -s "$ROOT/Lobby/plugins/FastLoginPlus.jar"
+          test -s "$ROOT/SMP/plugins/FastLoginPlus.jar"
 
       - name: Configurer Velocity, lobby et SMP
         shell: bash
@@ -164,7 +179,7 @@ jobs:
           proxies:
             velocity:
               enabled: true
-              online-mode: true
+              online-mode: false
               secret: "$SECRET"
           EOF
           done
@@ -236,6 +251,47 @@ jobs:
           pause
           EOF
 
+          cat > "$ROOT/CONFIGURER-RESEAU.bat" <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          set "PROXYID=%~dp0Velocity\plugins\fastloginplus\proxyId.txt"
+          set "FGKEY=%~dp0Velocity\plugins\floodgate\key.pem"
+          if not exist "%PROXYID%" (
+            echo proxyId FastLoginPlus introuvable.
+            echo Demarre Velocity une fois, puis ferme-le proprement.
+            pause
+            exit /b 1
+          )
+          if not exist "%FGKEY%" (
+            echo Cle Floodgate introuvable.
+            echo Demarre Velocity une fois, puis ferme-le proprement.
+            pause
+            exit /b 1
+          )
+          for %%S in (Lobby SMP) do (
+            if not exist "%%S\plugins\fastloginplus" mkdir "%%S\plugins\fastloginplus"
+            copy /Y "%PROXYID%" "%%S\plugins\fastloginplus\allowed-proxies.txt" >nul
+            if not exist "%%S\plugins\floodgate" mkdir "%%S\plugins\floodgate"
+            copy /Y "%FGKEY%" "%%S\plugins\floodgate\key.pem" >nul
+          )
+          echo.
+          echo Cle Floodgate et proxy FastLoginPlus copies sur les deux backends.
+          echo Redemarre Lobby, SMP puis Velocity.
+          pause
+          EOF
+
+          cat > "$ROOT/OUVRIR-PORTS-WINDOWS.bat" <<'EOF'
+          @echo off
+          net session >nul 2>&1
+          if errorlevel 1 (echo Execute ce fichier en administrateur.& pause & exit /b 1)
+          netsh advfirewall firewall add rule name="Larpers Java Velocity TCP 25565" dir=in action=allow protocol=TCP localport=25565
+          netsh advfirewall firewall add rule name="Larpers Bedrock TCP 19132" dir=in action=allow protocol=TCP localport=19132
+          netsh advfirewall firewall add rule name="Larpers Bedrock UDP 19132" dir=in action=allow protocol=UDP localport=19132
+          echo Pare-feu Windows configure. Redirige aussi ces ports sur ton routeur.
+          echo N'ouvre JAMAIS les ports backend 25566 et 25567 sur Internet.
+          pause
+          EOF
+
           cat > "$ROOT/LISEZ-MOI.txt" <<'EOF'
           LARPERS COIN - RESEAU COMPLET
           =============================
@@ -244,6 +300,7 @@ jobs:
           - Lobby Paper separe: 127.0.0.1:25566 (authentification uniquement: /register et /login)
           - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
           - Geyser + Floodgate installes sur Velocity, Floodgate aussi sur Lobby et SMP pour reconnaitre les joueurs Bedrock
+          - FastLoginPlus sur Velocity et les deux backends pour verifier les comptes Java premium; les comptes non premium gardent /register et /login LPC
           - Lobby: Java cracke utilise /register et /login; Java premium verifie et Bedrock via Floodgate sont exempts de mot de passe
           - Apres authentification, transfert automatique vers le SMP
           - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend
@@ -255,14 +312,18 @@ jobs:
           2. Lire https://aka.ms/MinecraftEULA et accepter l'EULA dans Lobby/eula.txt et SMP/eula.txt.
           3. Lancer START-NETWORK.bat.
           4. Au premier demarrage, arreter les trois processus proprement (commande stop dans chaque console).
-          5. Lancer Velocity une fois pour generer les fichiers Geyser/Floodgate, puis CONFIGURER-BEDROCK.bat.
-          6. Redemarrer avec START-NETWORK.bat.
-          7. Ouvrir/rediriger TCP 25565 (Java) et UDP 19132 (Bedrock) vers le PC.
-          8. Les ports 25566 et 25567 restent locaux: ne pas les exposer sur Internet.
-          9. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
+          5. Demarrer Velocity une fois, puis l'arreter proprement pour generer les fichiers Geyser/Floodgate/FastLoginPlus.
+          6. Lancer CONFIGURER-RESEAU.bat pour partager la cle Floodgate et autoriser le proxy FastLoginPlus sur Lobby/SMP.
+          7. Lancer CONFIGURER-BEDROCK.bat (auth-type floodgate + transport nethernet).
+          8. Accepter l'EULA dans les deux backends, puis lancer START-NETWORK.bat.
+          9. Lancer OUVRIR-PORTS-WINDOWS.bat en administrateur; rediriger TCP 25565 et TCP+UDP 19132 sur le routeur.
+          10. Les ports 25566 et 25567 restent locaux: ne pas les exposer sur Internet.
+          11. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
 
           IMPORTANT:
-          - Le proxy accepte Java cracke; ces joueurs utilisent /register et /login. Java premium necessite une authentification premium reelle cote proxy avant d'etre exempte. Bedrock doit passer par Geyser auth-type floodgate et Floodgate sur les deux backends.
+          - FastLoginPlus verifie l'identite Java premium sur Velocity. Le statut premium doit etre transmis aux backends par le plugin FastLoginPlus; les joueurs crackes gardent /register et /login LPC.
+          - Garde le forwarding moderne et le secret prive identiques sur les deux Paper. Le mode online-mode du proxy et celui de proxies.velocity.online-mode dans Paper doivent rester false pour ce mode mixte.
+          - Bedrock doit passer par Geyser auth-type floodgate + NetherNet; la meme cle Floodgate doit etre partagee avec les deux backends.
           - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
           - Ne change pas online-mode du proxy et ne rends jamais les ports backend publics.
           - Le plugin anticheat utilise des seuils de sanctions progressives configurables; ajuste-les apres tests.
