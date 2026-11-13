@@ -280,6 +280,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 for(String member:members)db.set("clan-members."+member,null);
                 for(String ally:db.getStringList(path+".allies")){List<String> list=db.getStringList(clanPath(ally)+".allies");list.remove(own);db.set(clanPath(ally)+".allies",list);}
                 var invites=db.getConfigurationSection("invites");if(invites!=null)for(String key:new ArrayList<>(invites.getKeys(false)))if(own.equals(db.getString("invites."+key)))db.set("invites."+key,null);
+                var requests=db.getConfigurationSection("alliance-requests");
+                if(requests!=null)for(String key:new ArrayList<>(requests.getKeys(false))) {
+                    db.set("alliance-requests."+key+"."+own,null);
+                    db.set("alliance-requests."+own+"."+key,null);
+                }
                 db.set(path,null);clanChests.remove(own);clanChestUsers.remove(own);clanChestSnapshots.remove(own);save();msg(p,"Clan dissous. Les membres ont été retirés.");return true;
             }
             case "info","stats","level" -> {
