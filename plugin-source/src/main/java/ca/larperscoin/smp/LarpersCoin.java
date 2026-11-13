@@ -95,6 +95,14 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         }
         data.set("balances." + key(uuid), next);
     }
+    void recordTransaction(String type, UUID from, UUID to, double amount) {
+        if (!Double.isFinite(amount) || amount <= 0.0) return;
+        List<String> records = data.getStringList("transactions");
+        records.add(System.currentTimeMillis() + "|" + type + "|" + from + "|" + to + "|" + amount);
+        if (records.size() > 2000) records = new ArrayList<>(records.subList(records.size() - 2000, records.size()));
+        data.set("transactions", records);
+        saveData();
+    }
 
     private void reply(CommandSender sender, String message) {
         sender.sendMessage(ChatColor.GOLD + "[LPC] " + ChatColor.RESET + message);
@@ -168,6 +176,37 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     saveData();
                     reply(player, "Tu as envoyé " + format(amount) + " à " + target.getName() + ".");
                     reply(target, "Tu as reçu " + format(amount) + " de " + player.getName() + ".");
+                    return true;
+                }
+                case "history" -> {
+                    UUID targetId;
+                    String targetName;
+                    if (args.length == 0) {
+                        Player player = requirePlayer(sender);
+                        if (player == null) return true;
+                        targetId = player.getUniqueId();
+                        targetName = player.getName();
+                    } else {
+                        if (!isStaff(sender)) { reply(sender, "Permission insuffisante."); return true; }
+                        OfflinePlayer target = Bukkit.getOfflinePlayer(args[0]);
+                        targetId = target.getUniqueId();
+                        targetName = args[0];
+                    }
+                    List<String> records = data.getStringList("transactions");
+                    int shown = 0;
+                    reply(sender, "Historique LPC de " + targetName + " (10 dernières opérations) :");
+                    for (int i = records.size() - 1; i >= 0 && shown < 10; i--) {
+                        String[] parts = records.get(i).split("\\\\|");
+                        if (parts.length != 5) continue;
+                        if (!parts[2].equals(targetId.toString()) && !parts[3].equals(targetId.toString())) continue;
+                        long stamp;
+                        try { stamp = Long.parseLong(parts[0]); } catch (NumberFormatException ex) { continue; }
+                        String direction = parts[2].equals(targetId.toString()) ? "-" : "+";
+                        String date = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(new java.util.Date(stamp));
+                        reply(sender, date + " " + parts[1] + " " + direction + parts[4] + " LPC");
+                        shown++;
+                    }
+                    if (shown == 0) reply(sender, "Aucune transaction enregistrée.");
                     return true;
                 }
                 case "baltop" -> {
