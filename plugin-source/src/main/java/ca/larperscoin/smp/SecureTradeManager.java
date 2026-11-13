@@ -161,7 +161,16 @@ public final class SecureTradeManager implements Listener {
                         msg(p, "Un des joueurs participe déjà à un échange."); return true;
                     }
                     invitations.put(target.getUniqueId(), p.getUniqueId());
-                    msg(p, "Invitation envoyée à " + target.getName() + ".");
+                    UUID targetId=target.getUniqueId(), requesterId=p.getUniqueId();
+                    Bukkit.getScheduler().runTaskLater(plugin,()->{
+                        if(requesterId.equals(invitations.get(targetId))) {
+                            invitations.remove(targetId);
+                            Player receiver=Bukkit.getPlayer(targetId),requester=Bukkit.getPlayer(requesterId);
+                            if(receiver!=null)msg(receiver,"L'invitation d'échange a expiré.");
+                            if(requester!=null)msg(requester,"Ton invitation d'échange a expiré.");
+                        }
+                    },1200L);
+                    msg(p, "Invitation envoyée à " + target.getName() + " (expire après 60 secondes).");
                     msg(target, p.getName() + " te propose un échange. Fais /trade accept ou /trade cancel.");
                     return true;
                 }
