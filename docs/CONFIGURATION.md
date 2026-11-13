@@ -59,6 +59,36 @@ Une bonne réponse donne 50 LPC et ajoute un point au classement `/quiz top`. Le
 - `larpers.admin`: commandes d'administration économique et actions réservées aux administrateurs.
 - Les deux permissions sont attribuées aux opérateurs par défaut dans `plugin.yml`.
 
+## Anti-triche v1.0
+
+Le module crée automatiquement les valeurs manquantes dans `plugins/LarpersCoin/config.yml`. Tu peux les modifier puis exécuter `/ac reload`.
+
+```yaml
+anticheat:
+  enabled: true
+  alert-cooldown-seconds: 4
+  evidence-limit: 50
+  checks:
+    speed:
+      enabled: true
+      max-ground-blocks-per-tick: 1.35
+    fly:
+      enabled: true
+      upward-limit-per-tick: 0.72
+      repeated-upward-ticks: 4
+    reach:
+      enabled: true
+      max-distance: 4.45
+```
+
+Commandes staff: `/ac status`, `/ac alerts`, `/ac info <joueur>`, `/ac top`, `/ac log`, `/ac reset <joueur>`, `/ac reload`.
+
+- `larpers.anticheat.alerts`: recevoir les alertes (OP par défaut).
+- `larpers.anticheat.bypass`: exclure un joueur de toutes les détections (OP par défaut).
+- Les compteurs sont enregistrés dans `anticheat-violations.yml`, avec sauvegarde périodique et à l'arrêt.
+- Les journaux récents sont conservés en mémoire jusqu'au redémarrage.
+- Les détections sont indicatives; elles ne déclenchent aucun kick ni bannissement.
+
 ## Sauvegardes
 
 - `data.yml`: soldes, primes, loterie et historique économique (2000 opérations récentes au maximum).
