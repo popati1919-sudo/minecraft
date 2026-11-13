@@ -2,10 +2,11 @@ name: Package reseau complet Larpers Coin (Velocity + Lobby + SMP)
 
 on:
   push:
-    branches: [main]
+    branches: [main, auth/velocity-replacement]
     paths:
       - ".github/workflows/network-package.yml"
       - "plugin-source/**"
+      - "velocity-plugin/**"
   workflow_dispatch:
 
 permissions:
@@ -65,6 +66,12 @@ jobs:
           cp "$plugin_jar" "$ROOT/SMP/plugins/LarpersCoin.jar"
           cp "$plugin_jar" "$ROOT/Lobby/plugins/LarpersCoin.jar"
 
+          # Compagnon Velocity LPC (diagnostic du proxy).
+          gradle --no-daemon -p velocity-plugin clean build
+          velocity_plugin_jar="$(find velocity-plugin/build/libs -maxdepth 1 -type f -name 'LarpersCoinVelocity-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
+          test -n "$velocity_plugin_jar"
+          cp "$velocity_plugin_jar" "$ROOT/Velocity/plugins/LarpersCoinVelocity.jar"
+
           curl -fL "https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/velocity" -o "$ROOT/Velocity/plugins/Geyser-Velocity.jar"
           curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/velocity" -o "$ROOT/Velocity/plugins/floodgate-velocity.jar"
           # Floodgate doit aussi etre present sur les backends Paper pour que
@@ -76,17 +83,7 @@ jobs:
           test -s "$ROOT/Lobby/plugins/floodgate-paper.jar"
           test -s "$ROOT/SMP/plugins/floodgate-paper.jar"
 
-          # FastLoginPlus: verification Mojang sur Velocity et statut premium cote backend.
-          flp_velocity_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/fastloginplus/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22velocity%22%5D')"
-          flp_velocity_url="$(echo "$flp_velocity_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
-          test -n "$flp_velocity_url"
-          curl -fL "$flp_velocity_url" -o "$ROOT/Velocity/plugins/FastLoginPlus.jar"
-
-          flp_paper_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/fastloginplus/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
-          flp_paper_url="$(echo "$flp_paper_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
-          test -n "$flp_paper_url"
-          curl -fL "$flp_paper_url" -o "$ROOT/Lobby/plugins/FastLoginPlus.jar"
-          cp "$ROOT/Lobby/plugins/FastLoginPlus.jar" "$ROOT/SMP/plugins/FastLoginPlus.jar"
+          # FastLoginPlus retire: aucune verification Mojang externe.
 
           papi_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/placeholderapi/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
           papi_url="$(echo "$papi_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
@@ -95,9 +92,6 @@ jobs:
           cp "$ROOT/Lobby/plugins/PlaceholderAPI.jar" "$ROOT/SMP/plugins/PlaceholderAPI.jar"
 
 
-          test -s "$ROOT/Velocity/plugins/FastLoginPlus.jar"
-          test -s "$ROOT/Lobby/plugins/FastLoginPlus.jar"
-          test -s "$ROOT/SMP/plugins/FastLoginPlus.jar"
           test -s "$ROOT/Lobby/plugins/PlaceholderAPI.jar"
           test -s "$ROOT/SMP/plugins/PlaceholderAPI.jar"
 
@@ -254,7 +248,7 @@ jobs:
           where java >nul 2>nul
           if errorlevel 1 (echo Java 25 est requis.& pause & exit /b 1)
           if not exist "velocity.jar" (echo velocity.jar introuvable.& pause & exit /b 1)
-          echo Premier lancement: attends que Geyser, Floodgate et FastLoginPlus generent leurs fichiers.
+          echo Premier lancement: attends que Geyser et Floodgate generent leurs fichiers.
           echo Quand Velocity est pret, tape CTRL+C dans cette fenetre pour l'arreter.
           java -Xms512M -Xmx1G -jar velocity.jar
           pause
@@ -277,31 +271,19 @@ jobs:
           cat > "$ROOT/CONFIGURER-RESEAU.bat" <<'EOF'
           @echo off
           cd /d "%~dp0"
-          set "PROXYID=%~dp0Velocity\plugins\fastloginplus\proxyId.txt"
-          set "FGKEY=%~dp0Velocity\plugins\floodgate\key.pem"
-          if not exist "%PROXYID%" (
-            echo proxyId FastLoginPlus introuvable.
-            echo Demarre Velocity une fois, puis ferme-le proprement.
-            pause
-            exit /b 1
-          )
+          set "FGKEY=%~dp0Velocity\\plugins\\floodgate\\key.pem"
           if not exist "%FGKEY%" (
-            echo Cle Floodgate introuvable.
-            echo Demarre Velocity une fois, puis ferme-le proprement.
+            echo Cle Floodgate introuvable. Lance Velocity une fois puis ferme-le.
             pause
             exit /b 1
           )
           for %%S in (Lobby SMP) do (
-            if not exist "%%S\plugins\fastloginplus" mkdir "%%S\plugins\fastloginplus"
-            copy /Y "%PROXYID%" "%%S\plugins\fastloginplus\allowed-proxies.txt" >nul
-            if not exist "%%S\plugins\floodgate" mkdir "%%S\plugins\floodgate"
-            copy /Y "%FGKEY%" "%%S\plugins\floodgate\key.pem" >nul
+            if not exist "%%S\\plugins\\floodgate" mkdir "%%S\\plugins\\floodgate"
+            copy /Y "%FGKEY%" "%%S\\plugins\\floodgate\\key.pem" >nul
           )
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$files=@('Velocity\plugins\fastloginplus\config.yml','Lobby\plugins\fastloginplus\config.yml','SMP\plugins\fastloginplus\config.yml'); foreach($f in $files){if(Test-Path $f){$s=Get-Content -Raw $f; $s=[regex]::Replace($s,'(?m)^(\s*secondAttemptCracked\s*:\s*)false','$1true'); Set-Content -Path $f -Value $s -Encoding utf8}}"
-          if errorlevel 1 (echo Echec de configuration FastLoginPlus.& pause & exit /b 1)
-          echo.
-          echo Cle Floodgate, proxy autorise et reessai cracked configures.
-          echo Redemarre Lobby, SMP puis Velocity.
+          echo Cle Floodgate partagee avec Lobby et SMP.
+          echo Tous les joueurs Java utilisent /register puis /login LPC.
+          echo Les joueurs Bedrock passent par Floodgate.
           pause
           EOF
 
@@ -347,8 +329,8 @@ jobs:
           - Lobby Paper separe: 127.0.0.1:25566 (authentification uniquement: /register et /login)
           - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
           - Geyser + Floodgate installes sur Velocity, Floodgate aussi sur Lobby et SMP pour reconnaitre les joueurs Bedrock
-          - FastLoginPlus: connexion sans mot de passe pour les comptes Java premium verifies; comptes crackes conservent /register et /login LPC
-          - Lobby: Java premium verifie sans mot de passe; Java cracke utilise /register et /login LPC
+          - Aucun FastLoginPlus: tous les comptes Java, premium ou crackes, utilisent /register et /login LPC; Bedrock passe par Floodgate
+          - Lobby: tous les joueurs Java utilisent /register et /login LPC
           - Apres authentification, transfert automatique vers le SMP
           - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend
           - Geyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login
@@ -367,7 +349,7 @@ jobs:
           10. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
 
           IMPORTANT:
-          - FastLoginPlus verifie les comptes Java premium via Mojang. Les joueurs crackes gardent /register et /login LPC; le reessai cracked est active pour eviter un blocage sur une session non premium.
+          - FastLoginPlus est retire. Tous les joueurs Java doivent faire /register puis /login; aucun compte premium n'est automatiquement reconnu.
           - Garde le forwarding moderne et le secret prive identiques sur les deux Paper. Le mode online-mode du proxy et celui de proxies.velocity.online-mode dans Paper doivent rester false pour ce mode mixte.
           - Bedrock doit passer par Geyser auth-type floodgate + NetherNet; la meme cle Floodgate doit etre partagee avec les deux backends.
           - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
