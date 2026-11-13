@@ -1,5 +1,5 @@
 name: LarpersCoin
-version: 1.0.0
+version: 1.0.1
 main: ca.larperscoin.smp.LarpersCoin
 api-version: '26.3'
 author: Larpers Coin SMP
