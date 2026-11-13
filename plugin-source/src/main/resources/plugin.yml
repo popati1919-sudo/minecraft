@@ -15,6 +15,9 @@ commands:
   baltop:
     description: Classement des fortunes LPC
     usage: /baltop
+  history:
+    description: Historique des transactions LPC
+    usage: /history [joueur]
   daily:
     description: Réclame ta récompense quotidienne
     usage: /daily
