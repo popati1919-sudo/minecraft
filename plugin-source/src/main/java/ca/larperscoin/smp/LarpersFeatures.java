@@ -563,13 +563,6 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
         msg(p,"/ah list | /ah sell <prix> | /ah buy <id>");return true;
     }
-    private boolean trade(CommandSender s,String[] a) {
-        Player p=player(s);if(p==null)return true;
-        if(a.length!=1){msg(p,"Usage: /trade <joueur> — demande d'échange (confirmation des deux joueurs requise).");return true;}
-        Player t=Bukkit.getPlayerExact(a[0]);if(t==null||t.equals(p)){msg(p,"Joueur invalide.");return true;}
-        tradeInvites.put(t.getUniqueId(),p.getUniqueId());msg(t,p.getName()+" souhaite échanger. Réponds avec /trade "+p.getName()+" pour indiquer ton intérêt.");msg(p,"Demande envoyée. Le transfert sécurisé n'est pas encore disponible dans cette version.");return true;
-    }
-
     @EventHandler public void onMove(PlayerMoveEvent e) {
         if(frozen.contains(e.getPlayer().getUniqueId())&&e.getTo()!=null&&(e.getFrom().getX()!=e.getTo().getX()||e.getFrom().getZ()!=e.getTo().getZ()))e.setTo(e.getFrom());
     }
