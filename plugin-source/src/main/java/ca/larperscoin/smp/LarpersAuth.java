@@ -23,7 +23,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import javax.crypto.SecretKeyFactory;
@@ -57,7 +56,7 @@ final class LarpersAuth implements Listener {
         this.plugin = plugin;
         this.file = new File(plugin.getDataFolder(), "auth.yml");
         this.accounts = YamlConfiguration.loadConfiguration(file);
-        plugin.getConfig().addDefault("auth.proxy-authenticated", true);
+        plugin.getConfig().addDefault("auth.proxy-authenticated", false);
         plugin.getConfig().addDefault("auth.remember-ip", false);
         plugin.getConfig().addDefault("auth.connect-to-smp", false);
         Bukkit.getMessenger().registerOutgoingPluginChannel(plugin, "BungeeCord");
@@ -268,25 +267,13 @@ final class LarpersAuth implements Listener {
     }
 
     private boolean isPremium(Player player) {
-        Plugin fastLogin = Bukkit.getPluginManager().getPlugin("FastLoginPlus");
-        if (fastLogin == null || !fastLogin.isEnabled()) return false;
-        // Seul le statut verifie par FastLoginPlus peut dispenser du mot de passe.
-        Plugin papi = Bukkit.getPluginManager().getPlugin("PlaceholderAPI");
-        if (papi == null || !papi.isEnabled()) return false;
-        try {
-            Class<?> api = Class.forName("me.clip.placeholderapi.PlaceholderAPI");
-            Object premium = api.getMethod("setPlaceholders",
-                    org.bukkit.OfflinePlayer.class, String.class)
-                    .invoke(null, player, "%fastloginplus_is_premium%");
-            if (premium != null && premium.toString().equalsIgnoreCase("true")) return true;
-            Object status = api.getMethod("setPlaceholders",
-                    org.bukkit.OfflinePlayer.class, String.class)
-                    .invoke(null, player, "%fastloginplus_status%");
-            return status != null && status.toString().equalsIgnoreCase("premium");
-        } catch (ReflectiveOperationException | LinkageError ex) {
-            plugin.getLogger().fine("Statut FastLoginPlus indisponible pour " + player.getName());
-            return false;
-        }
+        // Avec Velocity en modern forwarding, le proxy Premium transmet l'UUID
+        // authentifie par Microsoft/Mojang. Le proxy Crack transmet l'UUID offline.
+        // Ne jamais activer cette detection si le backend est accessible directement
+        // ou si le forwarding moderne et son secret ne sont pas configures.
+        UUID offlineId = UUID.nameUUIDFromBytes(
+                ("OfflinePlayer:" + player.getName()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return !player.getUniqueId().equals(offlineId);
     }
 
     private boolean exempt(Player player) {
