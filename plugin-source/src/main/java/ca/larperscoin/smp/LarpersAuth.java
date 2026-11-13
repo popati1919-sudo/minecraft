@@ -269,12 +269,22 @@ final class LarpersAuth implements Listener {
 
     private boolean isPremium(Player player) {
         Plugin fastLogin = Bukkit.getPluginManager().getPlugin("FastLoginPlus");
-        if (fastLogin == null) fastLogin = Bukkit.getPluginManager().getPlugin("FastLogin");
         if (fastLogin == null || !fastLogin.isEnabled()) return false;
+        // Seul le statut verifie par FastLoginPlus peut dispenser du mot de passe.
+        Plugin papi = Bukkit.getPluginManager().getPlugin("PlaceholderAPI");
+        if (papi == null || !papi.isEnabled()) return false;
         try {
-            Object status = fastLogin.getClass().getMethod("getStatus", UUID.class).invoke(fastLogin, player.getUniqueId());
-            return status != null && status.toString().equalsIgnoreCase("PREMIUM");
+            Class<?> api = Class.forName("me.clip.placeholderapi.PlaceholderAPI");
+            Object premium = api.getMethod("setPlaceholders",
+                    org.bukkit.OfflinePlayer.class, String.class)
+                    .invoke(null, player, "%fastloginplus_is_premium%");
+            if (premium != null && premium.toString().equalsIgnoreCase("true")) return true;
+            Object status = api.getMethod("setPlaceholders",
+                    org.bukkit.OfflinePlayer.class, String.class)
+                    .invoke(null, player, "%fastloginplus_status%");
+            return status != null && status.toString().equalsIgnoreCase("premium");
         } catch (ReflectiveOperationException | LinkageError ex) {
+            plugin.getLogger().fine("Statut FastLoginPlus indisponible pour " + player.getName());
             return false;
         }
     }
