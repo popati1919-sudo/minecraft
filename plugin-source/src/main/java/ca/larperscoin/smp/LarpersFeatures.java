@@ -249,8 +249,16 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 if(a.length==1){msg(p,"Banque du clan: "+db.getDouble(path)+" LPC. /clan bank deposit|withdraw <montant>");return true;}
                 if(a.length!=3){msg(p,"Usage: /clan bank deposit|withdraw <montant>");return true;}
                 double v=Double.parseDouble(a[2]);if(!Double.isFinite(v)||v<=0){msg(p,"Montant invalide.");return true;}
-                if(a[1].equalsIgnoreCase("deposit")){if(!charge(p,v)){msg(p,"Fonds insuffisants.");return true;}db.set(path,db.getDouble(path)+v);}
-                else if(a[1].equalsIgnoreCase("withdraw")){if(!clanLeaderOrOfficer(p,own)||db.getDouble(path)<v){msg(p,"Retrait refusé (chef/officier seulement ou fonds insuffisants).");return true;}db.set(path,db.getDouble(path)-v);give(p,v);}
+                if(a[1].equalsIgnoreCase("deposit")){
+                    double nextBank=db.getDouble(path)+v;
+                    if(!Double.isFinite(nextBank)){msg(p,"La banque dépasserait la limite numérique.");return true;}
+                    if(!charge(p,v)){msg(p,"Fonds insuffisants.");return true;}
+                    db.set(path,nextBank);core.recordTransaction("CLAN_DEPOSIT",p.getUniqueId(),new UUID(0L,0L),v);
+                }
+                else if(a[1].equalsIgnoreCase("withdraw")){
+                    if(!clanLeaderOrOfficer(p,own)||db.getDouble(path)<v||!Double.isFinite(core.balance(p.getUniqueId())+v)){msg(p,"Retrait refusé (chef/officier seulement ou fonds insuffisants).");return true;}
+                    db.set(path,db.getDouble(path)-v);give(p,v);core.recordTransaction("CLAN_WITHDRAW",new UUID(0L,0L),p.getUniqueId(),v);
+                }
                 else {msg(p,"Choisis deposit ou withdraw.");return true;} save();msg(p,"Opération effectuée.");return true;
             }
             case "chest" -> {
@@ -351,9 +359,10 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             String claimPath="quest-claims."+(isWeekly?"weekly":"daily")+"."+period+"."+id(p);
             if(db.getBoolean(claimPath,false)){msg(p,"Cette récompense a déjà été réclamée pour cette période.");return true;}
             if(!questReady(p,isWeekly)){msg(p,"Objectifs incomplets. Fais /quests pour voir ta progression.");return true;}
-            db.set(claimPath,true);
             double reward=isWeekly?800.0:150.0;
-            give(p,reward);save();
+            if(!Double.isFinite(core.balance(p.getUniqueId())+reward)){msg(p,"Ton solde ne peut pas recevoir cette récompense.");return true;}
+            db.set(claimPath,true);
+            give(p,reward);core.recordTransaction(isWeekly?"QUEST_WEEKLY":"QUEST_DAILY",new UUID(0L,0L),p.getUniqueId(),reward);save();
             msg(p,"Quête "+(isWeekly?"hebdomadaire":"quotidienne")+" terminée : +"+reward+" LPC.");
             return true;
         }
@@ -439,6 +448,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         double price=db.getDouble("shop.prices."+key,SHOP_PRICES.getOrDefault(key,0.0))*amount;
         if(!Double.isFinite(price)||price<=0||!charge(p,price)) { msg(p,"Fonds LPC insuffisants. Prix: "+price+" LPC.");return true; }
         p.getInventory().addItem(purchase);
+        core.recordTransaction("SHOP_BUY",p.getUniqueId(),new UUID(0L,0L),price);
         msg(p,"Achat effectué: "+amount+" x "+material.name()+" pour "+price+" LPC.");
         return true;
     }
@@ -477,7 +487,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(!simulated.addItem(stack.clone()).isEmpty()){msg(p,"Inventaire insuffisant; aucun LPC débité.");return true;}
             if(!charge(p,price)){msg(p,"Fonds insuffisants.");return true;}
             p.getInventory().addItem(stack);
-            UUID sellerId=UUID.fromString(db.getString(path+".sellerId"));core.credit(sellerId,price);core.saveData();db.set(path,null);save();msg(p,"Achat effectué.");return true;
+            UUID sellerId=UUID.fromString(db.getString(path+".sellerId"));
+            if(!Double.isFinite(core.balance(sellerId)+price)){give(p,price);msg(p,"Le solde du vendeur est saturé; achat annulé.");return true;}
+            core.credit(sellerId,price);core.saveData();
+            core.recordTransaction("AH_BUY",p.getUniqueId(),sellerId,price);
+            db.set(path,null);save();msg(p,"Achat effectué.");return true;
         }
         msg(p,"/ah list | /ah sell <prix> | /ah buy <id>");return true;
     }
@@ -534,7 +548,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             String expected=db.getString("quiz."+id(p)+".answer","");
             String selected=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
             if(expected.isEmpty()){msg(p,"Cette question est expirée. Fais /quiz.");p.closeInventory();return;}
-            if(selected.equalsIgnoreCase(expected)){give(p,50);msg(p,"Bonne réponse! +50 LPC.");}
+            if(selected.equalsIgnoreCase(expected)){give(p,50);core.recordTransaction("QUIZ",new UUID(0L,0L),p.getUniqueId(),50);msg(p,"Bonne réponse! +50 LPC.");}
             else msg(p,"Mauvaise réponse. La bonne réponse était: "+expected+".");
             db.set("quiz."+id(p)+".answer",null);save();p.closeInventory();
             return;
