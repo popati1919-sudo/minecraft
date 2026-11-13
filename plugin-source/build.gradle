@@ -1,7 +1,7 @@
 plugins { id 'java' }
 
 group = 'ca.larperscoin'
-version = '0.7.0'
+version = '0.8.0'
 
 repositories {
     maven { url = 'https://repo.papermc.io/repository/maven-public/' }
