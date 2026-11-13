@@ -75,6 +75,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     }
 
     private void setBalance(UUID uuid, double amount) {
+        if (!Double.isFinite(amount)) return;
         data.set("balances." + key(uuid), Math.max(0.0, amount));
         saveData();
     }
@@ -86,9 +87,13 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     }
 
     void credit(UUID uuid, double amount) {
-        if (Double.isFinite(amount) && amount > 0.0) {
-            data.set("balances." + key(uuid), balance(uuid) + amount);
+        if (!Double.isFinite(amount) || amount <= 0.0) return;
+        double next = balance(uuid) + amount;
+        if (!Double.isFinite(next)) {
+            getLogger().warning("Crédit refusé: dépassement numérique pour " + uuid);
+            return;
         }
+        data.set("balances." + key(uuid), next);
     }
 
     private void reply(CommandSender sender, String message) {
@@ -151,6 +156,10 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         reply(sender, "Joueur en ligne ou montant invalide.");
                         return true;
                     }
+                    if (!Double.isFinite(balance(target.getUniqueId()) + amount)) {
+                        reply(sender, "Le solde du destinataire dépasserait la limite numérique.");
+                        return true;
+                    }
                     if (!debit(player.getUniqueId(), amount)) {
                         reply(sender, "Fonds insuffisants.");
                         return true;
@@ -193,7 +202,10 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         return true;
                     }
                     data.set("daily." + id, now);
-                    int streak = data.getInt("streak." + id, 0) + 1;
+                    long previousDay = data.getLong("daily." + id, 0L);
+                    int previousStreak = data.getInt("streak." + id, 0);
+                    int streak = previousDay > 0 && now - previousDay <= 172_800_000L
+                            ? previousStreak + 1 : 1;
                     data.set("streak." + id, streak);
                     double reward = 100.0 + Math.min(streak, 7) * 20.0;
                     credit(player.getUniqueId(), reward);
@@ -214,12 +226,17 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         reply(sender, "Cible ou montant invalide.");
                         return true;
                     }
+                    String targetId = key(target.getUniqueId());
+                    double nextBounty = data.getDouble("bounties." + targetId) + amount;
+                    if (!Double.isFinite(nextBounty)) {
+                        reply(sender, "La prime totale dépasserait la limite numérique.");
+                        return true;
+                    }
                     if (!debit(player.getUniqueId(), amount)) {
                         reply(sender, "Fonds insuffisants.");
                         return true;
                     }
-                    String targetId = key(target.getUniqueId());
-                    data.set("bounties." + targetId, data.getDouble("bounties." + targetId) + amount);
+                    data.set("bounties." + targetId, nextBounty);
                     saveData();
                     Bukkit.broadcastMessage(ChatColor.GOLD + "[LPC] " + player.getName() + " place une prime de " + format(amount) + " sur " + target.getName() + " !");
                     return true;
