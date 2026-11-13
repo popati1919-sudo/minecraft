@@ -366,26 +366,39 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(String.join(" ",a).equalsIgnoreCase(expected)){give(p,50);msg(p,"Bonne réponse! +50 LPC.");}else msg(p,"Pas cette fois. Réponse: "+expected);
         db.set("quiz."+id(p)+".answer",null);save();return true;
     }
+    private void openShop(Player p) {
+        Inventory inv=Bukkit.createInventory(null,54,"LPC | Boutique");
+        int slot=0;
+        for(var entry:SHOP.entrySet()) {
+            if(slot>=54) break;
+            double price=db.getDouble("shop.prices."+entry.getKey(),SHOP_PRICES.get(entry.getKey()));
+            inv.setItem(slot++,item(entry.getValue(),entry.getKey(),"Prix: "+price+" LPC","Clique pour acheter 1"));
+        }
+        p.openInventory(inv);
+    }
+    private boolean buyShop(Player p,String key,int amount) {
+        if(!SHOP.containsKey(key)) { msg(p,"Objet inconnu. Utilise /shop search <objet>.");return true; }
+        if(amount<1||amount>64) { msg(p,"Quantité autorisée: 1 à 64.");return true; }
+        Material material=SHOP.get(key);
+        ItemStack purchase=new ItemStack(material,amount);
+        Inventory simulated=Bukkit.createInventory(null,36);
+        simulated.setStorageContents(p.getInventory().getStorageContents());
+        if(!simulated.addItem(purchase.clone()).isEmpty()) { msg(p,"Inventaire insuffisant; aucun LPC débité.");return true; }
+        double price=db.getDouble("shop.prices."+key,SHOP_PRICES.getOrDefault(key,0.0))*amount;
+        if(!Double.isFinite(price)||price<=0||!charge(p,price)) { msg(p,"Fonds LPC insuffisants. Prix: "+price+" LPC.");return true; }
+        p.getInventory().addItem(purchase);
+        msg(p,"Achat effectué: "+amount+" x "+material.name()+" pour "+price+" LPC.");
+        return true;
+    }
     private boolean shop(CommandSender s,String[] a) {
+        if(a.length==0) { Player p=player(s);if(p!=null)openShop(p);return true; }
         if(a.length>=2&&a[0].equalsIgnoreCase("buy")) {
             Player p=player(s);if(p==null)return true;
-            String key=a[1].toLowerCase(Locale.ROOT);
-            if(!SHOP.containsKey(key)) { msg(p,"Objet inconnu. Utilise /shop search <objet>.");return true; }
             int amount=1;
             if(a.length>=3) try { amount=Integer.parseInt(a[2]); } catch(NumberFormatException ex) { amount=0; }
-            if(amount<1||amount>64) { msg(p,"Quantité autorisée: 1 à 64.");return true; }
-            Material material=SHOP.get(key);
-            ItemStack purchase=new ItemStack(material,amount);
-            Inventory simulated=Bukkit.createInventory(null,36);
-            simulated.setStorageContents(p.getInventory().getStorageContents());
-            if(!simulated.addItem(purchase.clone()).isEmpty()) { msg(p,"Inventaire insuffisant; aucun LPC débité.");return true; }
-            double price=db.getDouble("shop.prices."+key,SHOP_PRICES.getOrDefault(key,0.0))*amount;
-            if(!Double.isFinite(price)||price<=0||!charge(p,price)) { msg(p,"Fonds LPC insuffisants. Prix: "+price+" LPC.");return true; }
-            p.getInventory().addItem(purchase);
-            msg(p,"Achat effectué: "+amount+" x "+material.name()+" pour "+price+" LPC.");
-            return true;
+            return buyShop(p,a[1].toLowerCase(Locale.ROOT),amount);
         }
-        if(a.length<2||!a[0].equalsIgnoreCase("search")){msg(s,"Usage: /shop search <objet> | /shop buy <clé> [quantité]");return true;}
+        if(a.length<2||!a[0].equalsIgnoreCase("search")){msg(s,"Usage: /shop | /shop search <objet> | /shop buy <clé> [quantité]");return true;}
         String query=String.join(" ",Arrays.copyOfRange(a,1,a.length)).toLowerCase(Locale.ROOT);
         List<String> found=SHOP.entrySet().stream().filter(e->e.getKey().contains(query)||e.getValue().name().toLowerCase(Locale.ROOT).contains(query)).map(e->e.getKey()+" — "+e.getValue().name()+" ("+db.getDouble("shop.prices."+e.getKey(),SHOP_PRICES.get(e.getKey()))+" LPC/u)").toList();
         msg(s,found.isEmpty()?"Aucun objet correspondant dans le catalogue.":"Résultats: "+String.join(" | ",found));return true;
@@ -442,12 +455,20 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
         if(title.equals("LPC | Sélection invsee")||title.equals("LPC | Sélection freeze")) {
             e.setCancelled(true);
+            if(e.getRawSlot()>=e.getView().getTopInventory().getSize()) return;
             if(!(e.getWhoClicked() instanceof Player viewer)||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
             String targetName=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName());
             Player target=Bukkit.getPlayerExact(targetName);
             if(target==null) { msg(viewer,"Ce joueur n'est plus en ligne.");viewer.closeInventory();return; }
             if(title.endsWith("invsee")) viewer.openInventory(target.getInventory());
             else { viewer.closeInventory();viewer.performCommand("freeze "+target.getName()); }
+        }
+        if(title.equals("LPC | Boutique")) {
+            e.setCancelled(true);
+            if(e.getRawSlot()>=e.getView().getTopInventory().getSize()) return;
+            if(!(e.getWhoClicked() instanceof Player buyer)||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
+            String key=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
+            buyShop(buyer,key,1);
         }
     }
     @EventHandler public void onChestClose(org.bukkit.event.inventory.InventoryCloseEvent e) {
