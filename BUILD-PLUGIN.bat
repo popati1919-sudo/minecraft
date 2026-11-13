@@ -9,6 +9,8 @@ echo.
 where java >nul 2>nul
 if errorlevel 1 (echo ERREUR : Java est introuvable. Installe un JDK 25. & goto :fail)
 java -version
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$v = (& java -XshowSettings:properties -version 2>&1 | Select-String 'java.specification.version'); if ($v -notmatch '=\\s*25') { Write-Host 'ERREUR : un JDK 25 est requis.'; exit 1 }"
+if errorlevel 1 (echo ERREUR : installe un JDK 25 et configure JAVA_HOME. & goto :fail)
 if not exist "plugin-source\build.gradle" (echo ERREUR : plugin-source\build.gradle introuvable. & goto :fail)
 where gradle >nul 2>nul
 if errorlevel 1 (
@@ -20,7 +22,7 @@ if errorlevel 1 (
 ) else (set "GRADLE=gradle")
 echo.
 echo Compilation en cours...
-call "%GRADLE%" -p plugin-source --no-daemon clean build > BUILD-PLUGIN.log 2>&1
+call "%GRADLE%" -p plugin-source --no-daemon clean build --stacktrace > BUILD-PLUGIN.log 2>&1
 if errorlevel 1 (echo ECHEC. Consulte BUILD-PLUGIN.log & type BUILD-PLUGIN.log & goto :fail)
 if not exist "plugins" mkdir "plugins"
 copy /Y "plugin-source\build\libs\LarpersCoin-*.jar" "plugins\LarpersCoin.jar" >nul
