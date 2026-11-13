@@ -41,11 +41,11 @@ jobs:
           set -euo pipefail
           mkdir -p package/LarpersCoin-Server-Ready/plugins
           PAPER_VERSION="26.3"
-          PAPER_META="$(curl -fsSL "https://api.papermc.io/v2/projects/paper/versions/${PAPER_VERSION}/builds")"
-          PAPER_BUILD="$(echo "$PAPER_META" | jq -r '.builds[-1].build')"
-          PAPER_NAME="$(echo "$PAPER_META" | jq -r --argjson b "$PAPER_BUILD" '.builds[] | select(.build == $b) | .downloads.application.name')"
-          test -n "$PAPER_NAME" && test "$PAPER_NAME" != "null"
-          curl -fL "https://api.papermc.io/v2/projects/paper/versions/${PAPER_VERSION}/builds/${PAPER_BUILD}/downloads/${PAPER_NAME}" -o package/LarpersCoin-Server-Ready/paper.jar
+          PAPER_META="$(curl -fsSL -H 'User-Agent: LarpersCoin-Server-Packager/1.0 (github.com/popati1919-sudo/minecraft)' "https://fill.papermc.io/v3/projects/paper/versions/${PAPER_VERSION}/builds?channel=STABLE&limit=1")"
+          PAPER_URL="$(echo "$PAPER_META" | jq -r '.[0].downloads["server:default"].url // empty')"
+          test -n "$PAPER_URL"
+          curl -fL "$PAPER_URL" -o package/LarpersCoin-Server-Ready/paper.jar
+          test -s package/LarpersCoin-Server-Ready/paper.jar
 
           LP_META="$(curl -fsSL https://api.github.com/repos/LuckPerms/LuckPerms/releases/latest)"
           LP_URL="$(echo "$LP_META" | jq -r '.assets[] | select(.name | test("^LuckPerms-Bukkit-.*\\.jar$")) | .browser_download_url' | head -n 1)"
