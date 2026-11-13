@@ -372,15 +372,31 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     @EventHandler public void onQuestFish(PlayerFishEvent e) {
         if(e.getState()==PlayerFishEvent.State.CAUGHT_FISH) progressQuest(e.getPlayer(),"fish");
     }
+    private void openQuiz(Player p,String question,String[] choices) {
+        Inventory inv=Bukkit.createInventory(null,27,"LPC | Quiz");
+        inv.setItem(4,item(Material.BOOK,"Question",question,"Choisis une réponse ci-dessous."));
+        inv.setItem(11,item(Material.PAPER,choices[0],"Réponse A"));
+        inv.setItem(13,item(Material.PAPER,choices[1],"Réponse B"));
+        inv.setItem(15,item(Material.PAPER,choices[2],"Réponse C"));
+        p.openInventory(inv);
+    }
     private boolean quiz(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
-        long now=System.currentTimeMillis();if(a.length==0&&now-lastQuiz.getOrDefault(p.getUniqueId(),0L)<60_000L){msg(p,"Attends une minute avant un autre quiz.");return true;}
-        String[] q={"Quel minerai permet de fabriquer une boussole?","Combien de côtés possède un bloc standard?","Quel mob explose près du joueur?"};
-        String[] answers={"fer","6","creeper"};int n=new Random().nextInt(q.length);
-        if(a.length==0){msg(p,"Quiz Minecraft: "+q[n]);msg(p,"Réponds avec /quiz <réponse>.");db.set("quiz."+id(p)+".answer",answers[n]);db.set("quiz."+id(p)+".time",now);save();lastQuiz.put(p.getUniqueId(),now);return true;}
+        long now=System.currentTimeMillis();
+        long previous=db.getLong("quiz."+id(p)+".time",0L);
+        if(a.length==0&&now-previous<60_000L){msg(p,"Attends une minute avant un autre quiz.");return true;}
+        String[] q={"Quel minerai permet de fabriquer une boussole?","Combien de faces possède un bloc standard?","Quel mob explose près du joueur?"};
+        String[] answers={"fer","6","creeper"};
+        String[][] choices={{"fer","cuivre","or"},{"4","6","8"},{"creeper","zombie","squelette"}};
+        if(a.length==0) {
+            int n=new Random().nextInt(q.length);
+            db.set("quiz."+id(p)+".answer",answers[n]);db.set("quiz."+id(p)+".time",now);save();
+            openQuiz(p,q[n],choices[n]);return true;
+        }
         String expected=db.getString("quiz."+id(p)+".answer","");
         if(expected.isEmpty()){msg(p,"Commence par /quiz.");return true;}
-        if(String.join(" ",a).equalsIgnoreCase(expected)){give(p,50);msg(p,"Bonne réponse! +50 LPC.");}else msg(p,"Pas cette fois. Réponse: "+expected);
+        if(String.join(" ",a).equalsIgnoreCase(expected)){give(p,50);msg(p,"Bonne réponse! +50 LPC.");}
+        else msg(p,"Pas cette fois. Réponse: "+expected);
         db.set("quiz."+id(p)+".answer",null);save();return true;
     }
     private void openShop(Player p) {
@@ -486,6 +502,19 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(!(e.getWhoClicked() instanceof Player buyer)||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
             String key=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
             buyShop(buyer,key,1);
+        }
+        if(title.equals("LPC | Quiz")) {
+            e.setCancelled(true);
+            if(e.getRawSlot()>=e.getView().getTopInventory().getSize()) return;
+            if(!(e.getWhoClicked() instanceof Player p)||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
+            if(e.getRawSlot()!=11&&e.getRawSlot()!=13&&e.getRawSlot()!=15) return;
+            String expected=db.getString("quiz."+id(p)+".answer","");
+            String selected=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
+            if(expected.isEmpty()){msg(p,"Cette question est expirée. Fais /quiz.");p.closeInventory();return;}
+            if(selected.equalsIgnoreCase(expected)){give(p,50);msg(p,"Bonne réponse! +50 LPC.");}
+            else msg(p,"Mauvaise réponse. La bonne réponse était: "+expected+".");
+            db.set("quiz."+id(p)+".answer",null);save();p.closeInventory();
+            return;
         }
         if(title.equals("LPC | Clan")||title.equals("LPC | Quêtes")) {
             e.setCancelled(true);
