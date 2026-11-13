@@ -246,8 +246,9 @@ jobs:
             pause
             exit /b 1
           )
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='plugins\Geyser-Velocity\config.yml'; $s=Get-Content -Raw $p; $s=[regex]::Replace($s,'(?m)^(\s*auth-type\s*:\s*)[^\r\n]+','$1floodgate'); Set-Content -Path $p -Value $s -Encoding utf8"
-          echo Geyser doit utiliser auth-type: floodgate. Verifie aussi le port 19132 UDP.
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='plugins\Geyser-Velocity\config.yml'; $s=Get-Content -Raw $p; $s=[regex]::Replace($s,'(?m)^(\s*auth-type\s*:\s*)[^\r\n]+','$1floodgate'); $s=[regex]::Replace($s,'(?m)^(\s*transport\s*:\s*)[^\r\n]+','$1nethernet'); Set-Content -Path $p -Value $s -Encoding utf8"
+          if errorlevel 1 (echo Echec de configuration Geyser.& pause & exit /b 1)
+          echo Geyser configure: Floodgate + NetherNet. Ouvre TCP et UDP 19132.
           pause
           EOF
 
