@@ -217,7 +217,8 @@ final class LarpersAuth implements Listener {
     }
 
     private boolean isPremium(Player player) {
-        Plugin fastLogin = Bukkit.getPluginManager().getPlugin("FastLogin");
+        Plugin fastLogin = Bukkit.getPluginManager().getPlugin("FastLoginPlus");
+        if (fastLogin == null) fastLogin = Bukkit.getPluginManager().getPlugin("FastLogin");
         if (fastLogin == null || !fastLogin.isEnabled()) return false;
         try {
             Object status = fastLogin.getClass().getMethod("getStatus", UUID.class).invoke(fastLogin, player.getUniqueId());
