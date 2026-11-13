@@ -197,7 +197,7 @@ final class LarpersAuth implements Listener {
             return Base64.getEncoder().encodeToString(result);
         } finally {
             spec.clearPassword();
-            java.util.Arrays.fill(password, '\\0');
+            java.util.Arrays.fill(password, '\0');
         }
     }
 
