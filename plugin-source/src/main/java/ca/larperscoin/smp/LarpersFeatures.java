@@ -463,8 +463,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private void openShop(Player p,String category,int page) {
         List<String> categories=List.of("Tous","Minerais","Construction","Nourriture","Rares");
         if(!categories.contains(category))category="Tous";
+        final String selectedCategory=category;
         List<Map.Entry<String,Material>> entries=SHOP.entrySet().stream()
-            .filter(e->category.equals("Tous")||shopCategoryFor(e.getKey()).equals(category)).toList();
+            .filter(e->selectedCategory.equals("Tous")||shopCategoryFor(e.getKey()).equals(selectedCategory)).toList();
         int pages=Math.max(1,(entries.size()+35)/36);
         page=Math.max(0,Math.min(page,pages-1));
         shopCategory.put(p.getUniqueId(),category);shopPage.put(p.getUniqueId(),page);
@@ -597,12 +598,14 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             e.setCancelled(true);
             if(e.getRawSlot()>=e.getView().getTopInventory().getSize()) return;
             if(!(e.getWhoClicked() instanceof Player p)||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
-            if(e.getRawSlot()!=11&&e.getRawSlot()!=13&&e.getRawSlot()!=15) return;
+            int slot=e.getRawSlot();if(!List.of(11,13,15,17,20,22).contains(slot))return;
             String expected=db.getString("quiz."+id(p)+".answer","");
             String selected=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
             if(expected.isEmpty()){msg(p,"Cette question est expirée. Fais /quiz.");p.closeInventory();return;}
-            if(selected.equalsIgnoreCase(expected)){if(!Double.isFinite(core.balance(p.getUniqueId())+50)){msg(p,"Ton solde ne peut pas recevoir la récompense.");}else{give(p,50);core.recordTransaction("QUIZ",new UUID(0L,0L),p.getUniqueId(),50);msg(p,"Bonne réponse! +50 LPC.");}}
-            else msg(p,"Mauvaise réponse. La bonne réponse était: "+expected+".");
+            if(selected.equalsIgnoreCase(expected)){
+                if(!Double.isFinite(core.balance(p.getUniqueId())+50)){msg(p,"Ton solde ne peut pas recevoir la récompense.");}
+                else {give(p,50);core.recordTransaction("QUIZ",new UUID(0L,0L),p.getUniqueId(),50);String scorePath="quiz-scores."+id(p);db.set(scorePath,db.getInt(scorePath,0)+1);msg(p,"Bonne réponse! +50 LPC. Score: "+db.getInt(scorePath)+" points.");}
+            } else msg(p,"Mauvaise réponse. La bonne réponse était: "+expected+".");
             db.set("quiz."+id(p)+".answer",null);save();p.closeInventory();
             return;
         }
