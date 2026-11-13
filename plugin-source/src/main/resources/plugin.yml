@@ -1,5 +1,5 @@
 name: LarpersCoin
-version: 0.7.0
+version: 0.8.0
 main: ca.larperscoin.smp.LarpersCoin
 api-version: '26.3'
 author: Larpers Coin SMP
@@ -30,17 +30,17 @@ commands:
     usage: /lottery <buy|pot|draw>
   clan:
     description: Système de clans
-    usage: /clan <create|invite|join|leave|bank|top|allies|level|chest|stats|leaderboard>
+    usage: /clan <create|invite|join|leave|role|bank|top|allies|level|chest|stats|leaderboard>
   quest:
     description: Quêtes quotidiennes
     aliases: [quests]
-    usage: /quests [claim]
+    usage: /quests [claim|weekly [claim]]
   quiz:
     description: Quiz de connaissances Minecraft
     usage: /quiz [réponse]
   shop:
-    description: Recherche dans le catalogue de la boutique
-    usage: /shop search <objet>
+    description: Recherche et achat LPC dans la boutique
+    usage: /shop <search <objet>|buy <clé> [quantité]>
   admin:
     description: Menu graphique du staff
     permission: larpers.staff
@@ -60,8 +60,8 @@ commands:
     description: Hôtel des ventes
     usage: /ah <list|sell|buy>
   trade:
-    description: Demander un échange
-    usage: /trade <joueur>
+    description: Échange sécurisé avec double confirmation
+    usage: /trade <joueur>|accept|item|money <montant>|confirm|cancel
 permissions:
   larpers.staff:
     description: Accès aux outils du staff LPC
