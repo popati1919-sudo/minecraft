@@ -251,7 +251,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(a[0].equalsIgnoreCase("buy")&&a.length==2) {
             String path="ah."+a[1];if(!db.contains(path)){msg(p,"Annonce introuvable.");return true;}
             double price=db.getDouble(path+".price");if(!charge(p,price)){msg(p,"Fonds insuffisants.");return true;}
-            ItemStack stack=db.getItemStack(path+".stack");if(stack==null||!p.getInventory().addItem(stack).isEmpty()){give(p,price);msg(p,"Inventaire plein ou objet indisponible.");return true;}
+            ItemStack stack=db.getItemStack(path+".stack");int empty=p.getInventory().firstEmpty();
+            if(stack==null||empty<0){give(p,price);msg(p,"Il faut un emplacement libre; achat annulé.");return true;}
+            p.getInventory().setItem(empty,stack);
             UUID sellerId=UUID.fromString(db.getString(path+".sellerId"));core.credit(sellerId,price);core.saveData();db.set(path,null);save();msg(p,"Achat effectué.");return true;
         }
         msg(p,"/ah list | /ah sell <prix> | /ah buy <id>");return true;
