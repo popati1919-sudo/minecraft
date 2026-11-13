@@ -52,6 +52,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<UUID, String> shopCategory = new HashMap<>();
     private final Map<UUID, Integer> shopPage = new HashMap<>();
     private final Map<UUID, Integer> adminPage = new HashMap<>();
+    private final Map<UUID, Integer> ahPage = new HashMap<>();
+    private final Map<UUID, Map<Integer, String>> ahSlots = new HashMap<>();
+    private final Map<UUID, UUID> pendingOpTarget = new HashMap<>();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
     private static final Map<String, Material> SHOP = new LinkedHashMap<>();
     private static final Map<String, Double> SHOP_PRICES = new LinkedHashMap<>();
@@ -174,7 +177,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     private void openAdmin(Player p) { openAdmin(p,0); }
     private void openAdmin(Player p,int page) {
-        page=Math.max(0,Math.min(1,page));adminPage.put(p.getUniqueId(),page);
+        page=Math.max(0,Math.min(2,page));adminPage.put(p.getUniqueId(),page);
         Inventory inv=Bukkit.createInventory(null,54,"LPC | Administration");
         if(page==0) {
             inv.setItem(10,item(Material.BOOK,"Voir inventaire","Sélectionner un joueur"));
@@ -182,14 +185,79 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             inv.setItem(14,item(Material.ENDER_EYE,"Vanish","Activer/désactiver"));
             inv.setItem(16,item(Material.REDSTONE_TORCH,"Staffchat","/staffchat <message>"));
             inv.setItem(53,item(Material.ARROW,"Page suivante"));
-        } else {
+        } else if(page==1) {
             inv.setItem(10,item(Material.GOLD_INGOT,"Économie LPC","/eco give|take|set <joueur> <montant>"));
             inv.setItem(12,item(Material.CHEST,"Jackpot","Afficher /lottery pot"));
             inv.setItem(14,item(Material.DIAMOND,"Tirage loterie","/lottery draw"));
             inv.setItem(16,item(Material.EMERALD,"Classement LPC","/baltop"));
             inv.setItem(45,item(Material.ARROW,"Page précédente"));
+            inv.setItem(53,item(Material.ARROW,"Page suivante"));
+        } else {
+            inv.setItem(10,item(Material.COMMAND_BLOCK,"Gestion OP","Donner ou retirer OP à un joueur en ligne","Confirmation obligatoire"));
+            inv.setItem(45,item(Material.ARROW,"Page précédente"));
         }
         inv.setItem(49,item(Material.BARRIER,"Fermer"));
+        p.openInventory(inv);
+    }
+    private void openAuction(Player p,int page) {
+        List<String> keys=new ArrayList<>();
+        var section=db.getConfigurationSection("ah");
+        if(section!=null) keys.addAll(section.getKeys(false));
+        keys.sort(Comparator.comparingLong(k->db.getLong("ah."+k+".created",0L)));
+        Collections.reverse(keys);
+        int maxPage=Math.max(0,(keys.size()-1)/45);
+        page=Math.max(0,Math.min(page,maxPage));
+        ahPage.put(p.getUniqueId(),page);
+        Map<Integer,String> slots=new HashMap<>();
+        Inventory inv=Bukkit.createInventory(null,54,"LPC | Hôtel des ventes");
+        int start=page*45;
+        for(int n=start;n<Math.min(keys.size(),start+45);n++) {
+            String key=keys.get(n),path="ah."+key;
+            ItemStack stack=db.getItemStack(path+".stack");
+            if(stack==null||stack.getType()==Material.AIR) continue;
+            ItemStack display=stack.clone();
+            ItemMeta meta=display.getItemMeta();
+            if(meta!=null) {
+                List<String> lore=meta.hasLore()?new ArrayList<>(meta.getLore()):new ArrayList<>();
+                lore.add(ChatColor.GRAY+"Vendeur: "+db.getString(path+".seller","inconnu"));
+                lore.add(ChatColor.GOLD+"Prix: "+db.getDouble(path+".price")+" LPC");
+                lore.add(ChatColor.YELLOW+"Clique pour acheter / récupérer");
+                meta.setLore(lore);display.setItemMeta(meta);
+            }
+            int slot=n-start;inv.setItem(slot,display);slots.put(slot,key);
+        }
+        ahSlots.put(p.getUniqueId(),slots);
+        inv.setItem(45,item(Material.EMERALD,"Vendre l'objet en main","Clique puis choisis un prix"));
+        if(page>0)inv.setItem(48,item(Material.ARROW,"Page précédente"));
+        inv.setItem(49,item(Material.BARRIER,"Fermer"));
+        if(page<maxPage)inv.setItem(50,item(Material.ARROW,"Page suivante"));
+        inv.setItem(53,item(Material.SUNFLOWER,"Actualiser",keys.size()+" annonce(s)"));
+        p.openInventory(inv);
+    }
+    private void openAuctionSell(Player p) {
+        Inventory inv=Bukkit.createInventory(null,27,"LPC | Prix de vente");
+        inv.setItem(10,item(Material.IRON_INGOT,"10 LPC","Mettre l'objet en main en vente"));
+        inv.setItem(12,item(Material.GOLD_INGOT,"50 LPC","Mettre l'objet en main en vente"));
+        inv.setItem(14,item(Material.EMERALD,"100 LPC","Mettre l'objet en main en vente"));
+        inv.setItem(16,item(Material.DIAMOND,"500 LPC","Mettre l'objet en main en vente"));
+        inv.setItem(22,item(Material.BARRIER,"Annuler"));
+        p.openInventory(inv);
+    }
+    private void createAuction(Player p,double price) {
+        ItemStack hand=p.getInventory().getItemInMainHand();
+        if(!Double.isFinite(price)||price<=0||hand.getType()==Material.AIR){msg(p,"Prix invalide ou main vide.");return;}
+        String key=UUID.randomUUID().toString().substring(0,8),path="ah."+key;
+        db.set(path+".seller",p.getName());db.set(path+".sellerId",id(p));
+        db.set(path+".item",hand.getType().name());db.set(path+".amount",hand.getAmount());
+        db.set(path+".price",price);db.set(path+".stack",hand.clone());db.set(path+".created",System.currentTimeMillis());
+        p.getInventory().setItemInMainHand(null);save();msg(p,"Annonce créée pour "+price+" LPC.");
+        openAuction(p,0);
+    }
+    private void openOpConfirm(Player p,Player target) {
+        pendingOpTarget.put(p.getUniqueId(),target.getUniqueId());
+        Inventory inv=Bukkit.createInventory(null,27,"LPC | Confirmer OP");
+        inv.setItem(11,item(Material.LIME_CONCRETE,target.isOp()?"Retirer OP":"Donner OP","Joueur: "+target.getName()));
+        inv.setItem(15,item(Material.RED_CONCRETE,"Annuler","Aucun changement"));
         p.openInventory(inv);
     }
     private void openPlayerSelector(Player viewer,String action) {
@@ -589,15 +657,12 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     private boolean auction(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
-        if(a.length==0||a[0].equalsIgnoreCase("list")) {
-            var sec=db.getConfigurationSection("ah");if(sec==null){msg(p,"Aucune annonce. /ah sell <prix>");return true;}
-            msg(p,"Hôtel des ventes:");for(String key:sec.getKeys(false)){String path="ah."+key;msg(p,key+": "+db.getString(path+".item")+" x"+db.getInt(path+".amount")+" — "+db.getDouble(path+".price")+" LPC par "+db.getString(path+".seller"));}return true;
-        }
+        if(a.length==0||a[0].equalsIgnoreCase("list")) { openAuction(p,0);return true; }
         if(a[0].equalsIgnoreCase("sell")) {
             if(a.length!=2){msg(p,"Usage: /ah sell <prix>");return true;}
             double price=Double.parseDouble(a[1]);ItemStack hand=p.getInventory().getItemInMainHand();
             if(!Double.isFinite(price)||price<=0||hand.getType()==Material.AIR){msg(p,"Prix invalide ou main vide.");return true;}
-            String key=UUID.randomUUID().toString().substring(0,8);db.set("ah."+key+".seller",p.getName());db.set("ah."+key+".sellerId",id(p));db.set("ah."+key+".item",hand.getType().name());db.set("ah."+key+".amount",hand.getAmount());db.set("ah."+key+".price",price);db.set("ah."+key+".stack",hand.clone());p.getInventory().setItemInMainHand(null);save();msg(p,"Annonce créée: /ah buy "+key);return true;
+            createAuction(p,price);return true;
         }
         if(a[0].equalsIgnoreCase("buy")&&a.length==2) {
             String path="ah."+a[1];if(!db.contains(path)){msg(p,"Annonce introuvable.");return true;}
@@ -631,24 +696,24 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(!(e.getWhoClicked() instanceof Player p)) return;
             int page=adminPage.getOrDefault(p.getUniqueId(),0),slot=e.getRawSlot();
             if(slot==49){p.closeInventory();return;}
-            if(slot==53&&page==0){openAdmin(p,1);return;}
-            if(slot==45&&page==1){openAdmin(p,0);return;}
+            if(slot==53&&page<2){openAdmin(p,page+1);return;}
+            if(slot==45&&page>0){openAdmin(p,page-1);return;}
             if(page==0)switch(slot) {
                 case 10 -> openPlayerSelector(p,"invsee");
                 case 12 -> openPlayerSelector(p,"freeze");
                 case 14 -> {p.closeInventory();p.performCommand("vanish");}
                 case 16 -> msg(p,"Utilise /staffchat <message> pour parler au staff.");
                 default -> { }
-            } else switch(slot) {
+            } else if(page==1) switch(slot) {
                 case 10 -> msg(p,"Économie: /eco give|take|set <joueur> <montant>.");
                 case 12 -> {p.closeInventory();p.performCommand("lottery pot");}
                 case 14 -> {p.closeInventory();p.performCommand("lottery draw");}
                 case 16 -> {p.closeInventory();p.performCommand("baltop");}
                 default -> { }
-            }
+            } else if(page==2&&slot==10) openPlayerSelector(p,"op/deop")
             return;
         }
-        if(title.equals("LPC | Sélection invsee")||title.equals("LPC | Sélection freeze")) {
+        if(title.equals("LPC | Sélection invsee")||title.equals("LPC | Sélection freeze")||title.equals("LPC | Sélection op/deop")) {
             e.setCancelled(true);
             if(e.getRawSlot()>=e.getView().getTopInventory().getSize()) return;
             if(!(e.getWhoClicked() instanceof Player viewer)||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
@@ -656,7 +721,59 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             Player target=Bukkit.getPlayerExact(targetName);
             if(target==null) { msg(viewer,"Ce joueur n'est plus en ligne.");viewer.closeInventory();return; }
             if(title.endsWith("invsee")) viewer.openInventory(target.getInventory());
+            else if(title.endsWith("op/deop")) openOpConfirm(viewer,target);
             else { viewer.closeInventory();viewer.performCommand("freeze "+target.getName()); }
+        }
+        if(title.equals("LPC | Confirmer OP")) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player staffPlayer))return;
+            if(e.getRawSlot()==15){pendingOpTarget.remove(staffPlayer.getUniqueId());staffPlayer.closeInventory();return;}
+            if(e.getRawSlot()!=11)return;
+            if(!staff(staffPlayer)){pendingOpTarget.remove(staffPlayer.getUniqueId());staffPlayer.closeInventory();msg(staffPlayer,"Permission insuffisante.");return;}
+            UUID targetId=pendingOpTarget.remove(staffPlayer.getUniqueId());
+            Player target=targetId==null?null:Bukkit.getPlayer(targetId);
+            if(target==null){staffPlayer.closeInventory();msg(staffPlayer,"Le joueur n'est plus en ligne.");return;}
+            target.setOp(!target.isOp());
+            staffPlayer.closeInventory();
+            msg(staffPlayer,(target.isOp()?"OP donné à ":"OP retiré à ")+target.getName()+".");
+            msg(target,"Ton statut OP a été "+(target.isOp()?"activé":"retiré")+" par le staff.");
+            plugin.getLogger().warning(staffPlayer.getName()+" a "+(target.isOp()?"donné":"retiré")+" OP à "+target.getName()+".");
+        }
+        if(title.equals("LPC | Hôtel des ventes")) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player buyer))return;
+            int slot=e.getRawSlot();
+            if(slot>=0&&slot<45) {
+                String key=ahSlots.getOrDefault(buyer.getUniqueId(),Map.of()).get(slot);
+                if(key==null)return;
+                String path="ah."+key;
+                if(!db.contains(path)){msg(buyer,"Cette annonce n'existe plus.");openAuction(buyer,ahPage.getOrDefault(buyer.getUniqueId(),0));return;}
+                if(id(buyer).equals(db.getString(path+".sellerId"))) {
+                    ItemStack stack=db.getItemStack(path+".stack");
+                    if(stack!=null) {
+                        Inventory simulated=Bukkit.createInventory(null,36);
+                        simulated.setStorageContents(buyer.getInventory().getStorageContents());
+                        if(!simulated.addItem(stack.clone()).isEmpty()){msg(buyer,"Inventaire plein; annonce conservée.");return;}
+                        buyer.getInventory().addItem(stack);
+                        db.set(path,null);save();msg(buyer,"Ton annonce a été retirée et l'objet rendu.");openAuction(buyer,ahPage.getOrDefault(buyer.getUniqueId(),0));return;
+                    }
+                }
+                auction(buyer,new String[]{"buy",key});
+                openAuction(buyer,ahPage.getOrDefault(buyer.getUniqueId(),0));
+                return;
+            }
+            if(slot==45){openAuctionSell(buyer);return;}
+            if(slot==48){openAuction(buyer,ahPage.getOrDefault(buyer.getUniqueId(),0)-1);return;}
+            if(slot==49){buyer.closeInventory();return;}
+            if(slot==50){openAuction(buyer,ahPage.getOrDefault(buyer.getUniqueId(),0)+1);return;}
+            if(slot==53){openAuction(buyer,ahPage.getOrDefault(buyer.getUniqueId(),0));return;}
+        }
+        if(title.equals("LPC | Prix de vente")) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player seller))return;
+            double price=switch(e.getRawSlot()){case 10->10.0;case 12->50.0;case 14->100.0;case 16->500.0;default->-1.0;};
+            if(e.getRawSlot()==22){openAuction(seller,0);return;}
+            if(price>0){seller.closeInventory();createAuction(seller,price);}
         }
         if(title.equals("LPC | Boutique")) {
             e.setCancelled(true);
