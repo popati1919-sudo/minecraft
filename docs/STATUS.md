@@ -15,14 +15,14 @@ Dernière mise à jour: 2026-11-12 — version de développement 0.8.0.
 - [x] Workflow GitHub Actions et script de compilation Windows.
 
 ## Limites restantes
-- [ ] Boutique: le GUI et les achats LPC sont disponibles; il reste à ajouter catégories, pagination, quantités dans le GUI et gestion du stock.
-- [ ] Clans: transfert de chef, dissolution, permissions fines par rôle et gestion complète des invitations hors ligne.
-- [ ] Coffre de clan: interface partagée persistante; les permissions par rôle et journal d'audit restent à ajouter.
-- [ ] Quiz: petit ensemble de questions statiques; pas encore de banque de questions configurable ni de classement.
-- [ ] Menu admin: raccourcis, pas encore de véritables pages de gestion avec pagination et actions intégrées.
+- [x] Boutique: GUI par catégories, navigation paginée, quantités par clic, prix configurables et contrôle de capacité d'inventaire. Stock illimité (pas de gestion de stock).
+- [x] Clans: transfert du chef, dissolution avec confirmation, invitations UUID pouvant être acceptées hors ligne, rôles leader/officer/member et retraits de banque limités au chef/officier.
+- [x] Coffre de clan: contenu persistant, verrou contre les ouvertures concurrentes, accès membres et journal des changements consultable par chef/officiers.
+- [x] Quiz: banque de questions modifiable dans features.yml et classement des scores.
+- [x] Menu admin: deux pages paginées avec sélecteurs de joueurs, vanish, freeze, raccourcis économie et loterie.
 - [ ] Sauvegarde transactionnelle résistante à une coupure brutale pendant l'écriture; les échanges sont validés sur le thread serveur mais les données restent en YAML.
-- [ ] Tests automatisés et tests en serveur Paper 26.3 réel.
-- [ ] Validation Java/Bedrock via Geyser + Floodgate sur serveur dédié.
+- [ ] Tests automatisés et essais en serveur Paper 26.3 réel (la compilation CI doit réussir avant publication).
+- [ ] Validation Java/Bedrock via Geyser + Floodgate sur serveur dédié (requiert un serveur réel et des clients de test).
 
 ## Hors périmètre explicite
 - Aucun claim / protection de terrain.
@@ -36,4 +36,6 @@ Dernière mise à jour: 2026-11-12 — version de développement 0.8.0.
 - /quests, /quests claim, /quests weekly, /quests weekly claim.
 - /shop search <objet>, /shop buy <clé> [quantité].
 - /clan role <joueur> <officer|member>.
+- /clan transfer <joueur>, /clan disband confirm, /clan audit.
+- /quiz top.
 - /clan allies request|accept|remove <clan>.
