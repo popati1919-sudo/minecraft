@@ -1,0 +1,24 @@
+plugins { id 'java' }
+
+group = 'ca.larperscoin'
+version = '0.6.0'
+
+repositories {
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+    mavenCentral()
+}
+
+dependencies {
+    compileOnly 'io.papermc.paper:paper-api:26.3.build.+'
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(25) }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 25
+}
+
+jar { archiveBaseName = 'LarpersCoin'; archiveVersion = project.version }
