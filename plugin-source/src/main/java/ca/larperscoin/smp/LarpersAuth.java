@@ -77,9 +77,8 @@ final class LarpersAuth implements Listener {
             // en mode online et Floodgate valide les comptes Bedrock.
             if (plugin.getConfig().getBoolean("auth.proxy-authenticated", false)
                     || isFloodgate(player) || isPremium(player)) {
-                authenticated.put(player.getUniqueId(), true);
+                markAuthenticated(player);
                 player.sendMessage(ChatColor.GREEN + "Connexion automatique réussie.");
-                joinLocations.remove(player.getUniqueId());
                 return;
             }
             String path = accountPath(player.getName());
