@@ -63,7 +63,7 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 ## Accès Bedrock et comptes Java non premium
 - Geyser-Spigot et Floodgate sont inclus dans le ZIP généré par GitHub Actions.
 - Après le premier démarrage du serveur, arrête-le avec `stop`, puis lance `CONFIGURER-BEDROCK.bat` et redémarre. Geyser utilisera Floodgate (`auth-type: floodgate`).
-- Ouvre et redirige le port **19132 en TCP et UDP** vers le serveur; le port Java reste TCP 25565. Autorise aussi ces ports dans le pare-feu Windows.
+- Lance `OUVRIR-PORTS-WINDOWS.bat` en administrateur pour autoriser les ports dans le pare-feu; redirige aussi **TCP 25565** et **TCP + UDP 19132** sur le routeur.
 - `online-mode=false` permet les comptes Java non premium; AuthMe est inclus et doit rester activé. Les joueurs utilisent `/register motdepasse motdepasse` puis `/login motdepasse`.
 - **Avertissement sécurité:** en mode hors-ligne, Mojang ne vérifie pas les noms Java. Sans authentification AuthMe correctement configurée, un joueur peut usurper le pseudo d'un autre, y compris celui d'un administrateur. N'accorde jamais OP avant d'avoir sécurisé l'inscription, utilise des mots de passe uniques et sauvegarde les données.
 - Floodgate authentifie les joueurs Bedrock via son mécanisme de clé. Ne partage jamais les fichiers de clés Floodgate.
