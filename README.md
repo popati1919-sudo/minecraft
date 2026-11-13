@@ -4,7 +4,8 @@ Plugin Paper pour le serveur **Larpers Coin SMP**, avec monnaie LPC et systèmes
 
 ## Cible
 - Minecraft Java avec Paper 26.3 / Java 25.
-- Compatibilité Bedrock prévue par **Geyser + Floodgate** installés séparément sur Paper; ce dépôt ne contient pas ces projets tiers.
+- Compatibilité Bedrock empaquetée avec **Geyser + Floodgate**.
+- Connexion Java non premium en mode hors-ligne avec **AuthMe** obligatoire (voir avertissement sécurité ci-dessous).
 - Gradle 9.2.1.
 - Aucune protection de terrain, aucun claim, aucun système VIP. Les commandes vanilla et sélecteurs vanilla ne sont pas remplacés.
 
@@ -25,6 +26,7 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/baltop` — classement des fortunes.
 - `/history` — tes 10 dernières transactions; `/history <joueur>` est réservé au staff.
 - `/daily` — récompense quotidienne avec série.
+- `/bounty` ou `/bounty list` — menu graphique de toutes les primes actives; bouton pour choisir un joueur en ligne et saisir le montant dans le chat.
 - `/bounty <joueur> <montant>` — prime payée au joueur qui élimine la cible.
 - `/eco give|take|set <joueur> <montant>` — administration.
 - `/lottery buy [1-10]`, `/lottery pot`, `/lottery draw` — tickets, jackpot et tirage hebdomadaire.
@@ -44,7 +46,8 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/quests` ouvre le menu des objectifs; `/quests claim`, `/quests weekly`, `/quests weekly claim` — objectifs automatiques quotidiens et hebdomadaires.
 - `/quiz` — quiz Minecraft à choix multiples configurable dans `features.yml`; `/quiz top` — classement des scores.
 - `/shop` ouvre la boutique graphique avec catégories, pages et quantités par clic (gauche=1, droit=16, Maj-clic=64); `/shop search <objet>` et `/shop buy <clé> [quantité]` — recherche et achats LPC; prix modifiables dans features.yml.
-- `/ah list`, `/ah sell <prix>`, `/ah buy <id>` — hôtel des ventes persistant.
+- `/ah` ou `/ah list` — hôtel des ventes graphique persistant avec barre de recherche (clic sur la boussole, puis saisie dans le chat), filtre vendeur/objet et bouton pour effacer la recherche.
+- `/ah search <objet|vendeur>` et `/ah search clear` — recherche directe; `/ah sell <prix>`, `/ah buy <id>` — gestion des annonces.
 - `/trade <joueur>`, `/trade accept`, `/trade item`, `/trade money <montant>`, `/trade confirm`, `/trade cancel` — échange avec double confirmation.
 
 ### Anti-triche et modération
@@ -57,10 +60,18 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/vanish`, `/invsee <joueur>`, `/freeze <joueur>`, `/staffchat <message>`.
 - Accès contrôlé par `larpers.staff` et `larpers.admin` (OP par défaut).
 
+## Accès Bedrock et comptes Java non premium
+- Geyser-Spigot et Floodgate sont inclus dans le ZIP généré par GitHub Actions.
+- Après le premier démarrage du serveur, arrête-le avec `stop`, puis lance `CONFIGURER-BEDROCK.bat` et redémarre. Geyser utilisera Floodgate (`auth-type: floodgate`).
+- Ouvre et redirige le port **19132 en TCP et UDP** vers le serveur; le port Java reste TCP 25565. Autorise aussi ces ports dans le pare-feu Windows.
+- `online-mode=false` permet les comptes Java non premium; AuthMe est inclus et doit rester activé. Les joueurs utilisent `/register motdepasse motdepasse` puis `/login motdepasse`.
+- **Avertissement sécurité:** en mode hors-ligne, Mojang ne vérifie pas les noms Java. Sans authentification AuthMe correctement configurée, un joueur peut usurper le pseudo d'un autre, y compris celui d'un administrateur. N'accorde jamais OP avant d'avoir sécurisé l'inscription, utilise des mots de passe uniques et sauvegarde les données.
+- Floodgate authentifie les joueurs Bedrock via son mécanisme de clé. Ne partage jamais les fichiers de clés Floodgate.
+
 ## Données
 Les soldes sont dans `plugins/LarpersCoin/data.yml`; clans, quêtes, quiz et hôtel des ventes sont dans `plugins/LarpersCoin/features.yml`.
 
 ## État et limites à connaître
-Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et achats boutique ont maintenant une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Le menu staff possède deux pages d'actions rapides; le quiz dispose d'une banque configurable et d'un classement. Geyser/Floodgate et la compatibilité Bedrock doivent être testés sur un serveur dédié.
+Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et achats boutique ont maintenant une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Le menu staff possède deux pages d'actions rapides; le quiz dispose d'une banque configurable et d'un classement. Le menu primes et la recherche AH sont ajoutés dans la version 1.0.2. Geyser/Floodgate/AuthMe sont empaquetés automatiquement; les connexions Bedrock et hors-ligne doivent encore être testées sur le serveur réel.
 
 Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions, [docs/CONFIGURATION.md](docs/CONFIGURATION.md) pour les prix/quiz/permissions et [CHANGELOG.txt](CHANGELOG.txt) pour les changements de la version 1.0.0.
