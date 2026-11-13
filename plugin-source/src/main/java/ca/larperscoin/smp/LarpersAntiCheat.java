@@ -1,6 +1,7 @@
 package ca.larperscoin.smp;
 
 import org.bukkit.Bukkit;
+import org.bukkit.BanList;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -31,6 +32,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -55,6 +57,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     private final Map<UUID, Integer> lastMovementTick = new ConcurrentHashMap<>();
     private final Map<UUID, Double> horizontalDistanceThisTick = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> violations = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> lastSanctionTier = new ConcurrentHashMap<>();
     private final Map<String, Long> lastAlert = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> alertsEnabled = new ConcurrentHashMap<>();
     private final Deque<String> evidence = new ArrayDeque<>();
@@ -88,6 +91,11 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
             config.set("anticheat.checks.reach.max-distance", 3.75D);
         config.addDefault("anticheat.alert-cooldown-seconds", 4);
         config.addDefault("anticheat.evidence-limit", MAX_EVIDENCE);
+        config.addDefault("anticheat.auto-punish.enabled", true);
+        config.addDefault("anticheat.auto-punish.thresholds.kick", 12);
+        config.addDefault("anticheat.auto-punish.thresholds.ban-1d", 24);
+        config.addDefault("anticheat.auto-punish.thresholds.ban-7d", 36);
+        config.addDefault("anticheat.auto-punish.thresholds.ban-30d", 48);
         config.options().copyDefaults(true);
         plugin.saveConfig();
     }
@@ -162,6 +170,8 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onJoin(PlayerJoinEvent event) {
         grantGrace(event.getPlayer());
+        UUID id = event.getPlayer().getUniqueId();
+        lastSanctionTier.put(id, tierFor(violations.getOrDefault(id, 0)));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -183,6 +193,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         horizontalDistanceThisTick.remove(id);
         graceUntil.remove(id);
         alertsEnabled.remove(id);
+        lastSanctionTier.remove(id);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -275,6 +286,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
             while (evidence.size() > Math.max(1, plugin.getConfig().getInt("anticheat.evidence-limit", MAX_EVIDENCE))) evidence.removeLast();
         }
         plugin.getLogger().warning("[AntiCheat] " + plain);
+        applyAutomaticSanction(player, total);
         String message = PREFIX + ChatColor.YELLOW + player.getName() + ChatColor.GRAY + " — "
                 + ChatColor.RED + check + ChatColor.GRAY + " — " + detail
                 + ChatColor.DARK_GRAY + " (VL " + total + ")";
@@ -283,6 +295,54 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
                 staff.sendMessage(message);
             }
         }
+    }
+
+    private int tierFor(int count) {
+        var config = plugin.getConfig();
+        if (count >= config.getInt("anticheat.auto-punish.thresholds.ban-30d", 48)) return 4;
+        if (count >= config.getInt("anticheat.auto-punish.thresholds.ban-7d", 36)) return 3;
+        if (count >= config.getInt("anticheat.auto-punish.thresholds.ban-1d", 24)) return 2;
+        if (count >= config.getInt("anticheat.auto-punish.thresholds.kick", 12)) return 1;
+        return 0;
+    }
+
+    private void applyAutomaticSanction(Player player, int totalViolations) {
+        if (!plugin.getConfig().getBoolean("anticheat.auto-punish.enabled", true)
+                || player.hasPermission("larpers.anticheat.bypass")) return;
+        UUID id = player.getUniqueId();
+        int tier = tierFor(totalViolations);
+        int previousTier = lastSanctionTier.getOrDefault(id, tierFor(totalViolations - 1));
+        if (tier <= previousTier) return;
+        lastSanctionTier.put(id, tier);
+
+        String reason;
+        Date expires;
+        switch (tier) {
+            case 1 -> {
+                reason = "Anti-cheat LPC: seuil de violations atteint (kick).";
+                player.kickPlayer(ChatColor.RED + reason);
+                plugin.getLogger().warning("[AntiCheat] Kick automatique: " + player.getName()
+                        + " (" + totalViolations + " VL)");
+                return;
+            }
+            case 2 -> {
+                reason = "Anti-cheat LPC: violations répétées (ban 1 jour).";
+                expires = new Date(System.currentTimeMillis() + 24L * 60L * 60L * 1000L);
+            }
+            case 3 -> {
+                reason = "Anti-cheat LPC: violations répétées (ban 7 jours).";
+                expires = new Date(System.currentTimeMillis() + 7L * 24L * 60L * 60L * 1000L);
+            }
+            case 4 -> {
+                reason = "Anti-cheat LPC: violations répétées (ban 30 jours).";
+                expires = new Date(System.currentTimeMillis() + 30L * 24L * 60L * 60L * 1000L);
+            }
+            default -> { return; }
+        }
+        Bukkit.getBanList(BanList.Type.NAME).addBan(player.getName(), reason, expires, "LarpersAntiCheat");
+        player.kickPlayer(ChatColor.RED + reason);
+        plugin.getLogger().warning("[AntiCheat] " + reason + " Joueur: " + player.getName()
+                + " (" + totalViolations + " VL)");
     }
 
     private boolean isAdmin(CommandSender sender) {
@@ -316,7 +376,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         switch (args[0].toLowerCase(Locale.ROOT)) {
             case "status" -> {
                 send(sender, "État: " + (globallyEnabled() ? ChatColor.GREEN + "ACTIF" : ChatColor.RED + "DÉSACTIVÉ")
-                        + ChatColor.GRAY + " | Speed/Fly/Reach configurables | sanctions automatiques: désactivées.");
+                        + ChatColor.GRAY + " | Speed/Fly/Reach configurables | sanctions automatiques progressives: actives.");
                 return true;
             }
             case "alerts" -> {
