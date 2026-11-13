@@ -3,7 +3,7 @@
 Dernière mise à jour: 2026-11-12 — version de développement 0.8.0.
 
 ## Implémenté dans le dépôt
-- [x] Économie LPC persistante: soldes, paiements, classement, daily, primes et commandes admin.
+- [x] Économie LPC persistante: soldes, paiements, classement, daily, primes, commandes admin et historique des 10 dernières transactions par joueur.
 - [x] Loterie: tickets, jackpot persistant et tirage périodique.
 - [x] Hôtel des ventes: mise en vente, liste et achat avec validation d'inventaire et paiement LPC.
 - [x] Boutique LPC: GUI cliquable, catalogue, recherche et achats de 1 à 64 objets; prix stockés dans features.yml et modifiables.
