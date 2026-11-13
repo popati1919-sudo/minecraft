@@ -67,7 +67,10 @@ final class LarpersAuth implements Listener {
         player.sendMessage(ChatColor.YELLOW + "Vérification de ton compte...");
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!player.isOnline() || authenticated.containsKey(player.getUniqueId())) return;
-            if (isFloodgate(player) || isPremium(player)) {
+            // Le backend est privé derrière Velocity: le proxy valide les comptes Java
+            // en mode online et Floodgate valide les comptes Bedrock.
+            if (plugin.getConfig().getBoolean("auth.proxy-authenticated", false)
+                    || isFloodgate(player) || isPremium(player)) {
                 authenticated.put(player.getUniqueId(), true);
                 player.sendMessage(ChatColor.GREEN + "Connexion automatique réussie.");
                 joinLocations.remove(player.getUniqueId());
