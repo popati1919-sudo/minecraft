@@ -31,8 +31,8 @@ public final class LarpersCoinVelocity {
                 new SimpleCommand() {
                     @Override
                     public void execute(Invocation invocation) {
-                        if (!invocation.arguments().equals(new String[]{"status"})
-                                && !(invocation.arguments().length == 0)) {
+                        if (invocation.arguments().length > 1
+                                || invocation.arguments().length == 1 && !invocation.arguments()[0].equalsIgnoreCase("status")) {
                             invocation.source().sendMessage(Component.text("Usage: /lpcproxy status"));
                             return;
                         }
