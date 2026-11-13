@@ -31,4 +31,4 @@ Not yet complete / not yet verified
 - Expanded admin GUI actions and paginated player-management pages.
 - Automated integration tests and live Paper 26.3 server test.
 - Geyser/Floodgate Java-Bedrock validation.
-- CI build result for this commit has not yet been confirmed.
+- GitHub Actions build succeeded with Java 25 and Paper 26.3 API on commit bbb7342284e87f5eafdf7f8ee9dbbc6d3635725b; a live server session is still required.
