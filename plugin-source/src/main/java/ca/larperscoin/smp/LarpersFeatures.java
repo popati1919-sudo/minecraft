@@ -33,6 +33,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final File file;
     private final Set<UUID> frozen = new HashSet<>();
     private final Set<String> playerPlacedBlocks = new HashSet<>();
+    private final Map<String, Inventory> clanChests = new HashMap<>();
+    private final Map<String, UUID> clanChestUsers = new HashMap<>();
     private final Set<UUID> vanished = new HashSet<>();
     private final SecureTradeManager tradeManager;
     private final Map<UUID, Long> lastQuiz = new HashMap<>();
@@ -253,10 +255,17 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             }
             case "chest" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
-                Inventory inv=Bukkit.createInventory(null,54,"Coffre clan: "+own);
-                List<ItemStack> contents=(List<ItemStack>)db.getList(clanPath(own)+".chest");
-                if(contents!=null)for(int i=0;i<Math.min(54,contents.size());i++)inv.setItem(i,contents.get(i));
-                p.openInventory(inv);msg(p,"Coffre partagé: sauvegarde du contenu à la fermeture.");return true;
+                UUID user=clanChestUsers.get(own);
+                if(user!=null&&!user.equals(p.getUniqueId())){msg(p,"Le coffre du clan est déjà utilisé par un autre membre.");return true;}
+                Inventory inv=clanChests.get(own);
+                if(inv==null) {
+                    inv=Bukkit.createInventory(null,54,"Coffre clan: "+own);
+                    List<ItemStack> contents=(List<ItemStack>)db.getList(clanPath(own)+".chest");
+                    if(contents!=null)for(int i=0;i<Math.min(54,contents.size());i++)inv.setItem(i,contents.get(i));
+                    clanChests.put(own,inv);
+                }
+                clanChestUsers.put(own,p.getUniqueId());
+                p.openInventory(inv);msg(p,"Coffre partagé ouvert. Un seul membre peut l'utiliser à la fois.");return true;
             }
             case "allies" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
@@ -543,7 +552,10 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         String title=e.getView().getTitle();
         if(!title.startsWith("Coffre clan:"))return;
         String clan=title.substring("Coffre clan:".length());
-        db.set(clanPath(clan)+".chest",Arrays.asList(e.getInventory().getContents()));save();
+        if(!Objects.equals(clanChestUsers.get(clan),e.getPlayer().getUniqueId()))return;
+        db.set(clanPath(clan)+".chest",Arrays.asList(e.getInventory().getContents()));
+        clanChestUsers.remove(clan);
+        save();
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) { frozen.remove(e.getPlayer().getUniqueId()); }
     @Override public List<String> onTabComplete(CommandSender s,Command c,String alias,String[] a) {
