@@ -71,7 +71,8 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     }
 
     double balance(UUID uuid) {
-        return data.getDouble("balances." + key(uuid), 0.0);
+        double value=data.getDouble("balances." + key(uuid),0.0);
+        return Double.isFinite(value)&&value>0.0?value:0.0;
     }
 
     private void setBalance(UUID uuid, double amount) {
