@@ -194,6 +194,11 @@ public final class SecureTradeManager implements Listener {
             cancel(s, "une offre n'est plus valide (objet déplacé ou solde modifié)");
             return;
         }
+        if (!Double.isFinite(economy.balance(a.getUniqueId()) + s.b.money)
+                || !Double.isFinite(economy.balance(b.getUniqueId()) + s.a.money)) {
+            cancel(s, "le solde du destinataire dépasserait la limite numérique");
+            return;
+        }
         if (!canReceive(a, s.b, s.a) || !canReceive(b, s.a, s.b)) {
             cancel(s, "inventaire plein; aucun objet ni LPC n'a été transféré");
             return;
