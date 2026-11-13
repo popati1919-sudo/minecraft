@@ -69,8 +69,8 @@ jobs:
           curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/velocity" -o "$ROOT/Velocity/plugins/floodgate-velocity.jar"
           # Floodgate doit aussi etre present sur les backends Paper pour que
           # l'API isFloodgatePlayer(UUID) reconnaisse les joueurs Bedrock au lobby.
-          curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/paper" -o "$ROOT/Lobby/plugins/floodgate-paper.jar"
-          curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/paper" -o "$ROOT/SMP/plugins/floodgate-paper.jar"
+          curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/spigot" -o "$ROOT/Lobby/plugins/floodgate-paper.jar"
+          curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/spigot" -o "$ROOT/SMP/plugins/floodgate-paper.jar"
           test -s "$ROOT/Velocity/plugins/Geyser-Velocity.jar"
           test -s "$ROOT/Velocity/plugins/floodgate-velocity.jar"
           test -s "$ROOT/Lobby/plugins/floodgate-paper.jar"
