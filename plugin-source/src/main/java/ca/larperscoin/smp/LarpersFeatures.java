@@ -224,13 +224,25 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
                 String ap=clanPath(own)+".allies";
                 if(a.length==1){msg(p,"Alliés: "+String.join(", ",db.getStringList(ap)));return true;}
-                if(!id(p).equals(db.getString(clanPath(own)+".owner"))||a.length!=3){msg(p,"Chef: /clan allies add|remove <clan>");return true;}
+                if(!id(p).equals(db.getString(clanPath(own)+".owner"))||a.length!=3){msg(p,"Chef: /clan allies request|accept|remove <clan>");return true;}
                 String other=a[2].toLowerCase(Locale.ROOT);if(!db.contains(clanPath(other))||other.equals(own)){msg(p,"Clan invalide.");return true;}
-                List<String> allies=db.getStringList(ap);
-                if(a[1].equalsIgnoreCase("add")){if(!allies.contains(other))allies.add(other);}
-                else if(a[1].equalsIgnoreCase("remove"))allies.remove(other);
-                else {msg(p,"Choisis add ou remove.");return true;}
-                db.set(ap,allies);save();msg(p,"Alliances mises à jour.");return true;
+                if(a[1].equalsIgnoreCase("request")) {
+                    db.set("alliance-requests."+other+"."+own,true);save();
+                    msg(p,"Demande d'alliance envoyée à "+db.getString(clanPath(other)+".name")+". Le chef adverse doit accepter.");
+                    for(Player online:Bukkit.getOnlinePlayers()) if(id(online).equals(db.getString(clanPath(other)+".owner"))) msg(online,"Demande d'alliance de "+db.getString(clanPath(own)+".name")+". /clan allies accept "+own);
+                    return true;
+                }
+                if(a[1].equalsIgnoreCase("accept")) {
+                    if(!db.getBoolean("alliance-requests."+own+"."+other,false)){msg(p,"Aucune demande de ce clan.");return true;}
+                    List<String> mine=db.getStringList(ap), theirs=db.getStringList(clanPath(other)+".allies");
+                    if(!mine.contains(other))mine.add(other);if(!theirs.contains(own))theirs.add(own);
+                    db.set(ap,mine);db.set(clanPath(other)+".allies",theirs);db.set("alliance-requests."+own+"."+other,null);save();msg(p,"Alliance bilatérale créée.");return true;
+                }
+                if(a[1].equalsIgnoreCase("remove")) {
+                    List<String> mine=db.getStringList(ap), theirs=db.getStringList(clanPath(other)+".allies");
+                    mine.remove(other);theirs.remove(own);db.set(ap,mine);db.set(clanPath(other)+".allies",theirs);save();msg(p,"Alliance supprimée des deux clans.");return true;
+                }
+                msg(p,"Choisis request, accept ou remove.");return true;
             }
             case "top","leaderboard" -> {
                 var sec=db.getConfigurationSection("clans");if(sec==null){msg(p,"Aucun clan.");return true;}
