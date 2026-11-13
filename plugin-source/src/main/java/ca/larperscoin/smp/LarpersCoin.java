@@ -174,6 +174,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     }
                     credit(target.getUniqueId(), amount);
                     saveData();
+                    recordTransaction("PAY", player.getUniqueId(), target.getUniqueId(), amount);
                     reply(player, "Tu as envoyé " + format(amount) + " à " + target.getName() + ".");
                     reply(target, "Tu as reçu " + format(amount) + " de " + player.getName() + ".");
                     return true;
@@ -249,6 +250,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     double reward = 100.0 + Math.min(streak, 7) * 20.0;
                     credit(player.getUniqueId(), reward);
                     saveData();
+                    recordTransaction("DAILY", new UUID(0L,0L), player.getUniqueId(), reward);
                     reply(sender, "Récompense quotidienne : +" + format(reward) + " (série " + streak + ").");
                     return true;
                 }
