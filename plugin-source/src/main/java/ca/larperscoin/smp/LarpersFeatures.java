@@ -169,7 +169,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 if(own!=null){msg(p,"Tu es déjà dans un clan.");return true;}
                 String n=a[1].toLowerCase(Locale.ROOT), path=clanPath(n);
                 if(db.contains(path)){msg(p,"Ce clan existe déjà.");return true;}
-                db.set(path+".name",a[1]); db.set(path+".owner",id(p)); db.set(path+".members",List.of(id(p)));
+                db.set(path+".name",a[1]); db.set(path+".owner",id(p)); db.set(path+".members",List.of(id(p))); db.set(path+".roles."+id(p),"leader");
                 db.set(path+".bank",0.0); db.set(path+".level",1); db.set(path+".xp",0); db.set(path+".allies",new ArrayList<String>());
                 db.set("clan-members."+id(p),n); save(); msg(p,"Clan "+a[1]+" créé."); return true;
             }
@@ -188,11 +188,20 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             case "leave" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
                 String path=clanPath(own); if(id(p).equals(db.getString(path+".owner"))){msg(p,"Le chef doit transférer le rôle ou supprimer le clan (fonction staff).");return true;}
-                List<String> m=db.getStringList(path+".members");m.remove(id(p));db.set(path+".members",m);db.set("clan-members."+id(p),null);save();msg(p,"Tu as quitté le clan.");return true;
+                List<String> m=db.getStringList(path+".members");m.remove(id(p));db.set(path+".members",m);db.set(path+".roles."+id(p),null);db.set("clan-members."+id(p),null);save();msg(p,"Tu as quitté le clan.");return true;
             }
             case "info","stats","level" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
-                String path=clanPath(own);msg(p,db.getString(path+".name")+" | membres: "+db.getStringList(path+".members").size()+" | niveau "+db.getInt(path+".level",1)+" | XP "+db.getInt(path+".xp",0)+" | banque "+db.getDouble(path+".bank",0)+" LPC");return true;
+                String path=clanPath(own);int level=Math.max(1,db.getInt(path+".level",1));
+                msg(p,db.getString(path+".name")+" | membres: "+db.getStringList(path+".members").size()+" | niveau "+level+" | XP "+db.getInt(path+".xp",0)+"/"+(level*100)+" | banque "+db.getDouble(path+".bank",0)+" LPC");
+                msg(p,"Ton rôle: "+db.getString(path+".roles."+id(p),"member"));return true;
+            }
+            case "role" -> {
+                if(own==null||a.length!=3||!id(p).equals(db.getString(clanPath(own)+".owner"))){msg(p,"Chef seulement: /clan role <joueur> <officer|member>");return true;}
+                Player target=Bukkit.getPlayerExact(a[1]);
+                String role=a[2].toLowerCase(Locale.ROOT);
+                if(target==null||!own.equals(clanOf(target.getUniqueId()))||!(role.equals("officer")||role.equals("member"))){msg(p,"Joueur du clan en ligne et rôle valide requis.");return true;}
+                db.set(clanPath(own)+".roles."+id(target),role);save();msg(p,target.getName()+" est maintenant "+role+".");msg(target,"Ton rôle de clan est maintenant "+role+".");return true;
             }
             case "bank" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
@@ -201,7 +210,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 if(a.length!=3){msg(p,"Usage: /clan bank deposit|withdraw <montant>");return true;}
                 double v=Double.parseDouble(a[2]);if(v<=0){msg(p,"Montant invalide.");return true;}
                 if(a[1].equalsIgnoreCase("deposit")){if(!charge(p,v)){msg(p,"Fonds insuffisants.");return true;}db.set(path,db.getDouble(path)+v);}
-                else if(a[1].equalsIgnoreCase("withdraw")){if(!id(p).equals(db.getString(clanPath(own)+".owner"))||db.getDouble(path)<v){msg(p,"Retrait refusé (chef seulement ou fonds insuffisants).");return true;}db.set(path,db.getDouble(path)-v);give(p,v);}
+                else if(a[1].equalsIgnoreCase("withdraw")){if(!clanLeaderOrOfficer(p,own)||db.getDouble(path)<v){msg(p,"Retrait refusé (chef/officier seulement ou fonds insuffisants).");return true;}db.set(path,db.getDouble(path)-v);give(p,v);}
                 else {msg(p,"Choisis deposit ou withdraw.");return true;} save();msg(p,"Opération effectuée.");return true;
             }
             case "chest" -> {
@@ -244,7 +253,23 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private void progressQuest(Player p, String objective) {
         db.set(questPath(false,p,objective),db.getInt(questPath(false,p,objective),0)+1);
         db.set(questPath(true,p,objective),db.getInt(questPath(true,p,objective),0)+1);
+        addClanXp(p,1);
         saveSoon();
+    }
+    private void addClanXp(Player p,int amount) {
+        String clan=clanOf(p.getUniqueId());
+        if(clan==null) return;
+        String path=clanPath(clan);
+        int level=Math.max(1,db.getInt(path+".level",1));
+        int xp=db.getInt(path+".xp",0)+amount;
+        while(xp>=level*100) { xp-=level*100; level++; }
+        db.set(path+".xp",xp);
+        db.set(path+".level",level);
+    }
+    private boolean clanLeaderOrOfficer(Player p,String clan) {
+        String path=clanPath(clan);
+        String role=db.getString(path+".roles."+id(p),"member");
+        return id(p).equals(db.getString(path+".owner")) || role.equalsIgnoreCase("officer");
     }
     private void saveSoon() {
         if(saveQueued) return;
