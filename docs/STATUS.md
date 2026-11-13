@@ -15,7 +15,7 @@ Dernière mise à jour: 2026-11-12 — version de développement 0.8.0.
 - [x] Workflow GitHub Actions et script de compilation Windows.
 
 ## Limites restantes
-- [ ] Boutique: les prix sont configurables dans features.yml, mais il n'y a pas encore de GUI de boutique.
+- [ ] Boutique: le GUI et les achats LPC sont disponibles; il reste à ajouter catégories, pagination, quantités dans le GUI et gestion du stock.
 - [ ] Clans: transfert de chef, dissolution, permissions fines par rôle et gestion complète des invitations hors ligne.
 - [ ] Coffre de clan: interface partagée persistante; les permissions par rôle et journal d'audit restent à ajouter.
 - [ ] Quiz: petit ensemble de questions statiques; pas encore de banque de questions configurable ni de classement.
@@ -31,6 +31,7 @@ Dernière mise à jour: 2026-11-12 — version de développement 0.8.0.
 - Geyser et Floodgate sont des plugins externes à installer séparément.
 
 ## Commandes récemment ajoutées
+- /history [joueur] — historique économique (consultation d'un autre joueur réservée au staff).
 - /trade <joueur>, /trade accept, /trade item, /trade money <montant>, /trade confirm, /trade cancel.
 - /quests, /quests claim, /quests weekly, /quests weekly claim.
 - /shop search <objet>, /shop buy <clé> [quantité].
