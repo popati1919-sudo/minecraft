@@ -35,3 +35,8 @@ Not yet complete / not yet verified
 - GitHub Actions build succeeded with Java 25 and Paper 26.3 API on commit c081497fdb512fb0be74b798ab088c2638f3b5c5; a live server session is still required.
 
 - Ajout du module anti-triche LPC: détection de vitesse, déplacement aérien suspect et portée de frappe, alertes staff et commandes de diagnostic; aucune sanction automatique.
+
+## 0.9.0 — Anti-triche initiale
+- Ajout de détections conservatrices de vitesse, vol/montée suspecte et portée de frappe.
+- Ajout des alertes staff `/ac alerts`, du diagnostic `/ac info` et de la remise à zéro `/ac reset`.
+- Ajout d'une permission de bypass pour les membres de confiance; aucune sanction automatique.
