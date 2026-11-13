@@ -1,9 +1,11 @@
 # État du projet Larpers Coin SMP 26.3
 
-Dernière mise à jour: 2026-11-13 — version 1.0.0.
+Dernière mise à jour: 2026-11-13 — version 1.0.2.
 
 ## Implémenté dans le dépôt
 - [x] Économie LPC persistante: soldes, paiements, classement, daily, primes, commandes admin et historique des 10 dernières transactions par joueur.
+- [x] Menu graphique des primes actives, liste triée, sélection d'une cible en ligne et saisie du montant dans le chat.
+- [x] Hôtel des ventes avec recherche interactive par objet ou vendeur, filtre effaçable et commande `/ah search`.
 - [x] Loterie: tickets, jackpot persistant et tirage périodique.
 - [x] Hôtel des ventes: mise en vente, liste et achat avec validation d'inventaire et paiement LPC.
 - [x] Boutique LPC: GUI cliquable, catalogue, recherche et achats de 1 à 64 objets; prix stockés dans features.yml et modifiables.
@@ -27,15 +29,18 @@ Dernière mise à jour: 2026-11-13 — version 1.0.0.
 - [ ] Calibrage anti-triche sur serveur réel avec joueurs à latence variable: les seuils sont conservateurs et les alertes doivent être vérifiées par le staff.
 - [ ] Essais fonctionnels en serveur Paper 26.3 réel: le build CI compile et produit le JAR, mais aucune session de jeu réelle n'a été exécutée ici.
 - [ ] Validation Java/Bedrock via Geyser + Floodgate sur serveur dédié (requiert un serveur réel et des clients de test).
+- [ ] Validation des connexions Java non premium avec AuthMe et tests anti-usurpation sur serveur isolé.
 
 ## Hors périmètre explicite
 - Aucun claim / protection de terrain.
 - Aucun rang VIP.
 - Ne pas remplacer les commandes vanilla ni les sélecteurs vanilla.
-- Geyser et Floodgate sont des plugins externes à installer séparément.
+- Geyser, Floodgate et AuthMe sont ajoutés automatiquement au paquet serveur par le workflow; leur configuration finale doit être vérifiée au premier démarrage.
 
 ## Commandes récemment ajoutées
 - /history [joueur] — historique économique (consultation d'un autre joueur réservée au staff).
+- /bounty [list] — menu des primes; /bounty <joueur> <montant> pour placer une prime.
+- /ah search <objet|vendeur> et /ah search clear — filtre de l'hôtel des ventes.
 - /trade <joueur>, /trade accept, /trade item, /trade money <montant>, /trade confirm, /trade cancel.
 - /quests, /quests claim, /quests weekly, /quests weekly claim.
 - /shop search <objet>, /shop buy <clé> [quantité].
