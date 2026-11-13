@@ -48,7 +48,7 @@ jobs:
           cp "$ROOT/Lobby/paper.jar" "$ROOT/SMP/paper.jar"
 
           velocity_versions="$(curl -fsSL -H 'User-Agent: LarpersCoin-Packager/1.0' "https://fill.papermc.io/v3/projects/velocity")"
-          velocity_version="$(echo "$velocity_versions" | jq -r '[.versions[] | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))] | first // empty')"
+          velocity_version="$(echo "$velocity_versions" | jq -r '[.versions[][] | select(type == "string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))] | first // empty')"
           test -n "$velocity_version"
           velocity_meta="$(curl -fsSL -H 'User-Agent: LarpersCoin-Packager/1.0' "https://fill.papermc.io/v3/projects/velocity/versions/$velocity_version/builds?channel=STABLE&limit=1")"
           velocity_url="$(echo "$velocity_meta" | jq -r '.[0].downloads["server:default"].url // empty')"
