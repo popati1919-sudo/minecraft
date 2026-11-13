@@ -487,6 +487,18 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             String key=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
             buyShop(buyer,key,1);
         }
+        if(title.equals("LPC | Clan")||title.equals("LPC | Quêtes")) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player viewer)) return;
+            if(e.getRawSlot()==22) { viewer.closeInventory();return; }
+            if(title.equals("LPC | Clan")) {
+                String command=switch(e.getRawSlot()) { case 10 -> "clan info";case 12 -> "clan bank";case 14 -> "clan chest";case 16 -> "clan top";default -> null; };
+                if(command!=null){viewer.closeInventory();viewer.performCommand(command);}
+            } else {
+                String command=switch(e.getRawSlot()) { case 11 -> "quests claim";case 15 -> "quests weekly claim";default -> null; };
+                if(command!=null){viewer.closeInventory();viewer.performCommand(command);}
+            }
+        }
     }
     @EventHandler public void onChestClose(org.bukkit.event.inventory.InventoryCloseEvent e) {
         String title=e.getView().getTitle();
