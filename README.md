@@ -49,8 +49,10 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 
 ### Anti-triche et modération
 - `/ac alerts` — activer/désactiver les alertes anti-triche pour le staff.
-- `/ac info <joueur>` et `/ac reset <joueur>` — consulter ou remettre à zéro les violations observées.
-- Détections conservatrices de vitesse anormale, montée/vol non autorisé et portée de frappe suspecte. Les alertes ne constituent pas une preuve et aucune expulsion/bannissement automatique n'est appliqué.
+- `/ac status` — état du module et rappels des sanctions désactivées.
+- `/ac alerts` — activer/désactiver ses alertes staff.
+- `/ac info <joueur>`, `/ac top`, `/ac log`, `/ac reset <joueur>`, `/ac reload` — diagnostic, classement, journal récent, remise à zéro et rechargement.
+- Détections configurables de vitesse anormale, montée verticale répétée et portée de frappe suspecte. Les violations sont sauvegardées dans `anticheat-violations.yml`; réglages dans `config.yml`. Les alertes ne constituent pas une preuve et aucune expulsion/bannissement automatique n'est appliqué.
 - `/admin` — menu du staff.
 - `/vanish`, `/invsee <joueur>`, `/freeze <joueur>`, `/staffchat <message>`.
 - Accès contrôlé par `larpers.staff` et `larpers.admin` (OP par défaut).
@@ -61,4 +63,4 @@ Les soldes sont dans `plugins/LarpersCoin/data.yml`; clans, quêtes, quiz et hô
 ## État et limites à connaître
 Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et achats boutique ont maintenant une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Le menu staff possède deux pages d'actions rapides; le quiz dispose d'une banque configurable et d'un classement. Geyser/Floodgate et la compatibilité Bedrock doivent être testés sur un serveur dédié.
 
-Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions, [docs/CONFIGURATION.md](docs/CONFIGURATION.md) pour les prix/quiz/permissions et [CHANGELOG.txt](CHANGELOG.txt) pour les changements de la version 0.9.0.
+Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions, [docs/CONFIGURATION.md](docs/CONFIGURATION.md) pour les prix/quiz/permissions et [CHANGELOG.txt](CHANGELOG.txt) pour les changements de la version 1.0.0.
