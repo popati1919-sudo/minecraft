@@ -52,6 +52,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     private final Map<UUID, Long> graceUntil = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> upwardTicks = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> airTicks = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> lastMovementTick = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> violations = new ConcurrentHashMap<>();
     private final Map<String, Long> lastAlert = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> alertsEnabled = new ConcurrentHashMap<>();
@@ -128,6 +129,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         graceUntil.put(player.getUniqueId(), System.currentTimeMillis() + GRACE_MS);
         upwardTicks.remove(player.getUniqueId());
         airTicks.remove(player.getUniqueId());
+        lastMovementTick.remove(player.getUniqueId());
     }
 
     private boolean inGrace(Player player) {
@@ -171,6 +173,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         UUID id = event.getPlayer().getUniqueId();
         upwardTicks.remove(id);
         airTicks.remove(id);
+        lastMovementTick.remove(id);
         graceUntil.remove(id);
         alertsEnabled.remove(id);
     }
@@ -189,8 +192,12 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         if (movementExempt(player)) {
             upwardTicks.remove(id);
             airTicks.remove(id);
+            lastMovementTick.remove(id);
             return;
         }
+        int currentTick = player.getTicksLived();
+        Integer previousTick = lastMovementTick.put(id, currentTick);
+        if (previousTick != null && previousTick == currentTick) return;
 
         if (plugin.getConfig().getBoolean("anticheat.checks.speed.enabled", true)
                 && player.isOnGround()) {
@@ -218,6 +225,15 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
                 }
             } else if (dy <= 0.0D || player.isOnGround()) {
                 upwardTicks.remove(id);
+            }
+            if (!player.isOnGround() && Math.abs(dy) < 0.025D) {
+                int hovering = airTicks.merge(id, 1, Integer::sum);
+                if (hovering >= 40) {
+                    flag(player, "FLY_HOVER", "position verticale presque immobile en plein air pendant 40 ticks");
+                    airTicks.put(id, 0);
+                }
+            } else if (dy < -0.05D || player.isOnGround()) {
+                airTicks.remove(id);
             }
         }
     }
