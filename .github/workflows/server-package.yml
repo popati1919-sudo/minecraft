@@ -53,6 +53,19 @@ jobs:
           curl -fL "$LP_URL" -o package/LarpersCoin-Server-Ready/plugins/LuckPerms.jar
           test -s package/LarpersCoin-Server-Ready/plugins/LuckPerms.jar
 
+          GEYSER_URL="https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/spigot"
+          FLOODGATE_URL="https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/spigot"
+          curl -fL "$GEYSER_URL" -o package/LarpersCoin-Server-Ready/plugins/Geyser-Spigot.jar
+          curl -fL "$FLOODGATE_URL" -o package/LarpersCoin-Server-Ready/plugins/floodgate-spigot.jar
+          test -s package/LarpersCoin-Server-Ready/plugins/Geyser-Spigot.jar
+          test -s package/LarpersCoin-Server-Ready/plugins/floodgate-spigot.jar
+
+          AUTH_META="$(curl -fsSL https://api.github.com/repos/AuthMe/AuthMeReloaded/releases/latest)"
+          AUTH_URL="$(echo "$AUTH_META" | jq -r '[.assets[] | select(.name | endswith(".jar"))][0].browser_download_url // empty')"
+          test -n "$AUTH_URL"
+          curl -fL "$AUTH_URL" -o package/LarpersCoin-Server-Ready/plugins/AuthMe.jar
+          test -s package/LarpersCoin-Server-Ready/plugins/AuthMe.jar
+
           PLUGIN_JAR="$(find plugin-source/build/libs -maxdepth 1 -type f -name 'LarpersCoin-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
           test -n "$PLUGIN_JAR"
           cp "$PLUGIN_JAR" package/LarpersCoin-Server-Ready/plugins/LarpersCoin.jar
@@ -75,7 +88,7 @@ jobs:
           difficulty=normal
           hardcore=false
           max-players=30
-          online-mode=true
+          online-mode=false
           pvp=true
           server-port=25565
           server-ip=
@@ -113,6 +126,26 @@ jobs:
           java -Xms2G -Xmx4G -jar paper.jar --nogui
           pause
           EOF
+          cat > "$ROOT/CONFIGURER-BEDROCK.bat" <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          set "CFG=plugins\Geyser-Spigot\config.yml"
+          if not exist "%CFG%" (
+            echo Lance le serveur une premiere fois, puis arrete-le avec stop.
+            echo Geyser doit generer son fichier config.yml avant cette etape.
+            pause
+            exit /b 1
+          )
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='%CFG%'; $s=Get-Content -Raw -LiteralPath $p; if($s -notmatch '(?m)^\s*auth-type\s*:'){Write-Error 'auth-type introuvable dans la configuration Geyser'; exit 2}; $s=[regex]::Replace($s,'(?m)^(\s*auth-type\s*:\s*)[^\r\n]+','$1floodgate'); Set-Content -LiteralPath $p -Value $s -Encoding utf8"
+          if errorlevel 1 (
+            echo Echec de configuration. Modifie remote.auth-type en floodgate dans config.yml.
+            pause
+            exit /b 1
+          )
+          echo Geyser configure pour Floodgate.
+          echo Redemarre le serveur. Ouvre le port 19132 en TCP et UDP.
+          pause
+          EOF
           cat > "$ROOT/CONFIGURER-LES-GROUPES.bat" <<'EOF'
           @echo off
           echo Execute ces commandes dans la console du serveur, sans le slash:
@@ -142,6 +175,8 @@ jobs:
           - Java 25 requis
           - Plugin LarpersCoin compile depuis le depot
           - LuckPerms (gestion Admin/Moderateur)
+          - Geyser + Floodgate (accès Bedrock)
+          - AuthMe (authentification des comptes Java hors-ligne)
           - Configuration de base et scripts Windows
 
           PREMIER DEMARRAGE:
@@ -149,14 +184,18 @@ jobs:
           2. Lis https://aka.ms/MinecraftEULA.
           3. Si tu acceptes, ouvre eula.txt et change eula=false en eula=true.
           4. Lance START-SERVER.bat.
-          5. Attends la fin du premier demarrage, puis arrete avec stop.
-          6. Configure les groupes avec CONFIGURER-LES-GROUPES.bat (les commandes sont affichees).
+          5. Au premier demarrage, Geyser et Floodgate generent leur configuration; arrete avec stop.
+          6. Lance CONFIGURER-BEDROCK.bat pour régler Geyser sur Floodgate, puis redemarre.
+          7. Configure les groupes avec CONFIGURER-LES-GROUPES.bat.
+          8. Comptes Java non premium: AuthMe demande /register motdepasse motdepasse puis /login motdepasse.
+             Ne reutilise jamais un mot de passe personnel ou un mot de passe d'un autre service.
 
           RESEAU:
           - Java: TCP 25565.
-          - Bedrock: installe Geyser et Floodgate separement, puis ouvre UDP 19132.
-          - Geyser/Floodgate ne sont pas inclus dans ce ZIP.
-          - Garde online-mode=true pour la securite des comptes Java.
+          - Bedrock: TCP + UDP 19132 (routeur et pare-feu Windows).
+          - online-mode=false est active pour les comptes Java non premium; AuthMe est donc obligatoire.
+          - Les noms Java hors-ligne ne sont pas verifies par Mojang: un joueur peut usurper un pseudo non protege.
+          - Conserve AuthMe, impose des mots de passe uniques et donne OP uniquement apres verification.
           - Ne partage jamais les acces admin.
 
           IMPORTANT:
