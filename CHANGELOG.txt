@@ -18,6 +18,7 @@ Added
 - Clan leader/officer/member roles and officer bank withdrawals.
 - Bilateral clan alliances using request and acceptance.
 - Periodic feature-data saves and explicit flush on plugin shutdown.
+- Atomic, disk-flushed replacement for both YAML data files to prevent partially written files.
 
 Improved
 - BUILD-PLUGIN.bat checks that JDK 25 is installed and writes Gradle stack traces to BUILD-PLUGIN.log.
