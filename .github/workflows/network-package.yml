@@ -2,10 +2,11 @@ name: Package reseau complet Larpers Coin (Velocity + Lobby + SMP)
 
 on:
   push:
-    branches: [main]
+    branches: [main, auth/velocity-replacement]
     paths:
       - ".github/workflows/network-package.yml"
       - "plugin-source/**"
+      - "velocity-plugin/**"
   workflow_dispatch:
 
 permissions:
@@ -64,6 +65,12 @@ jobs:
           test -n "$plugin_jar"
           cp "$plugin_jar" "$ROOT/SMP/plugins/LarpersCoin.jar"
           cp "$plugin_jar" "$ROOT/Lobby/plugins/LarpersCoin.jar"
+
+          # Compagnon Velocity LPC (diagnostic du proxy; ne remplace pas FastLoginPlus).
+          gradle --no-daemon -p velocity-plugin clean build
+          velocity_plugin_jar="$(find velocity-plugin/build/libs -maxdepth 1 -type f -name 'LarpersCoinVelocity-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
+          test -n "$velocity_plugin_jar"
+          cp "$velocity_plugin_jar" "$ROOT/Velocity/plugins/LarpersCoinVelocity.jar"
 
           curl -fL "https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/velocity" -o "$ROOT/Velocity/plugins/Geyser-Velocity.jar"
           curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/velocity" -o "$ROOT/Velocity/plugins/floodgate-velocity.jar"
