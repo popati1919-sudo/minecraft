@@ -61,7 +61,7 @@ jobs:
           test -s package/LarpersCoin-Server-Ready/plugins/floodgate-spigot.jar
 
           AUTH_META="$(curl -fsSL https://api.github.com/repos/AuthMe/AuthMeReloaded/releases/latest)"
-          AUTH_URL="$(echo "$AUTH_META" | jq -r '[.assets[] | select(.name | endswith(".jar"))][0].browser_download_url // empty')"
+          AUTH_URL="$(echo "$AUTH_META" | jq -r '[.assets[] | select(.name | endswith("-Paper.jar"))][0].browser_download_url // empty')"
           test -n "$AUTH_URL"
           curl -fL "$AUTH_URL" -o package/LarpersCoin-Server-Ready/plugins/AuthMe.jar
           test -s package/LarpersCoin-Server-Ready/plugins/AuthMe.jar
