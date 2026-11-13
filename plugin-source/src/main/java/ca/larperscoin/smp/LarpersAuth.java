@@ -57,6 +57,9 @@ final class LarpersAuth implements Listener {
         this.plugin = plugin;
         this.file = new File(plugin.getDataFolder(), "auth.yml");
         this.accounts = YamlConfiguration.loadConfiguration(file);
+        plugin.getConfig().addDefault("auth.proxy-authenticated", true);
+        plugin.getConfig().options().copyDefaults(true);
+        plugin.saveConfig();
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
