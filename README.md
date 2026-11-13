@@ -5,7 +5,7 @@ Plugin Paper pour le serveur **Larpers Coin SMP**, avec monnaie LPC et systèmes
 ## Cible
 - Minecraft Java avec Paper 26.3 / Java 25.
 - Compatibilité Bedrock empaquetée avec **Geyser + Floodgate**.
-- Connexion Java non premium en mode hors-ligne avec **AuthMe** obligatoire (voir avertissement sécurité ci-dessous).
+- Connexion Java premium vérifiée par Mojang/Microsoft; Bedrock via Floodgate, sans AuthMe.
 - Gradle 9.2.1.
 - Aucune protection de terrain, aucun claim, aucun système VIP. Les commandes vanilla et sélecteurs vanilla ne sont pas remplacés.
 
@@ -69,17 +69,17 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - Les groupes LuckPerms peuvent attribuer ces permissions; le préfixe visuel est calculé par le plugin.
 
 ## Accès Bedrock et comptes Java non premium
-- Geyser-Spigot et Floodgate sont inclus dans le ZIP généré par GitHub Actions.
+- Geyser-Spigot et Floodgate sont inclus dans le ZIP généré par GitHub Actions; AuthMe n'est pas installé.
 - Après le premier démarrage du serveur, arrête-le avec `stop`, puis lance `CONFIGURER-BEDROCK.bat` et redémarre. Geyser utilisera Floodgate (`auth-type: floodgate`).
 - Lance `OUVRIR-PORTS-WINDOWS.bat` en administrateur pour autoriser les ports dans le pare-feu; redirige aussi **TCP 25565** et **TCP + UDP 19132** sur le routeur.
-- `online-mode=false` permet les comptes Java non premium; AuthMe est inclus et doit rester activé. Les joueurs utilisent `/register motdepasse motdepasse` puis `/login motdepasse`.
-- **Avertissement sécurité:** en mode hors-ligne, Mojang ne vérifie pas les noms Java. Sans authentification AuthMe correctement configurée, un joueur peut usurper le pseudo d'un autre, y compris celui d'un administrateur. N'accorde jamais OP avant d'avoir sécurisé l'inscription, utilise des mots de passe uniques et sauvegarde les données.
+- `online-mode=true` vérifie automatiquement les comptes Java premium auprès de Mojang/Microsoft: aucun mot de passe propre au serveur. Floodgate authentifie les joueurs Bedrock: aucun mot de passe AuthMe. Les comptes Java crackés/non premium ne sont pas acceptés.
+- **Sécurité:** garde `online-mode=true`. Ne passe pas en mode hors-ligne pour accepter des comptes crackés: les pseudos pourraient être usurpés, y compris celui d'un administrateur.
 - Floodgate authentifie les joueurs Bedrock via son mécanisme de clé. Ne partage jamais les fichiers de clés Floodgate.
 
 ## Données
 Les soldes sont dans `plugins/LarpersCoin/data.yml`; clans, quêtes, quiz et hôtel des ventes sont dans `plugins/LarpersCoin/features.yml`.
 
 ## État et limites à connaître
-Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et achats boutique ont maintenant une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Le menu staff possède deux pages d'actions rapides; le quiz dispose d'une banque configurable et d'un classement. Le menu primes et la recherche AH sont ajoutés dans la version 1.0.2. La version 1.0.3 ajoute le menu de loterie administrable et les préfixes de rang dans le chat et le tab. Geyser/Floodgate/AuthMe sont empaquetés automatiquement; les connexions Bedrock et hors-ligne doivent encore être testées sur le serveur réel.
+Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et achats boutique ont maintenant une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Le menu staff possède deux pages d'actions rapides; le quiz dispose d'une banque configurable et d'un classement. Le menu primes et la recherche AH sont ajoutés dans la version 1.0.2. La version 1.0.3 ajoute le menu de loterie administrable et les préfixes de rang dans le chat et le tab. Geyser/Floodgate sont empaquetés automatiquement; les connexions Bedrock et hors-ligne doivent encore être testées sur le serveur réel.
 
 Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions, [docs/CONFIGURATION.md](docs/CONFIGURATION.md) pour les prix/quiz/permissions et [CHANGELOG.txt](CHANGELOG.txt) pour les changements de la version 1.0.0.
