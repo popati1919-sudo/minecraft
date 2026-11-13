@@ -1,5 +1,5 @@
 name: LarpersCoin
-version: 1.0.1
+version: 1.0.2
 main: ca.larperscoin.smp.LarpersCoin
 api-version: '26.3'
 author: Larpers Coin SMP
@@ -22,8 +22,8 @@ commands:
     description: Réclame ta récompense quotidienne
     usage: /daily
   bounty:
-    description: Place une prime sur un joueur
-    usage: /bounty <joueur> <montant>
+    description: Menu des primes et placement sur un joueur
+    usage: /bounty [list|<joueur> <montant>]
   eco:
     description: Administration des soldes LPC
     usage: /eco <give|take|set> <joueur> <montant>
@@ -60,8 +60,8 @@ commands:
     description: Discussion privée du staff
     permission: larpers.staff
   ah:
-    description: Hôtel des ventes
-    usage: /ah <list|sell|buy>
+    description: Hôtel des ventes avec recherche
+    usage: /ah <list|search|sell|buy>
   ac:
     description: "Outils anti-triche LPC (modérateurs: lecture, admins: gestion)"
     usage: /ac <status|alerts|info|top|log|reset|reload>
