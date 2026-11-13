@@ -3,7 +3,7 @@ version: 0.8.0
 main: ca.larperscoin.smp.LarpersCoin
 api-version: '26.3'
 author: Larpers Coin SMP
-description: Plugin SMP LPC: économie, clans, quêtes, commerce et modération.
+description: Plugin SMP LPC: économie, clans, quêtes, commerce, modération et anti-triche.
 commands:
   balance:
     description: Affiche ton solde LPC
@@ -62,12 +62,19 @@ commands:
   ah:
     description: Hôtel des ventes
     usage: /ah <list|sell|buy>
+  ac:
+    description: Alertes et diagnostic anti-triche LPC
+    usage: /ac <alerts|info|reset>
+    permission: larpers.staff
   trade:
     description: Échange sécurisé avec double confirmation
     usage: /trade <joueur>|accept|item|money <montant>|confirm|cancel
 permissions:
   larpers.staff:
     description: Accès aux outils du staff LPC
+    default: op
+  larpers.anticheat.alerts:
+    description: Recevoir les alertes anti-triche (réservé au staff)
     default: op
   larpers.admin:
     description: Administration complète LPC
