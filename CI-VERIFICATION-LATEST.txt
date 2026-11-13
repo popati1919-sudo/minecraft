@@ -1,0 +1,1 @@
+CI verification branch for the current 0.8.0 main revision. Do not mark the release ready until the Paper 26.3 / Java 25 GitHub Actions build passes.
