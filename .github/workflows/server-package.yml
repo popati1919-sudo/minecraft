@@ -47,10 +47,11 @@ jobs:
           curl -fL "$PAPER_URL" -o package/LarpersCoin-Server-Ready/paper.jar
           test -s package/LarpersCoin-Server-Ready/paper.jar
 
-          LP_META="$(curl -fsSL https://api.github.com/repos/LuckPerms/LuckPerms/releases/latest)"
-          LP_URL="$(echo "$LP_META" | jq -r '.assets[] | select(.name | test("^LuckPerms-Bukkit-.*\\.jar$")) | .browser_download_url' | head -n 1)"
-          test -n "$LP_URL" && test "$LP_URL" != "null"
+          LP_META="$(curl -fsSL https://metadata.luckperms.net/data/downloads)"
+          LP_URL="$(echo "$LP_META" | jq -r '.downloads.bukkit // empty')"
+          test -n "$LP_URL"
           curl -fL "$LP_URL" -o package/LarpersCoin-Server-Ready/plugins/LuckPerms.jar
+          test -s package/LarpersCoin-Server-Ready/plugins/LuckPerms.jar
 
           PLUGIN_JAR="$(find plugin-source/build/libs -maxdepth 1 -type f -name 'LarpersCoin-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
           test -n "$PLUGIN_JAR"
