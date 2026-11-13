@@ -273,6 +273,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
 
     private void flag(Player player, String check, String detail) {
         int total = violations.merge(player.getUniqueId(), 1, Integer::sum);
+        applyAutomaticSanction(player, total);
         long now = System.currentTimeMillis();
         long cooldown = Math.max(1L, plugin.getConfig().getLong("anticheat.alert-cooldown-seconds", 4L)) * 1000L;
         String key = player.getUniqueId() + ":" + check;
@@ -286,7 +287,6 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
             while (evidence.size() > Math.max(1, plugin.getConfig().getInt("anticheat.evidence-limit", MAX_EVIDENCE))) evidence.removeLast();
         }
         plugin.getLogger().warning("[AntiCheat] " + plain);
-        applyAutomaticSanction(player, total);
         String message = PREFIX + ChatColor.YELLOW + player.getName() + ChatColor.GRAY + " — "
                 + ChatColor.RED + check + ChatColor.GRAY + " — " + detail
                 + ChatColor.DARK_GRAY + " (VL " + total + ")";
