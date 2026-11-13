@@ -82,6 +82,10 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         config.addDefault("anticheat.checks.fly.repeated-upward-ticks", 4);
         config.addDefault("anticheat.checks.reach.enabled", true);
         config.addDefault("anticheat.checks.reach.max-distance", 3.75D);
+        if (config.getDouble("anticheat.checks.speed.max-ground-blocks-per-tick", 1.35D) == 1.35D)
+            config.set("anticheat.checks.speed.max-ground-blocks-per-tick", 0.65D);
+        if (config.getDouble("anticheat.checks.reach.max-distance", 4.45D) == 4.45D)
+            config.set("anticheat.checks.reach.max-distance", 3.75D);
         config.addDefault("anticheat.alert-cooldown-seconds", 4);
         config.addDefault("anticheat.evidence-limit", MAX_EVIDENCE);
         config.options().copyDefaults(true);
