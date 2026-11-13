@@ -6,12 +6,12 @@ Dernière mise à jour: 2026-11-12 — version de développement 0.8.0.
 - [x] Économie LPC persistante: soldes, paiements, classement, daily, primes et commandes admin.
 - [x] Loterie: tickets, jackpot persistant et tirage périodique.
 - [x] Hôtel des ventes: mise en vente, liste et achat avec validation d'inventaire et paiement LPC.
-- [x] Boutique LPC: catalogue, recherche et achats de 1 à 64 objets; prix stockés dans features.yml et modifiables.
+- [x] Boutique LPC: GUI cliquable, catalogue, recherche et achats de 1 à 64 objets; prix stockés dans features.yml et modifiables.
 - [x] Échanges joueurs: invitations, offres d'objets et de LPC, double confirmation, invalidation des confirmations après modification, contrôle du solde et de l'espace d'inventaire avant transfert. Les objets restent dans l'inventaire avant validation.
 - [x] Quêtes quotidiennes et hebdomadaires: suivi automatique des blocs cassés, cultures mûres récoltées, créatures vaincues et poissons pêchés; récompense unique par période.
 - [x] Clans: création, invitation, adhésion, départ, banque, coffre, XP et niveaux par activité, rôles leader/officer/member, alliances bilatérales sur demande et acceptation, statistiques et classements.
-- [x] Quiz Minecraft simple avec récompense.
-- [x] Outils staff de base: GUI raccourcis, vanish, invsee, freeze et staffchat.
+- [x] Quiz Minecraft à choix multiples avec GUI et récompense.
+- [x] Menus GUI pour clans, quêtes, boutique et quiz; outils staff avec raccourcis invsee, vanish, freeze et staffchat.
 - [x] Workflow GitHub Actions et script de compilation Windows.
 
 ## Limites restantes
