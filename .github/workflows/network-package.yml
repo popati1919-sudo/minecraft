@@ -76,37 +76,10 @@ jobs:
           test -s "$ROOT/Lobby/plugins/floodgate-paper.jar"
           test -s "$ROOT/SMP/plugins/floodgate-paper.jar"
 
-          # Dependances Paper requises par FastLoginPlus.
-          papi_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/placeholderapi/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
-          papi_url="$(echo "$papi_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
-          test -n "$papi_url"
-          curl -fL "$papi_url" -o "$ROOT/Lobby/plugins/PlaceholderAPI.jar"
-          cp "$ROOT/Lobby/plugins/PlaceholderAPI.jar" "$ROOT/SMP/plugins/PlaceholderAPI.jar"
-
-          protocollib_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/protocollib/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
-          protocollib_url="$(echo "$protocollib_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
-          test -n "$protocollib_url"
-          curl -fL "$protocollib_url" -o "$ROOT/Lobby/plugins/ProtocolLib.jar"
-          cp "$ROOT/Lobby/plugins/ProtocolLib.jar" "$ROOT/SMP/plugins/ProtocolLib.jar"
-          test -s "$ROOT/Lobby/plugins/PlaceholderAPI.jar"
-          test -s "$ROOT/SMP/plugins/PlaceholderAPI.jar"
-          test -s "$ROOT/Lobby/plugins/ProtocolLib.jar"
-          test -s "$ROOT/SMP/plugins/ProtocolLib.jar"
-
-          # FastLoginPlus: verification premium sur Velocity et transmission du statut aux backends.
-          flp_proxy_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/fastloginplus/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22velocity%22%5D')"
-          flp_proxy_url="$(echo "$flp_proxy_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
-          test -n "$flp_proxy_url"
-          curl -fL "$flp_proxy_url" -o "$ROOT/Velocity/plugins/FastLoginPlus.jar"
-
-          flp_paper_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/fastloginplus/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
-          flp_paper_url="$(echo "$flp_paper_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
-          test -n "$flp_paper_url"
-          curl -fL "$flp_paper_url" -o "$ROOT/Lobby/plugins/FastLoginPlus.jar"
-          cp "$ROOT/Lobby/plugins/FastLoginPlus.jar" "$ROOT/SMP/plugins/FastLoginPlus.jar"
-          test -s "$ROOT/Velocity/plugins/FastLoginPlus.jar"
-          test -s "$ROOT/Lobby/plugins/FastLoginPlus.jar"
-          test -s "$ROOT/SMP/plugins/FastLoginPlus.jar"
+          # FastLoginPlus est volontairement omis du paquet 26.3:
+          # il a provoque Invalid session dans ce reseau et sa dependance packet
+          # Paper n'a pas de build stable verifie pour cette version.
+          # Les comptes utilisent donc /register et /login LPC jusqu'a integration valide.
 
       - name: Configurer Velocity, lobby et SMP
         shell: bash
@@ -352,8 +325,8 @@ jobs:
           - Lobby Paper separe: 127.0.0.1:25566 (authentification uniquement: /register et /login)
           - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
           - Geyser + Floodgate installes sur Velocity, Floodgate aussi sur Lobby et SMP pour reconnaitre les joueurs Bedrock
-          - FastLoginPlus sur Velocity et les deux backends pour verifier les comptes Java premium; les comptes non premium gardent /register et /login LPC
-          - Lobby: Java cracke utilise /register et /login; Java premium verifie et Bedrock via Floodgate sont exempts de mot de passe
+          - Authentification LPC integree: /register et /login pour les comptes Java et Bedrock non premium
+          - Lobby: les comptes Java et Bedrock utilisent /register et /login LPC
           - Apres authentification, transfert automatique vers le SMP
           - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend
           - Geyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login
@@ -363,7 +336,7 @@ jobs:
           1. Installer Java 25.
           2. Lire https://aka.ms/MinecraftEULA et accepter l'EULA dans Lobby/eula.txt et SMP/eula.txt.
           3. Lancer DEMARRER-VELOCITY-INITIAL.bat une seule fois; attendre la generation des fichiers, puis arreter Velocity avec CTRL+C.
-          4. Lancer CONFIGURER-RESEAU.bat pour partager la cle Floodgate et autoriser le proxy FastLoginPlus sur Lobby/SMP.
+          4. Lancer CONFIGURER-RESEAU.bat pour partager la cle Floodgate sur Lobby/SMP.
           5. Lancer CONFIGURER-BEDROCK.bat (auth-type floodgate + transport nethernet).
           6. Lancer START-NETWORK.bat: il demarre Lobby, SMP, puis Velocity.
           7. Lancer OUVRIR-PORTS-WINDOWS.bat en administrateur; rediriger TCP 25565 et TCP+UDP 19132 sur le routeur.
@@ -372,7 +345,7 @@ jobs:
           10. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
 
           IMPORTANT:
-          - FastLoginPlus verifie l'identite Java premium sur Velocity. Le statut premium doit etre transmis aux backends par le plugin FastLoginPlus; les joueurs crackes gardent /register et /login LPC.
+          - FastLoginPlus est desactive dans ce paquet pour eviter l'erreur Invalid session constatee. Les comptes Java utilisent /register et /login LPC.
           - Garde le forwarding moderne et le secret prive identiques sur les deux Paper. Le mode online-mode du proxy et celui de proxies.velocity.online-mode dans Paper doivent rester false pour ce mode mixte.
           - Bedrock doit passer par Geyser auth-type floodgate + NetherNet; la meme cle Floodgate doit etre partagee avec les deux backends.
           - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
