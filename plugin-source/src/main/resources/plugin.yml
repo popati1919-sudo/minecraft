@@ -1,9 +1,9 @@
 name: LarpersCoin
-version: 0.6.0
+version: 0.7.0
 main: ca.larperscoin.smp.LarpersCoin
 api-version: '26.3'
 author: Larpers Coin SMP
-description: Base LPC economy for Paper. No land claims or plot protection.
+description: Plugin SMP LPC: économie, clans, quêtes, commerce et modération.
 commands:
   balance:
     description: Affiche ton solde LPC
@@ -27,11 +27,45 @@ commands:
     permission: larpers.admin
   lottery:
     description: Loterie LPC
-    usage: /lottery <buy|pot>
+    usage: /lottery <buy|pot|draw>
+  clan:
+    description: Système de clans
+    usage: /clan <create|invite|join|leave|bank|top|allies|level|chest|stats|leaderboard>
+  quest:
+    description: Quêtes quotidiennes
+    aliases: [quests]
+    usage: /quests [claim]
+  quiz:
+    description: Quiz de connaissances Minecraft
+    usage: /quiz [réponse]
+  shop:
+    description: Recherche dans le catalogue de la boutique
+    usage: /shop search <objet>
+  admin:
+    description: Menu graphique du staff
+    permission: larpers.staff
+  vanish:
+    description: Invisibilité du staff
+    permission: larpers.staff
+  invsee:
+    description: Voir l'inventaire d'un joueur
+    permission: larpers.staff
+  freeze:
+    description: Immobiliser un joueur
+    permission: larpers.staff
+  staffchat:
+    description: Discussion privée du staff
+    permission: larpers.staff
+  ah:
+    description: Hôtel des ventes
+    usage: /ah <list|sell|buy>
+  trade:
+    description: Demander un échange
+    usage: /trade <joueur>
 permissions:
   larpers.staff:
     description: Accès aux outils du staff LPC
     default: op
   larpers.admin:
-    description: Administration économique LPC
+    description: Administration complète LPC
     default: op
