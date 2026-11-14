@@ -95,7 +95,7 @@ public final class LarpersServerTools implements Listener, CommandExecutor, TabC
                 tell(sender, "Valeur invalide (1 à 64 caractères)."); return true;
             }
             if (args[0].equalsIgnoreCase("ip")) {
-                if (!value.matches("[A-Za-z0-9._:\\-]+")) { tell(sender, "Adresse invalide."); return true; }
+                if (!value.matches("[A-Za-z0-9._:-]+")) { tell(sender, "Adresse invalide."); return true; }
                 settings.set("display.ip", value);
             } else if (args[0].equalsIgnoreCase("nom")) {
                 settings.set("display.name", value);
