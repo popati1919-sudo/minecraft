@@ -109,7 +109,7 @@ public final class LarpersServerTools implements Listener, CommandExecutor, TabC
         }
 
         if (!admin(sender)) { tell(sender, "Seuls les administrateurs peuvent lancer un événement."); return true; }
-        if (args.length != 1) { tell(sender, "Usage: /event <quiz|calcul|motmelange>"); return true; }
+        if (args.length != 1) { tell(sender, "Usage: /event <calcul|motmelange|devine>"); return true; }
         if (activeAnswer != null && System.currentTimeMillis() < eventEndsAt) {
             tell(sender, "Un événement est déjà en cours."); return true;
         }
@@ -125,12 +125,10 @@ public final class LarpersServerTools implements Listener, CommandExecutor, TabC
             String word = words[ThreadLocalRandom.current().nextInt(words.length)];
             activeAnswer = word;
             question = "Remets les lettres dans l'ordre: " + shuffle(word);
-        } else if (type.equals("quiz")) {
-            String[][] questions = {{"Quel minerai sert à fabriquer une boussole?", "fer"},
-                    {"Quel mob explose?", "creeper"}, {"Combien de côtés a un bloc?", "6"}};
-            String[] picked = questions[ThreadLocalRandom.current().nextInt(questions.length)];
-            activeAnswer = picked[1];
-            question = picked[0];
+        } else if (type.equals("devine")) {
+            int number = ThreadLocalRandom.current().nextInt(1, 21);
+            activeAnswer = Integer.toString(number);
+            question = "Devine le nombre entre 1 et 20!";
         } else {
             tell(sender, "Événement inconnu. Utilise quiz, calcul ou motmelange."); return true;
         }
@@ -178,7 +176,7 @@ public final class LarpersServerTools implements Listener, CommandExecutor, TabC
         if (command.getName().equalsIgnoreCase("modif") && args.length == 1)
             return List.of("ip", "nom").stream().filter(x -> x.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
         if (command.getName().equalsIgnoreCase("event") && args.length == 1)
-            return List.of("quiz", "calcul", "motmelange").stream().filter(x -> x.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
+            return List.of("calcul", "motmelange", "devine").stream().filter(x -> x.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
         return List.of();
     }
 }
