@@ -60,6 +60,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     private final Map<UUID, Integer> lastSanctionTier = new ConcurrentHashMap<>();
     private final Map<String, Long> lastAlert = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> alertsEnabled = new ConcurrentHashMap<>();
+    private final java.util.Set<UUID> bedrockPlayers = ConcurrentHashMap.newKeySet();
     private final Deque<String> evidence = new ArrayDeque<>();
     private YamlConfiguration storedViolations;
 
@@ -171,7 +172,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     }
 
     private boolean movementExempt(Player p) {
-        return isBedrockPlayer(p) || p.isDead() || p.isInsideVehicle() || p.isFlying() || p.getAllowFlight()
+        return bedrockPlayers.contains(p.getUniqueId()) || p.isDead() || p.isInsideVehicle() || p.isFlying() || p.getAllowFlight()
                 || p.isGliding() || p.isSwimming() || p.isRiptiding()
                 || p.isInWater() || p.isClimbing() || p.isSleeping()
                 || p.hasPotionEffect(PotionEffectType.LEVITATION)
@@ -183,6 +184,8 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     public void onJoin(PlayerJoinEvent event) {
         grantGrace(event.getPlayer());
         UUID id = event.getPlayer().getUniqueId();
+        if (isBedrockPlayer(event.getPlayer())) bedrockPlayers.add(id);
+        else bedrockPlayers.remove(id);
         lastSanctionTier.put(id, tierFor(violations.getOrDefault(id, 0)));
     }
 
@@ -204,6 +207,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         lastMovementTick.remove(id);
         horizontalDistanceThisTick.remove(id);
         graceUntil.remove(id);
+        bedrockPlayers.remove(id);
         alertsEnabled.remove(id);
         lastSanctionTier.remove(id);
     }
@@ -276,7 +280,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         if (!globallyEnabled() || !plugin.getConfig().getBoolean("anticheat.checks.reach.enabled", true)) return;
         if (!(event.getDamager() instanceof Player attacker) || !(event.getEntity() instanceof Player victim)) return;
         if (attacker.getWorld() != victim.getWorld() || bypass(attacker) || inGrace(attacker)
-                || isBedrockPlayer(attacker) || isBedrockPlayer(victim)) return;
+                || bedrockPlayers.contains(attacker.getUniqueId()) || bedrockPlayers.contains(victim.getUniqueId())) return;
         double distance = attacker.getEyeLocation().distance(victim.getLocation().add(0.0D, 1.0D, 0.0D));
         double limit = plugin.getConfig().getDouble("anticheat.checks.reach.max-distance", 4.45D);
         if (distance > limit) {
