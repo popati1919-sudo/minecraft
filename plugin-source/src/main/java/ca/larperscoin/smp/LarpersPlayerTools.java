@@ -134,6 +134,8 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
         viewer.openInventory(inv);
     }
 
+    private Object value(Map<?, ?> row, String key, Object fallback) { Object found = row.get(key); return found == null ? fallback : found; }
+
     private List<Map<?, ?>> reports() {
         return data.getMapList("reports");
     }
@@ -141,15 +143,15 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
     private void openReports(Player viewer) {
         Inventory inv = Bukkit.createInventory(null, 54, REPORTS_TITLE);
         List<Map<?, ?>> rows = new ArrayList<>(reports());
-        rows.sort(Comparator.comparingLong(row -> ((Number) row.getOrDefault("timestamp", 0L)).longValue()).reversed());
+        rows.sort(Comparator.comparingLong(row -> ((Number) value(row, "timestamp", 0L)).longValue()).reversed());
         int slot = 0;
         for (Map<?, ?> row : rows) {
             if (slot >= 45) break;
-            int id = ((Number) row.getOrDefault("id", 0)).intValue();
-            String target = String.valueOf(row.getOrDefault("target-name", "inconnu"));
-            String reporter = String.valueOf(row.getOrDefault("reporter-name", "inconnu"));
-            String reason = String.valueOf(row.getOrDefault("reason", "Aucun motif"));
-            String status = String.valueOf(row.getOrDefault("status", "OUVERT"));
+            int id = ((Number) value(row, "id", 0)).intValue();
+            String target = String.valueOf(value(row, "target-name", "inconnu"));
+            String reporter = String.valueOf(value(row, "reporter-name", "inconnu"));
+            String reason = String.valueOf(value(row, "reason", "Aucun motif"));
+            String status = String.valueOf(value(row, "status", "OUVERT"));
             inv.setItem(slot++, item(Material.PAPER, "#" + id + " • " + target,
                     "Signalé par: " + reporter, "Motif: " + reason, "Statut: " + status,
                     "Clique pour afficher les détails"));
