@@ -159,6 +159,10 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         boolean active=core.lotteryActive();
         inv.setItem(10,item(Material.PAPER,"Acheter 1 ticket","Prix: 25 LPC","Clique pour acheter"));
         inv.setItem(12,item(Material.GOLD_INGOT,"Acheter 5 tickets","Prix: 125 LPC","Clique pour acheter"));
+        inv.setItem(13,item(Material.PAPER,"Tes chances de gagner",
+            "Tes tickets: "+core.lotteryPlayerTicketCount(p.getUniqueId()),
+            "Tickets totaux: "+core.lotteryTicketCount(),
+            String.format(Locale.ROOT,"Chance actuelle: %.2f%%",core.lotteryChancePercent(p.getUniqueId()))));
         inv.setItem(14,item(Material.EMERALD,"Jackpot: "+core.lotteryPot()+" LPC",
             "Tickets vendus: "+core.lotteryTicketCount(),
             active?"Loterie en cours":"Aucune loterie en cours"));
