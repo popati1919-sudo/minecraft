@@ -247,6 +247,35 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         saveData();
     }
 
+    private void checkSuspiciousTransfer(Player from, Player to, double amount) {
+        long now=System.currentTimeMillis();
+        List<String> records=data.getStringList("transactions");
+        int recentLarge=0;
+        for(int i=records.size()-1;i>=0;i--) {
+            String[] part=records.get(i).split("\\|");
+            if(part.length!=5)continue;
+            long stamp;
+            double value;
+            try { stamp=Long.parseLong(part[0]); value=Double.parseDouble(part[4]); }
+            catch(NumberFormatException ex) { continue; }
+            if(now-stamp>60_000L)break;
+            if(part[1].equals("PAY")&&part[2].equals(from.getUniqueId().toString())&&value>=1000.0)recentLarge++;
+        }
+        boolean suspicious=amount>=5000.0||recentLarge>=3;
+        if(!suspicious)return;
+        String detail=from.getName()+" -> "+to.getName()+" : "+format(amount)+" (transferts élevés sur 60 s: "+recentLarge+")";
+        List<String> alerts=data.getStringList("suspicious-transfers");
+        alerts.add(now+"|"+detail);
+        if(alerts.size()>500)alerts=new ArrayList<>(alerts.subList(alerts.size()-500,alerts.size()));
+        data.set("suspicious-transfers",alerts);
+        saveData();
+        getLogger().warning("[Économie] Transfert à vérifier: "+detail);
+        for(Player staff:Bukkit.getOnlinePlayers()) {
+            if(staff.isOp()||staff.hasPermission("larpers.economy.alerts")||staff.hasPermission("larpers.admin"))
+                staff.sendMessage(ChatColor.RED+"[LPC ÉCONOMIE] Transfert à vérifier: "+detail);
+        }
+    }
+
     private String format(double amount) {
         return money.format(amount) + " LPC";
     }
@@ -323,6 +352,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     credit(target.getUniqueId(), amount);
                     saveData();
                     recordTransaction("PAY", player.getUniqueId(), target.getUniqueId(), amount);
+                    checkSuspiciousTransfer(player, target, amount);
                     reply(player, "Tu as envoyé " + format(amount) + " à " + target.getName() + ".");
                     reply(target, "Tu as reçu " + format(amount) + " de " + player.getName() + ".");
                     return true;
