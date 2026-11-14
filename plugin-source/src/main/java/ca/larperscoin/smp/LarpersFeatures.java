@@ -57,6 +57,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<UUID, String> ahSearch = new HashMap<>();
     private final Set<UUID> awaitingAhSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Set<UUID> awaitingLotteryAmount = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<UUID> awaitingBountySearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<UUID, UUID> pendingBountyTarget = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<UUID, UUID> pendingOpTarget = new HashMap<>();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
@@ -290,17 +291,23 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
         if(entries.isEmpty())inv.setItem(22,item(Material.PAPER,"Aucune prime active","Place une prime sur un joueur en ligne."));
         inv.setItem(45,item(Material.TARGET,"Placer une prime","Choisir un joueur en ligne"));
+        inv.setItem(46,item(Material.COMPASS,"Rechercher un joueur","Recherche par pseudo, compatible Java et Bedrock"));
         inv.setItem(49,item(Material.BARRIER,"Fermer"));
         inv.setItem(53,item(Material.SUNFLOWER,"Actualiser",entries.size()+" prime(s) active(s)"));
         viewer.openInventory(inv);
     }
-    private void openBountyTargets(Player viewer) {
+    private void openBountyTargets(Player viewer) { openBountyTargets(viewer, ""); }
+    private void openBountyTargets(Player viewer, String query) {
         Inventory inv=Bukkit.createInventory(null,54,"LPC | Choisir une cible");
         int slot=0;
+        String filter=query.toLowerCase(Locale.ROOT).trim();
         for(Player target:Bukkit.getOnlinePlayers()) {
             if(target.equals(viewer)||slot>=45)continue;
+            if(!filter.isEmpty()&&!target.getName().toLowerCase(Locale.ROOT).contains(filter))continue;
             inv.setItem(slot++,item(Material.PLAYER_HEAD,target.getName(),"Prime actuelle: "+core.bountyAmount(target.getUniqueId())+" LPC","Clique pour choisir"));
         }
+        if(slot==0)inv.setItem(22,item(Material.BARRIER,"Aucun joueur trouvé","Recherche: "+(filter.isEmpty()?"aucune":filter)));
+        inv.setItem(45,item(Material.COMPASS,"Rechercher","Pseudo actuel: "+(filter.isEmpty()?"tous":filter)));
         inv.setItem(49,item(Material.ARROW,"Retour aux primes"));
         viewer.openInventory(inv);
     }
@@ -840,6 +847,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             int slot=e.getRawSlot();
             if(slot==49){viewer.closeInventory();return;}
             if(slot==45){openBountyTargets(viewer);return;}
+            if(slot==46){viewer.closeInventory();awaitingBountySearch.add(viewer.getUniqueId());msg(viewer,"Écris le pseudo du joueur à rechercher (ou 'annuler').");return;}
             if(slot==53){openBountyMenu(viewer);return;}
             return;
         }
@@ -847,6 +855,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player viewer))return;
             if(e.getRawSlot()==49){openBountyMenu(viewer);return;}
+            if(e.getRawSlot()==45){viewer.closeInventory();awaitingBountySearch.add(viewer.getUniqueId());msg(viewer,"Écris le pseudo du joueur à rechercher (ou 'annuler').");return;}
             if(e.getRawSlot()<0||e.getRawSlot()>=45||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta())return;
             String targetName=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName());
             Player target=Bukkit.getPlayerExact(targetName);
@@ -959,11 +968,20 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) {
         UUID id=e.getPlayer().getUniqueId();
-        frozen.remove(id);awaitingAhSearch.remove(id);awaitingLotteryAmount.remove(id);pendingBountyTarget.remove(id);
+        frozen.remove(id);awaitingAhSearch.remove(id);awaitingLotteryAmount.remove(id);awaitingBountySearch.remove(id);pendingBountyTarget.remove(id);
     }
     @EventHandler public void onChatSearch(org.bukkit.event.player.AsyncPlayerChatEvent e) {
         Player sender=e.getPlayer();
         UUID senderId=sender.getUniqueId();
+        if(awaitingBountySearch.remove(senderId)) {
+            e.setCancelled(true);
+            String query=e.getMessage().trim();
+            Bukkit.getScheduler().runTask(plugin,()->{
+                if(query.equalsIgnoreCase("annuler")){msg(sender,"Recherche de prime annulée.");openBountyMenu(sender);return;}
+                openBountyTargets(sender,query);
+            });
+            return;
+        }
         if(awaitingLotteryAmount.remove(senderId)) {
             e.setCancelled(true);
             String amount=e.getMessage().trim();
