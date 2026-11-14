@@ -508,7 +508,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         Player player=requirePlayer(sender);if(player==null)return true;
                         if(!lotteryActive()){reply(sender,"Aucune loterie en cours. Attends l'annonce d'un administrateur.");return true;}
                         int count=args.length>=2?Integer.parseInt(args[1]):1;
-                        if(count<1||count>10){reply(sender,"Tu peux acheter de 1 à 10 tickets.");return true;}
+                        if(count<1||count>10000){reply(sender,"Achète entre 1 et 10 000 tickets par commande; tu peux refaire plusieurs achats sans limite totale.");return true;}
                         double cost=count*25.0,nextPot=lotteryPot()+cost;
                         if(!Double.isFinite(nextPot)){reply(sender,"Le jackpot dépasserait la limite numérique.");return true;}
                         if(!debit(player.getUniqueId(),cost)){reply(sender,"Fonds insuffisants : "+format(cost)+".");return true;}
@@ -530,7 +530,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         if(!isLpcAdminSender(sender)){reply(sender,"Seuls les administrateurs peuvent terminer une loterie.");return true;}
                         finishLottery(false);reply(sender,"La loterie a été terminée.");return true;
                     }
-                    reply(sender,"Usage : /lottery [menu] | buy [1-10] | start [minutes] (admin) | draw (admin)");return true;
+                    reply(sender,"Usage : /lottery [menu] | buy [quantité] | start [minutes] (admin) | draw (admin)");return true;
                 }
                 default -> {
                     return false;
@@ -548,6 +548,15 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
 
     public double lotteryPot(){return Math.max(0.0,data.getDouble("lottery.pot",0.0));}
     public int lotteryTicketCount(){return data.getStringList("lottery.tickets").size();}
+    public int lotteryPlayerTicketCount(UUID playerId){
+        int count=0;
+        for(String ticket:data.getStringList("lottery.tickets"))if(ticket.equals(playerId.toString()))count++;
+        return count;
+    }
+    public double lotteryChancePercent(UUID playerId){
+        int total=lotteryTicketCount();
+        return total==0?0.0:(lotteryPlayerTicketCount(playerId)*100.0/total);
+    }
     public boolean lotteryActive(){return data.getBoolean("lottery.active",false);}
     public long lotteryEndsAt(){return data.getLong("lottery.ends-at",0L);}
     private boolean isLpcAdminSender(CommandSender sender){return sender.isOp()||sender.hasPermission("larpers.admin");}
