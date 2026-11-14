@@ -33,7 +33,7 @@ import java.util.stream.Collectors;
 import java.time.LocalDate;
 import java.time.temporal.WeekFields;
 
-/** Modules sociaux, progression, commerce et modération de LarpersCoin. */
+/** Modules sociaux, progression, clans, ventes aux enchères et modération de LarpersCoin. */
 public final class LarpersFeatures implements CommandExecutor, TabCompleter, Listener {
     private final JavaPlugin plugin;
     private final LarpersCoin core;
@@ -46,11 +46,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<String, ItemStack[]> clanChestSnapshots = new HashMap<>();
     private final Set<UUID> vanished = new HashSet<>();
     private final SecureTradeManager tradeManager;
-    private final Map<UUID, Long> lastQuiz = new HashMap<>();
+
     private final Map<UUID, Long> questClaims = new HashMap<>();
     private final Map<UUID, UUID> pendingBids = new HashMap<>();
-    private final Map<UUID, String> shopCategory = new HashMap<>();
-    private final Map<UUID, Integer> shopPage = new HashMap<>();
+
+
     private final Map<UUID, Integer> adminPage = new HashMap<>();
     private final Map<UUID, Integer> ahPage = new HashMap<>();
     private final Map<UUID, Map<Integer, String>> ahSlots = new HashMap<>();
@@ -61,31 +61,15 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<UUID, String> bountySearch = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<UUID, UUID> pendingOpTarget = new HashMap<>();
     private final Map<UUID, String> selectorSearch = new java.util.concurrent.ConcurrentHashMap<>();
-    private final Map<UUID, String> shopSearch = new java.util.concurrent.ConcurrentHashMap<>();
-    private final Set<UUID> awaitingShopSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+
     private final Map<UUID, String> selectorAction = new java.util.concurrent.ConcurrentHashMap<>();
     private final Set<UUID> awaitingSelectorSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
-    private static final Map<String, Material> SHOP = new LinkedHashMap<>();
-    private static final Map<String, Double> SHOP_PRICES = new LinkedHashMap<>();
+
+
     private boolean saveQueued = false;
 
-    static {
-        SHOP.put("diamant", Material.DIAMOND); SHOP.put("fer", Material.IRON_INGOT);
-        SHOP.put("or", Material.GOLD_INGOT); SHOP.put("émeraude", Material.EMERALD);
-        SHOP.put("redstone", Material.REDSTONE); SHOP.put("lapis", Material.LAPIS_LAZULI);
-        SHOP.put("obsidienne", Material.OBSIDIAN); SHOP.put("pain", Material.BREAD);
-        SHOP.put("pomme", Material.APPLE); SHOP.put("bois", Material.OAK_LOG);
-        SHOP.put("pierre", Material.STONE); SHOP.put("terre", Material.DIRT);
-        SHOP.put("elytra", Material.ELYTRA); SHOP.put("netherite", Material.NETHERITE_INGOT);
-        SHOP_PRICES.put("diamant",250.0); SHOP_PRICES.put("fer",25.0);
-        SHOP_PRICES.put("or",40.0); SHOP_PRICES.put("émeraude",100.0);
-        SHOP_PRICES.put("redstone",10.0); SHOP_PRICES.put("lapis",12.0);
-        SHOP_PRICES.put("obsidienne",35.0); SHOP_PRICES.put("pain",5.0);
-        SHOP_PRICES.put("pomme",4.0); SHOP_PRICES.put("bois",8.0);
-        SHOP_PRICES.put("pierre",2.0); SHOP_PRICES.put("terre",1.0);
-        SHOP_PRICES.put("elytra",5000.0); SHOP_PRICES.put("netherite",1500.0);
-    }
 
     public LarpersFeatures(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -94,21 +78,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
         file = new File(plugin.getDataFolder(), "features.yml");
         db = YamlConfiguration.loadConfiguration(file);
-        for (var entry : SHOP_PRICES.entrySet()) {
-            String pricePath="shop.prices."+entry.getKey();
-            if (!db.contains(pricePath)) db.set(pricePath,entry.getValue());
-        }
-        seedQuizQuestion("compass","Quel minerai permet de fabriquer une boussole?","fer",List.of("fer","cuivre","or"));
-        seedQuizQuestion("faces","Combien de faces possède un bloc standard?","6",List.of("4","6","8"));
-        seedQuizQuestion("creeper","Quel mob explose près du joueur?","creeper",List.of("creeper","zombie","squelette"));
         save();
-        for (String cmd : List.of("clan","quest","quests","quiz","shop","admin","announce","vanish","invsee","freeze","staffchat","ah","trade")) {
+        for (String cmd : List.of("clan","quest","quests","admin","announce","vanish","invsee","freeze","staffchat","ah","trade")) {
             PluginCommand c = plugin.getCommand(cmd);
             if (c != null) { c.setExecutor(this); c.setTabCompleter(this); }
         }
         Bukkit.getPluginManager().registerEvents(this, plugin);
         Bukkit.getScheduler().runTaskTimer(plugin,this::save,1200L,1200L);
-        plugin.getLogger().info("Modules clans, quêtes, quiz, boutique et modération chargés.");
     }
 
     private void save() {
@@ -126,14 +102,6 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         } catch(IOException ex) {
             plugin.getLogger().severe("Échec de sauvegarde atomique de features.yml: "+ex.getMessage());
             try { Files.deleteIfExists(temporary); } catch(IOException ignored) { }
-        }
-    }
-    private void seedQuizQuestion(String key,String question,String answer,List<String> choices) {
-        String path="quiz-bank."+key;
-        if(!db.contains(path+".question")) {
-            db.set(path+".question",question);
-            db.set(path+".answer",answer);
-            db.set(path+".choices",choices);
         }
     }
     public void shutdown() { save(); }
@@ -757,111 +725,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     @EventHandler public void onQuestFish(PlayerFishEvent e) {
         if(e.getState()==PlayerFishEvent.State.CAUGHT_FISH) progressQuest(e.getPlayer(),"fish");
     }
-    private void openQuiz(Player p,String question,String[] choices) {
-        Inventory inv=Bukkit.createInventory(null,27,"LPC | Quiz");
-        inv.setItem(4,item(Material.BOOK,"Question",question,"Choisis une réponse ci-dessous."));
-        int[] slots={11,13,15,17,20,22};
-        for(int i=0;i<Math.min(choices.length,slots.length);i++)inv.setItem(slots[i],item(Material.PAPER,choices[i],"Réponse "+(char)('A'+i)));
-        LpcMenuTheme.frame(inv);
-        p.openInventory(inv);
-    }
-    private boolean quiz(CommandSender s,String[] a) {
-        Player p=player(s);if(p==null)return true;
-        if(a.length>0&&a[0].equalsIgnoreCase("top")) {
-            var section=db.getConfigurationSection("quiz-scores");
-            if(section==null){msg(p,"Aucun score enregistré.");return true;}
-            List<String> ids=new ArrayList<>(section.getKeys(false));
-            ids.sort(Comparator.comparingInt((String x)->db.getInt("quiz-scores."+x)).reversed());
-            msg(p,"Classement du quiz Minecraft:");
-            for(int i=0;i<Math.min(10,ids.size());i++) {
-                OfflinePlayer who=Bukkit.getOfflinePlayer(UUID.fromString(ids.get(i)));
-                msg(p,(i+1)+". "+(who.getName()==null?ids.get(i):who.getName())+" — "+db.getInt("quiz-scores."+ids.get(i))+" points");
-            }
-            return true;
-        }
-        long now=System.currentTimeMillis();
-        long previous=db.getLong("quiz."+id(p)+".time",0L);
-        if(a.length==0&&now-previous<60_000L){msg(p,"Attends une minute avant un autre quiz.");return true;}
-        var section=db.getConfigurationSection("quiz-bank");
-        if(section==null||section.getKeys(false).isEmpty()){msg(p,"La banque de questions est vide. Configure quiz-bank dans features.yml.");return true;}
-        List<String> keys=new ArrayList<>(section.getKeys(false));
-        if(a.length==0) {
-            String key=keys.get(new Random().nextInt(keys.size()));
-            String path="quiz-bank."+key;
-            String question=db.getString(path+".question","");
-            String answer=db.getString(path+".answer","");
-            List<String> choices=db.getStringList(path+".choices");
-            if(question.isBlank()||answer.isBlank()||choices.size()<2){msg(p,"Question mal configurée: "+key);return true;}
-            db.set("quiz."+id(p)+".answer",answer);
-            db.set("quiz."+id(p)+".time",now);
-            save();openQuiz(p,question,choices.toArray(String[]::new));return true;
-        }
-        msg(p,"Utilise /quiz pour une question ou /quiz top pour le classement.");
-        return true;
-    }
 
-    private String shopCategoryFor(String key) {
-        if(List.of("diamant","fer","or","émeraude","redstone","lapis","netherite").contains(key))return "Minerais";
-        if(List.of("obsidienne","bois","pierre","terre").contains(key))return "Construction";
-        if(List.of("pain","pomme").contains(key))return "Nourriture";
-        return "Rares";
-    }
-    private void openShop(Player p) { openShop(p,"Tous",0); }
-    private void openShop(Player p,String category,int page) {
-        List<String> categories=List.of("Tous","Minerais","Construction","Nourriture","Rares");
-        if(!categories.contains(category))category="Tous";
-        final String selectedCategory=category;
-        String query=shopSearch.getOrDefault(p.getUniqueId(),"").toLowerCase(Locale.ROOT).trim();
-        List<Map.Entry<String,Material>> entries=SHOP.entrySet().stream()
-            .filter(e->selectedCategory.equals("Tous")||shopCategoryFor(e.getKey()).equals(selectedCategory))
-            .filter(e->query.isEmpty()||e.getKey().toLowerCase(Locale.ROOT).contains(query)||e.getValue().name().toLowerCase(Locale.ROOT).contains(query)).toList();
-        int pages=Math.max(1,(entries.size()+35)/36);
-        page=Math.max(0,Math.min(page,pages-1));
-        shopCategory.put(p.getUniqueId(),category);shopPage.put(p.getUniqueId(),page);
-        Inventory inv=Bukkit.createInventory(null,54,"LPC | Boutique");
-        int[] tabs={0,2,4,6,8};
-        for(int i=0;i<categories.size();i++)inv.setItem(tabs[i],item(Material.BOOK,categories.get(i),category.equals(categories.get(i))?"Catégorie sélectionnée":"Clique pour filtrer"));
-        int start=page*36;
-        for(int i=start;i<Math.min(entries.size(),start+36);i++) {
-            var entry=entries.get(i);double price=db.getDouble("shop.prices."+entry.getKey(),SHOP_PRICES.get(entry.getKey()));
-            inv.setItem(9+(i-start),item(entry.getValue(),entry.getKey(),"Prix: "+price+" LPC/unité","Clic gauche: 1","Clic droit: 16","Maj-clic: 64"));
-        }
-        inv.setItem(45,item(Material.ARROW,"Page précédente"));
-        inv.setItem(46,item(Material.COMPASS,"Rechercher un objet","Écris le nom dans le chat (Java/Bedrock)","Filtre: "+(query.isEmpty()?"aucun":query)));
-        inv.setItem(47,item(Material.MILK_BUCKET,"Effacer la recherche"));
-        inv.setItem(49,item(Material.PAPER,"Page "+(page+1)+"/"+pages,"Clic droit: 16 objets","Maj-clic: 64 objets"));
-        inv.setItem(53,item(Material.ARROW,"Page suivante"));
-        LpcMenuTheme.frame(inv);
-        p.openInventory(inv);
-    }
-    private boolean buyShop(Player p,String key,int amount) {
-        if(!SHOP.containsKey(key)) { msg(p,"Objet inconnu. Utilise /shop search <objet>.");return true; }
-        if(amount<1||amount>64) { msg(p,"Quantité autorisée: 1 à 64.");return true; }
-        Material material=SHOP.get(key);
-        ItemStack purchase=new ItemStack(material,amount);
-        Inventory simulated=Bukkit.createInventory(null,36);
-        simulated.setStorageContents(p.getInventory().getStorageContents());
-        if(!simulated.addItem(purchase.clone()).isEmpty()) { msg(p,"Inventaire insuffisant; aucun LPC débité.");return true; }
-        double price=db.getDouble("shop.prices."+key,SHOP_PRICES.getOrDefault(key,0.0))*amount;
-        if(!Double.isFinite(price)||price<=0||!charge(p,price)) { msg(p,"Fonds LPC insuffisants. Prix: "+price+" LPC.");return true; }
-        p.getInventory().addItem(purchase);
-        core.recordTransaction("SHOP_BUY",p.getUniqueId(),new UUID(0L,0L),price);
-        msg(p,"Achat effectué: "+amount+" x "+material.name()+" pour "+price+" LPC.");
-        return true;
-    }
-    private boolean shop(CommandSender s,String[] a) {
-        if(a.length==0) { Player p=player(s);if(p!=null)openShop(p);return true; }
-        if(a.length>=2&&a[0].equalsIgnoreCase("buy")) {
-            Player p=player(s);if(p==null)return true;
-            int amount=1;
-            if(a.length>=3) try { amount=Integer.parseInt(a[2]); } catch(NumberFormatException ex) { amount=0; }
-            return buyShop(p,a[1].toLowerCase(Locale.ROOT),amount);
-        }
-        if(a.length<2||!a[0].equalsIgnoreCase("search")){msg(s,"Usage: /shop | /shop search <objet> | /shop buy <clé> [quantité]");return true;}
-        String query=String.join(" ",Arrays.copyOfRange(a,1,a.length)).toLowerCase(Locale.ROOT);
-        List<String> found=SHOP.entrySet().stream().filter(e->e.getKey().contains(query)||e.getValue().name().toLowerCase(Locale.ROOT).contains(query)).map(e->e.getKey()+" — "+e.getValue().name()+" ("+db.getDouble("shop.prices."+e.getKey(),SHOP_PRICES.get(e.getKey()))+" LPC/u)").toList();
-        msg(s,found.isEmpty()?"Aucun objet correspondant dans le catalogue.":"Résultats: "+String.join(" | ",found));return true;
-    }
     private boolean auction(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
         if(a.length==0||a[0].equalsIgnoreCase("list")) { openAuction(p,0);return true; }
@@ -1067,39 +931,6 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(e.getRawSlot()==22){openAuction(seller,0);return;}
             if(price>0){seller.closeInventory();createAuction(seller,price);}
         }
-        if(title.equals("LPC | Boutique")) {
-            e.setCancelled(true);
-            if(e.getRawSlot()>=e.getView().getTopInventory().getSize()) return;
-            if(!(e.getWhoClicked() instanceof Player buyer)||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
-            int slot=e.getRawSlot();String category=shopCategory.getOrDefault(buyer.getUniqueId(),"Tous");int page=shopPage.getOrDefault(buyer.getUniqueId(),0);
-            if(slot==0||slot==2||slot==4||slot==6||slot==8) {
-                String next=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName());
-                openShop(buyer,next,0);return;
-            }
-            if(slot==45){openShop(buyer,category,page-1);return;}
-            if(slot==46){awaitingShopSearch.add(buyer.getUniqueId());buyer.closeInventory();msg(buyer,"Écris le nom d'un objet dans le chat (ou 'annuler').");return;}
-            if(slot==47){shopSearch.remove(buyer.getUniqueId());openShop(buyer,category,0);return;}
-            if(slot==53){openShop(buyer,category,page+1);return;}
-            if(slot<9||slot>44)return;
-            String key=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
-            int amount=e.isShiftClick()?64:(e.isRightClick()?16:1);
-            buyShop(buyer,key,amount);
-        }
-        if(title.equals("LPC | Quiz")) {
-            e.setCancelled(true);
-            if(e.getRawSlot()>=e.getView().getTopInventory().getSize()) return;
-            if(!(e.getWhoClicked() instanceof Player p)||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
-            int slot=e.getRawSlot();if(!List.of(11,13,15,17,20,22).contains(slot))return;
-            String expected=db.getString("quiz."+id(p)+".answer","");
-            String selected=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
-            if(expected.isEmpty()){msg(p,"Cette question est expirée. Fais /quiz.");p.closeInventory();return;}
-            if(selected.equalsIgnoreCase(expected)){
-                if(!Double.isFinite(core.balance(p.getUniqueId())+50)){msg(p,"Ton solde ne peut pas recevoir la récompense.");}
-                else {give(p,50);core.recordTransaction("QUIZ",new UUID(0L,0L),p.getUniqueId(),50);String scorePath="quiz-scores."+id(p);db.set(scorePath,db.getInt(scorePath,0)+1);msg(p,"Bonne réponse! +50 LPC. Score: "+db.getInt(scorePath)+" points.");}
-            } else msg(p,"Mauvaise réponse. La bonne réponse était: "+expected+".");
-            db.set("quiz."+id(p)+".answer",null);save();p.closeInventory();
-            return;
-        }
         if(title.equals("LPC | Clan")||title.equals("LPC | Quêtes")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player viewer)) return;
@@ -1142,22 +973,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) {
         UUID id=e.getPlayer().getUniqueId();
-        frozen.remove(id);awaitingAhSearch.remove(id);awaitingBountySearch.remove(id);awaitingSelectorSearch.remove(id);awaitingShopSearch.remove(id);shopSearch.remove(id);selectorSearch.remove(id);selectorAction.remove(id);bountySearch.remove(id);pendingBountyTarget.remove(id);
+        frozen.remove(id);awaitingAhSearch.remove(id);awaitingBountySearch.remove(id);awaitingSelectorSearch.remove(id);selectorSearch.remove(id);selectorAction.remove(id);bountySearch.remove(id);pendingBountyTarget.remove(id);
     }
     @EventHandler public void onChatSearch(org.bukkit.event.player.AsyncPlayerChatEvent e) {
         Player sender=e.getPlayer();
         UUID senderId=sender.getUniqueId();
-        if(awaitingShopSearch.remove(senderId)) {
-            e.setCancelled(true);
-            String query=e.getMessage().trim();
-            Bukkit.getScheduler().runTask(plugin,()->{
-                if(query.equalsIgnoreCase("annuler")){msg(sender,"Recherche boutique annulée.");openShop(sender);return;}
-                if(query.length()>40){msg(sender,"Recherche trop longue (40 caractères maximum).");openShop(sender);return;}
-                shopSearch.put(senderId,query);
-                openShop(sender);
-            });
-            return;
-        }
         if(awaitingSelectorSearch.remove(senderId)) {
             e.setCancelled(true);
             String query=e.getMessage().trim();
