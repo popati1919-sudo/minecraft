@@ -203,6 +203,8 @@ jobs:
             proxy-authenticated: false
             remember-ip: false
             connect-to-smp: true
+          anticheat:
+            enabled: false
           EOF
           cat > "$ROOT/SMP/plugins/LarpersCoin/config.yml" <<'EOF'
           auth:
@@ -331,7 +333,7 @@ jobs:
           - Lobby Paper separe: 127.0.0.1:25566 (authentification /register et /login pour Java premium et crack)
           - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
           - Geyser + Floodgate installes sur Velocity, Floodgate aussi sur Lobby et SMP pour reconnaitre les joueurs Bedrock
-          - Authentification offline: Java premium et crack peuvent rejoindre; tous les comptes Java utilisent /register puis /login; Bedrock sans mot de passe via Floodgate
+          - Authentification offline: Java premium et crack peuvent rejoindre; dans cette version, tous les comptes Java utilisent /register puis /login; Bedrock sans mot de passe via Floodgate
           - Lobby: les joueurs Java premium et crack doivent utiliser /register <motdepasse> puis /login <motdepasse>; Bedrock est authentifie via Floodgate
           - Apres authentification, transfert automatique vers le SMP
           - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend
@@ -356,7 +358,9 @@ jobs:
           - Bedrock doit passer par Geyser auth-type floodgate + NetherNet; la meme cle Floodgate doit etre partagee avec les deux backends.
           - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
           - Le mode offline accepte les comptes crack mais ne valide pas l'identite Microsoft des comptes Java: un joueur peut usurper un pseudo si l'authentification du plugin est contournee. Garde les backends prives et impose /register + /login.
-          - Le plugin anticheat utilise des seuils de sanctions progressives configurables; ajuste-les apres tests.
+          - Le plugin anticheat utilise des seuils de sanctions progressives configurables; ajuste-les apres tests. Il est désactivé dans le Lobby et actif dans le SMP.
+          - /admin reset <joueur> supprime le mot de passe Java crack; si le joueur est en ligne, il reçoit un TITLE avec un compte à rebours de 10 secondes puis est kick. Il devra refaire /register à sa prochaine connexion.
+          - Le fichier d'authentification du Lobby est partagé avec le SMP afin que /admin reset fonctionne depuis le SMP.
           - Les mondes et donnees existants ne sont pas inclus: ce ZIP est un paquet serveur propre.
           - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
           EOF
