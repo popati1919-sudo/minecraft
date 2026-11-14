@@ -86,7 +86,7 @@ public final class LarpersCoinVelocity {
             String username = event.getUsername();
             if (username == null) {
                 event.setResult(PreLoginEvent.PreLoginComponentResult.denied(
-                        Component.text("Pseudo Minecraft invalide.")));
+                        Component.text("§cConnexion refusée : pseudo Minecraft invalide. §7Vérifie ton nom de joueur.")));
                 return;
             }
 
@@ -96,7 +96,7 @@ public final class LarpersCoinVelocity {
                 String bedrockName = username.substring(bedrockPrefix.length());
                 if (!bedrockName.matches("[A-Za-z0-9_]{1,16}")) {
                     event.setResult(PreLoginEvent.PreLoginComponentResult.denied(
-                            Component.text("Pseudo Bedrock invalide.")));
+                            Component.text("§cConnexion refusée : pseudo Bedrock invalide. §7Vérifie ton gamertag.")));
                     return;
                 }
                 event.setResult(PreLoginEvent.PreLoginComponentResult.forceOfflineMode());
@@ -115,12 +115,12 @@ public final class LarpersCoinVelocity {
                         ? PreLoginEvent.PreLoginComponentResult.forceOnlineMode()
                         : PreLoginEvent.PreLoginComponentResult.forceOfflineMode());
                 logger.info("[LPC Auth] {}: {}", username,
-                        premium ? "compte Java officiel - session Microsoft requise"
-                                : "pseudo non premium - authentification LPC requise");
+                        premium ? "pseudo réservé à Java Premium - session Microsoft obligatoire"
+                                : "compte crack - authentification LPC requise");
             } catch (Exception ex) {
-                logger.warn("[LPC Auth] Verification Mojang impossible pour {}: {}", username, ex.toString());
+                logger.warn("[LPC Auth] Vérification Minecraft impossible pour {}: {}", username, ex.toString());
                 event.setResult(PreLoginEvent.PreLoginComponentResult.denied(
-                        Component.text("Verification Minecraft indisponible. Reessaie dans quelques instants.")));
+                        Component.text("§cConnexion temporairement indisponible. §7La vérification Minecraft ne répond pas. Réessaie dans 1 à 2 minutes.")));
             }
         });
     }
