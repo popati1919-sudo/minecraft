@@ -57,6 +57,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<UUID, String> ahSearch = new HashMap<>();
     private final Set<UUID> awaitingAhSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<UUID, UUID> pendingBountyTarget = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Set<UUID> awaitingBountySearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Map<UUID, String> bountySearch = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<UUID, UUID> pendingOpTarget = new HashMap<>();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
     private static final Map<String, Material> SHOP = new LinkedHashMap<>();
@@ -312,10 +314,15 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private void openBountyTargets(Player viewer) {
         Inventory inv=Bukkit.createInventory(null,54,"LPC | Choisir une cible");
         int slot=0;
+        String query=bountySearch.getOrDefault(viewer.getUniqueId(),"").toLowerCase(Locale.ROOT).trim();
         for(Player target:Bukkit.getOnlinePlayers()) {
             if(target.equals(viewer)||slot>=45)continue;
+            if(!query.isEmpty()&&!target.getName().toLowerCase(Locale.ROOT).contains(query))continue;
             inv.setItem(slot++,item(Material.PLAYER_HEAD,target.getName(),"Prime actuelle: "+core.bountyAmount(target.getUniqueId())+" LPC","Clique pour choisir"));
         }
+        if(slot==0)inv.setItem(22,item(Material.PAPER,"Aucun joueur trouvé",query.isEmpty()?"Aucun autre joueur en ligne":"Recherche: "+query));
+        inv.setItem(45,item(Material.COMPASS,"Rechercher un pseudo",query.isEmpty()?"Filtrer les joueurs en ligne":"Filtre: "+query));
+        inv.setItem(47,item(Material.MILK_BUCKET,"Effacer la recherche"));
         inv.setItem(49,item(Material.ARROW,"Retour aux primes"));
         viewer.openInventory(inv);
     }
@@ -885,6 +892,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player viewer))return;
             if(e.getRawSlot()==49){openBountyMenu(viewer);return;}
+            if(e.getRawSlot()==45){awaitingBountySearch.add(viewer.getUniqueId());viewer.closeInventory();msg(viewer,"Écris le pseudo à rechercher (ou 'annuler').");return;}
+            if(e.getRawSlot()==47){bountySearch.remove(viewer.getUniqueId());openBountyTargets(viewer);return;}
             if(e.getRawSlot()<0||e.getRawSlot()>=45||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta())return;
             String targetName=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName());
             Player target=Bukkit.getPlayerExact(targetName);
@@ -997,11 +1006,21 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) {
         UUID id=e.getPlayer().getUniqueId();
-        frozen.remove(id);awaitingAhSearch.remove(id);pendingBountyTarget.remove(id);
+        frozen.remove(id);awaitingAhSearch.remove(id);awaitingBountySearch.remove(id);bountySearch.remove(id);pendingBountyTarget.remove(id);
     }
     @EventHandler public void onChatSearch(org.bukkit.event.player.AsyncPlayerChatEvent e) {
         Player sender=e.getPlayer();
         UUID senderId=sender.getUniqueId();
+        if(awaitingBountySearch.remove(senderId)) {
+            e.setCancelled(true);
+            String query=e.getMessage().trim();
+            Bukkit.getScheduler().runTask(plugin,()->{
+                if(query.equalsIgnoreCase("annuler")){msg(sender,"Recherche de prime annulée.");openBountyTargets(sender);return;}
+                if(query.length()>16){msg(sender,"Pseudo trop long.");openBountyTargets(sender);return;}
+                bountySearch.put(senderId,query);openBountyTargets(sender);
+            });
+            return;
+        }
         if(awaitingAhSearch.remove(senderId)) {
             e.setCancelled(true);
             String query=e.getMessage().trim();
