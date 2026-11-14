@@ -135,7 +135,7 @@ public final class LarpersServerTools implements Listener, CommandExecutor, TabC
             activeAnswer = Integer.toString(number);
             question = "Devine le nombre entre 1 et 20!";
         } else {
-            tell(sender, "Événement inconnu. Utilise quiz, calcul ou motmelange."); return true;
+            tell(sender, "Événement inconnu. Choisis calcul, motmelange ou devine."); return true;
         }
         activeEvent = type;
         eventEndsAt = System.currentTimeMillis() + 90_000L;
