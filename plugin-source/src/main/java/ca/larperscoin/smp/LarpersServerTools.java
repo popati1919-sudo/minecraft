@@ -12,6 +12,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -76,6 +77,10 @@ public final class LarpersServerTools implements Listener, CommandExecutor, TabC
                     ChatColor.DARK_GRAY + "  •  " + ChatColor.GREEN + "Ping: " + player.getPing() + " ms";
             player.setPlayerListHeaderFooter(header, footer);
         }
+    }
+
+    @EventHandler public void onWorldLoad(WorldLoadEvent event) {
+        event.getWorld().setGameRule(org.bukkit.GameRule.LOCATOR_BAR, false);
     }
 
     @EventHandler public void onJoin(PlayerJoinEvent event) {
