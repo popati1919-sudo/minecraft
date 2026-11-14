@@ -46,7 +46,7 @@ final class LarpersAuth implements Listener {
     private static final long LOCK_MILLIS = 15 * 60_000L;
     private final JavaPlugin plugin;
     private final File file;
-    private final YamlConfiguration accounts;
+    private YamlConfiguration accounts;
     private final SecureRandom random = new SecureRandom();
     private final Map<UUID, Boolean> authenticated = new ConcurrentHashMap<>();
     private final Map<UUID, Location> joinLocations = new ConcurrentHashMap<>();
@@ -55,11 +55,15 @@ final class LarpersAuth implements Listener {
 
     LarpersAuth(JavaPlugin plugin) {
         this.plugin = plugin;
-        this.file = new File(plugin.getDataFolder(), "auth.yml");
-        this.accounts = YamlConfiguration.loadConfiguration(file);
+        plugin.getConfig().addDefault("auth.storage-file", "");
         plugin.getConfig().addDefault("auth.proxy-authenticated", false);
         plugin.getConfig().addDefault("auth.remember-ip", false);
         plugin.getConfig().addDefault("auth.connect-to-smp", false);
+        String configuredStorage = plugin.getConfig().getString("auth.storage-file", "");
+        this.file = configuredStorage == null || configuredStorage.isBlank()
+                ? new File(plugin.getDataFolder(), "auth.yml")
+                : new File(configuredStorage).getAbsoluteFile();
+        this.accounts = YamlConfiguration.loadConfiguration(file);
         Bukkit.getMessenger().registerOutgoingPluginChannel(plugin, "BungeeCord");
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
@@ -192,6 +196,9 @@ final class LarpersAuth implements Listener {
     }
 
     void resetPassword(CommandSender sender, String targetName) {
+        // Le SMP recharge le fichier partage avant le reset afin de ne pas utiliser
+        // une copie devenue obsolete depuis l'inscription effectuee dans le Lobby.
+        accounts = YamlConfiguration.loadConfiguration(file);
         if (targetName == null || !targetName.matches("[A-Za-z0-9_]{3,16}")) {
             sender.sendMessage(ChatColor.RED + "Pseudo invalide.");
             return;
