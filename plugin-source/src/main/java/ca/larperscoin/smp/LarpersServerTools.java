@@ -138,9 +138,9 @@ public final class LarpersServerTools implements Listener, CommandExecutor, TabC
             tell(sender, "Événement inconnu. Choisis calcul, motmelange ou devine."); return true;
         }
         activeEvent = type;
-        eventEndsAt = System.currentTimeMillis() + 90_000L;
+        eventEndsAt = System.currentTimeMillis() + 60_000L;
         Bukkit.broadcastMessage(ChatColor.LIGHT_PURPLE + "✦ ÉVÉNEMENT LPC ✦ " + ChatColor.YELLOW + question);
-        Bukkit.broadcastMessage(ChatColor.GRAY + "Réponds dans le chat! Récompense: 100 LPC. Durée: 90 secondes.");
+        Bukkit.broadcastMessage(ChatColor.GRAY + "Réponds dans le chat! Récompense: 100 LPC. Durée maximale: 60 secondes.");
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (activeAnswer != null && activeEvent != null && System.currentTimeMillis() >= eventEndsAt) {
                 Bukkit.broadcastMessage(ChatColor.RED + "Fin de l'événement! Réponse: " + activeAnswer);
