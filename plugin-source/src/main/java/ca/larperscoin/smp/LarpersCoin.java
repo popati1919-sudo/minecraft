@@ -181,11 +181,15 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                 lobby.setSpawnLocation(0, 100, 0);
             }
         }, 1L);
-        webPanel = new LarpersWebPanel(this);\n        webPanel.start();\n        getLogger().info("LarpersCoin 1.0.8 actif. Aucun claim ni protection de parcelle n'est enregistré.");
+        webPanel = new LarpersWebPanel(this);
+        webPanel.start();
+        getLogger().info("LarpersCoin 1.0.8 actif. Aucun claim ni protection de parcelle n'est enregistré.");
     }
 
     @Override
-    public void onDisable() {\n        if (webPanel != null) webPanel.stop();\n        if (features != null) features.shutdown();
+    public void onDisable() {
+        if (webPanel != null) webPanel.stop();
+        if (features != null) features.shutdown();
         if (antiCheat != null) antiCheat.shutdown();
         if (playerTools != null) playerTools.shutdown();
         saveData();
@@ -715,7 +719,8 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             p.setPlayerListName(rankPrefix(p)+ChatColor.WHITE+p.getName());
             String header = globalAnnouncement.isBlank() ? ChatColor.GOLD+"Larpers Coin SMP"
                     : ChatColor.GOLD+"✦ "+globalAnnouncement+" ✦";
-            if(lotteryActive()) header += "\n"+ChatColor.LIGHT_PURPLE+"✦ LOTERIE LPC EN COURS ✦";
+            if(lotteryActive()) header += "
+"+ChatColor.LIGHT_PURPLE+"✦ LOTERIE LPC EN COURS ✦";
             p.setPlayerListHeaderFooter(header, lotteryActive()
                     ? ChatColor.YELLOW+"/lottery • Jackpot: "+format(lotteryPot())
                     : ChatColor.GRAY+"Bonne chance et bon jeu!");
