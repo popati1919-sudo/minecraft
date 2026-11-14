@@ -59,6 +59,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private LarpersModeration moderation;
     private LarpersPlayerTools playerTools;
     private LarpersServerTools serverTools;
+    private LarpersWebPanel webPanel;
     private File dataFile;
     private String globalAnnouncement = "";
     private final DecimalFormat money = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.CANADA_FRENCH));
@@ -180,12 +181,11 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                 lobby.setSpawnLocation(0, 100, 0);
             }
         }, 1L);
-        getLogger().info("LarpersCoin 1.0.8 actif. Aucun claim ni protection de parcelle n'est enregistré.");
+        webPanel = new LarpersWebPanel(this);\n        webPanel.start();\n        getLogger().info("LarpersCoin 1.0.8 actif. Aucun claim ni protection de parcelle n'est enregistré.");
     }
 
     @Override
-    public void onDisable() {
-        if (features != null) features.shutdown();
+    public void onDisable() {\n        if (webPanel != null) webPanel.stop();\n        if (features != null) features.shutdown();
         if (antiCheat != null) antiCheat.shutdown();
         if (playerTools != null) playerTools.shutdown();
         saveData();
