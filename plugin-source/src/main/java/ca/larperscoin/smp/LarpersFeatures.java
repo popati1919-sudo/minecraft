@@ -105,6 +105,15 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
 
     private void save() {
+        if (saveQueued || !plugin.isEnabled()) return;
+        saveQueued = true;
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            saveQueued = false;
+            saveNow();
+        }, 100L);
+    }
+
+    private void saveNow() {
         for(var entry:clanChests.entrySet())db.set(clanPath(entry.getKey())+".chest",Arrays.asList(entry.getValue().getContents()));
         Path target=file.toPath(),temporary=target.resolveSibling(target.getFileName()+".tmp");
         try {
@@ -129,7 +138,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             db.set(path+".choices",choices);
         }
     }
-    public void shutdown() { save(); }
+    public void shutdown() { saveNow(); }
     private void msg(CommandSender s, String m) { s.sendMessage(PREFIX + m); }
     private boolean staff(CommandSender s) { return s.isOp() || s.hasPermission("larpers.staff") || s.hasPermission("larpers.admin"); }
     private Player player(CommandSender s) { if (s instanceof Player p) return p; msg(s,"Commande réservée aux joueurs."); return null; }
