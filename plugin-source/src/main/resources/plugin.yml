@@ -1,5 +1,5 @@
 name: LarpersCoin
-version: 1.0.4
+version: 1.0.6
 main: ca.larperscoin.smp.LarpersCoin
 load: STARTUP
 api-version: '26.3'
@@ -46,12 +46,17 @@ commands:
     description: Quêtes quotidiennes
     aliases: [quests]
     usage: /quests [claim|weekly [claim]]
-  quiz:
-    description: Quiz de connaissances Minecraft
-    usage: /quiz [top]
-  shop:
-    description: Recherche et achat LPC dans la boutique
-    usage: /shop [search <objet>|buy <clé> [quantité]]
+  top:
+    description: Ouvre les classements LPC
+    usage: /top
+  event:
+    description: Lance un mini-jeu dans le chat (admin)
+    usage: /event <quiz|calcul|motmelange>
+    permission: larpers.admin
+  modif:
+    description: Modifie le nom et l'adresse affichés du serveur
+    usage: /modif <ip|nom> <valeur>
+    permission: larpers.admin
   admin:
     description: Menu graphique du staff et réinitialisation de compte
     usage: /admin [reset <joueur>]
