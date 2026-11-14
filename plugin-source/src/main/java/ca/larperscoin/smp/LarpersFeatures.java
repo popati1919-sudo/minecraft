@@ -1048,11 +1048,17 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
     }
     @Override public List<String> onTabComplete(CommandSender s,Command c,String alias,String[] a) {
-        if(c.getName().equalsIgnoreCase("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","audit","stats","leaderboard");
-        if(c.getName().equalsIgnoreCase("ah")&&a.length==1)return List.of("list","search","sell","buy");
-        if(c.getName().equalsIgnoreCase("ah")&&a.length==2&&a[0].equalsIgnoreCase("search"))return List.of("clear");
-        if(c.getName().equalsIgnoreCase("shop")&&a.length==1)return List.of("search","buy");
-        if(c.getName().equalsIgnoreCase("quiz")&&a.length==1)return List.of("top");
+        String name=c.getName().toLowerCase(Locale.ROOT);
+        if(name.equals("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","audit","stats","leaderboard");
+        if(name.equals("ah")&&a.length==1)return List.of("list","search","sell","buy");
+        if(name.equals("ah")&&a.length==2&&a[0].equalsIgnoreCase("search"))return List.of("clear");
+        if(name.equals("shop")&&a.length==1)return List.of("search","buy");
+        if(name.equals("quiz")&&a.length==1)return List.of("top");
+        if(name.equals("admin")&&a.length==1&&s.hasPermission("larpers.admin"))return List.of("reset");
+        if(name.equals("lottery")&&a.length==2&&a[0].equalsIgnoreCase("buy"))return List.of("1","5","10","25","50","100","500","1000");
+        if(List.of("invsee","freeze","admin").contains(name)&&a.length==(name.equals("admin")?2:1))
+            return Bukkit.getOnlinePlayers().stream().map(Player::getName).filter(n->n.toLowerCase(Locale.ROOT).startsWith(a[a.length-1].toLowerCase(Locale.ROOT))).toList();
+        if(name.equals("bounty")&&a.length==1)return List.of("list");
         return List.of();
     }
 }
