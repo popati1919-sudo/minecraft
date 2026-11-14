@@ -41,6 +41,7 @@ jobs:
           set -euo pipefail
           ROOT="package/LarpersCoin-Network"
           mkdir -p "$ROOT/Velocity/plugins" "$ROOT/Lobby/plugins" "$ROOT/SMP/plugins"
+          cp SUPERVISEUR-RESEAU.ps1 "$ROOT/SUPERVISEUR-RESEAU.ps1"
 
           paper_meta="$(curl -fsSL -H 'User-Agent: LarpersCoin-Packager/1.0' "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds?channel=STABLE&limit=1")"
           paper_url="$(echo "$paper_meta" | jq -r '.[0].downloads["server:default"].url // empty')"
@@ -236,13 +237,9 @@ jobs:
               exit /b 1
             )
           )
-          start "Larpers Lobby" cmd /k "cd /d ""%~dp0Lobby"" && java -Xms512M -Xmx1G -jar paper.jar --nogui"
-          timeout /t 8 /nobreak >nul
-          start "Larpers SMP" cmd /k "cd /d ""%~dp0SMP"" && java -Xms1G -Xmx4G -jar paper.jar --nogui"
-          timeout /t 8 /nobreak >nul
-          start "Larpers Velocity" cmd /k "cd /d ""%~dp0Velocity"" && java -Xms512M -Xmx1G -jar velocity.jar"
-          echo Reseau demarre. Les joueurs se connectent sur le port Java 25565.
-          echo Bedrock: port UDP 19132 apres configuration Geyser.
+          if not exist "SUPERVISEUR-RESEAU.ps1" (echo Fichier superviseur introuvable.& pause & exit /b 1)
+          echo Le superviseur gere Lobby, SMP et Velocity. /redemarrer relance les trois serveurs.
+          powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0SUPERVISEUR-RESEAU.ps1"
           pause
           EOF
 
