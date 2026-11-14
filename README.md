@@ -37,7 +37,7 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 ### Économie
 - `/balance [joueur]` (`/bal`) — solde.
 - `/pay <joueur> <montant>` — paiement entre joueurs connectés.
-- `/baltop` — classement des fortunes.
+- `/top` — menu des classements (fortunes, clans et primes); `/baltop` — classement des fortunes.
 - `/history` — tes 10 dernières transactions; `/history <joueur>` est réservé au staff.
 - `/daily` — récompense quotidienne avec série.
 - `/bounty` ou `/bounty list` — menu graphique de toutes les primes actives; bouton pour choisir un joueur en ligne et saisir le montant dans le chat.
@@ -56,13 +56,12 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/clan bank [deposit|withdraw <montant>]`.
 - `/clan allies request|accept|remove <clan>` — alliances bilatérales.
 - `/clan role <joueur> <officer|member>` — rôle d'officier ou membre.
-- `/clan chest` — coffre partagé.
+- `/clan chest` — coffre partagé de clan (1 emplacement au départ); `/clan chest upgrade` — agrandir avec des LPC.
+- `/clan quests` et `/clan quests claim` — objectifs hebdomadaires communs: 500 bûches ou 50 squelettes pour 750 LPC dans la banque du clan.
 - `/clan top`, `/clan leaderboard`.
 
 ### Activités et commerce
 - `/quests` ouvre le menu des objectifs; `/quests claim`, `/quests weekly`, `/quests weekly claim` — objectifs automatiques quotidiens et hebdomadaires.
-- `/quiz` — quiz Minecraft à choix multiples configurable dans `features.yml`; `/quiz top` — classement des scores.
-- `/shop` ouvre la boutique graphique avec catégories, pages et quantités par clic (gauche=1, droit=16, Maj-clic=64); `/shop search <objet>` et `/shop buy <clé> [quantité]` — recherche et achats LPC; prix modifiables dans features.yml.
 - `/ah` ou `/ah list` — hôtel des ventes graphique persistant avec barre de recherche (clic sur la boussole, puis saisie dans le chat), filtre vendeur/objet et bouton pour effacer la recherche.
 - `/ah search <objet|vendeur>` et `/ah search clear` — recherche directe; `/ah sell <prix>`, `/ah buy <id>` — gestion des annonces.
 - `/trade <joueur>`, `/trade accept`, `/trade item`, `/trade money <montant>`, `/trade confirm`, `/trade cancel` — échange avec double confirmation.
@@ -77,6 +76,9 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/vanish`, `/invsee <joueur>`, `/freeze <joueur>`, `/staffchat <message>`.
 - Accès contrôlé par `larpers.staff` et `larpers.admin` (OP par défaut).
 
+- `/event <calcul|motmelange|devine>` — mini-jeu dans le chat, démarrage réservé aux admins; 100 LPC au gagnant.
+- `/modif ip <adresse>` et `/modif nom <nom>` — personnaliser les informations affichées dans le TAB (admins).
+
 ## Rangs visibles
 - Les préfixes sont affichés dans le chat et la liste des joueurs: `[ADMIN]`, `[MOD]`, `[VIP]`, `[JOUEUR]`.
 - Admin: OP ou permission `larpers.admin`; modérateur: `larpers.staff` ou `larpers.anticheat.mod`; VIP: `larpers.vip`.
@@ -89,6 +91,8 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `online-mode=true` vérifie automatiquement les comptes Java premium auprès de Mojang/Microsoft: aucun mot de passe propre au serveur. Floodgate authentifie les joueurs Bedrock: aucun mot de passe AuthMe. Les comptes Java crackés/non premium ne sont pas acceptés.
 - **Sécurité:** garde `online-mode=true`. Ne passe pas en mode hors-ligne pour accepter des comptes crackés: les pseudos pourraient être usurpés, y compris celui d'un administrateur.
 - Floodgate authentifie les joueurs Bedrock via son mécanisme de clé. Ne partage jamais les fichiers de clés Floodgate.
+
+La barre de localisation des joueurs est désactivée via la règle du monde `locator_bar`. Le TAB affiche le solde LPC, le ping en ms et les informations personnalisées du serveur.
 
 ## Données
 Les soldes sont dans `plugins/LarpersCoin/data.yml`; clans, quêtes, quiz et hôtel des ventes sont dans `plugins/LarpersCoin/features.yml`.
