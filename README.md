@@ -35,7 +35,7 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 ## Commandes incluses
 
 ### Économie
-- `/balance [joueur]` (`/bal`) — solde.
+- `/money` ou `/balance [joueur]` (`/bal`) — affiche ton solde LPC; la consultation d'un autre joueur reste réservée au staff.
 - `/pay <joueur> <montant>` — paiement entre joueurs connectés.
 - `/top` — menu des classements (fortunes, clans et primes); `/baltop` — classement des fortunes.
 - `/history` — tes 10 dernières transactions; `/history <joueur>` est réservé au staff.
@@ -78,6 +78,7 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 
 - `/event <calcul|motmelange|devine>` — mini-jeu dans le chat, démarrage réservé aux admins; 100 LPC au gagnant.
 - `/modif ip <adresse>` et `/modif nom <nom>` — personnaliser les informations affichées dans le TAB (admins).
+- `/redemarrer` — redémarre proprement Lobby, SMP et Velocity; réservé aux administrateurs. Le réseau doit être lancé avec `START-NETWORK.bat` pour que le superviseur puisse relancer les trois processus.
 
 ## Rangs visibles
 - Les préfixes sont affichés dans le chat et la liste des joueurs: `[ADMIN]`, `[MOD]`, `[VIP]`, `[JOUEUR]`.
