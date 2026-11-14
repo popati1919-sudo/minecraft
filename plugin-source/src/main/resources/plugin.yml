@@ -1,5 +1,5 @@
 name: LarpersCoin
-version: 1.0.6
+version: 1.0.7
 main: ca.larperscoin.smp.LarpersCoin
 load: STARTUP
 api-version: '26.3'
@@ -51,7 +51,7 @@ commands:
     usage: /top
   event:
     description: Lance un mini-jeu dans le chat (admin)
-    usage: /event <quiz|calcul|motmelange>
+    usage: /event <calcul|motmelange|devine>
     permission: larpers.admin
   modif:
     description: Modifie le nom et l'adresse affichés du serveur
