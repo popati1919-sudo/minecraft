@@ -61,6 +61,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<UUID, String> bountySearch = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<UUID, UUID> pendingOpTarget = new HashMap<>();
     private final Map<UUID, String> selectorSearch = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Map<UUID, String> shopSearch = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Set<UUID> awaitingShopSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<UUID, String> selectorAction = new java.util.concurrent.ConcurrentHashMap<>();
     private final Set<UUID> awaitingSelectorSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
@@ -741,8 +743,10 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         List<String> categories=List.of("Tous","Minerais","Construction","Nourriture","Rares");
         if(!categories.contains(category))category="Tous";
         final String selectedCategory=category;
+        String query=shopSearch.getOrDefault(p.getUniqueId(),"").toLowerCase(Locale.ROOT).trim();
         List<Map.Entry<String,Material>> entries=SHOP.entrySet().stream()
-            .filter(e->selectedCategory.equals("Tous")||shopCategoryFor(e.getKey()).equals(selectedCategory)).toList();
+            .filter(e->selectedCategory.equals("Tous")||shopCategoryFor(e.getKey()).equals(selectedCategory))
+            .filter(e->query.isEmpty()||e.getKey().toLowerCase(Locale.ROOT).contains(query)||e.getValue().name().toLowerCase(Locale.ROOT).contains(query)).toList();
         int pages=Math.max(1,(entries.size()+35)/36);
         page=Math.max(0,Math.min(page,pages-1));
         shopCategory.put(p.getUniqueId(),category);shopPage.put(p.getUniqueId(),page);
@@ -755,6 +759,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             inv.setItem(9+(i-start),item(entry.getValue(),entry.getKey(),"Prix: "+price+" LPC/unité","Clic gauche: 1","Clic droit: 16","Maj-clic: 64"));
         }
         inv.setItem(45,item(Material.ARROW,"Page précédente"));
+        inv.setItem(46,item(Material.COMPASS,"Rechercher un objet","Écris le nom dans le chat (Java/Bedrock)","Filtre: "+(query.isEmpty()?"aucun":query)));
+        inv.setItem(47,item(Material.MILK_BUCKET,"Effacer la recherche"));
         inv.setItem(49,item(Material.PAPER,"Page "+(page+1)+"/"+pages,"Clic droit: 16 objets","Maj-clic: 64 objets"));
         inv.setItem(53,item(Material.ARROW,"Page suivante"));
         LpcMenuTheme.frame(inv);
@@ -983,6 +989,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 openShop(buyer,next,0);return;
             }
             if(slot==45){openShop(buyer,category,page-1);return;}
+            if(slot==46){awaitingShopSearch.add(buyer.getUniqueId());buyer.closeInventory();msg(buyer,"Écris le nom d'un objet dans le chat (ou 'annuler').");return;}
+            if(slot==47){shopSearch.remove(buyer.getUniqueId());openShop(buyer,category,0);return;}
             if(slot==53){openShop(buyer,category,page+1);return;}
             if(slot<9||slot>44)return;
             String key=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
@@ -1038,11 +1046,22 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) {
         UUID id=e.getPlayer().getUniqueId();
-        frozen.remove(id);awaitingAhSearch.remove(id);awaitingBountySearch.remove(id);awaitingSelectorSearch.remove(id);selectorSearch.remove(id);selectorAction.remove(id);bountySearch.remove(id);pendingBountyTarget.remove(id);
+        frozen.remove(id);awaitingAhSearch.remove(id);awaitingBountySearch.remove(id);awaitingSelectorSearch.remove(id);awaitingShopSearch.remove(id);shopSearch.remove(id);selectorSearch.remove(id);selectorAction.remove(id);bountySearch.remove(id);pendingBountyTarget.remove(id);
     }
     @EventHandler public void onChatSearch(org.bukkit.event.player.AsyncPlayerChatEvent e) {
         Player sender=e.getPlayer();
         UUID senderId=sender.getUniqueId();
+        if(awaitingShopSearch.remove(senderId)) {
+            e.setCancelled(true);
+            String query=e.getMessage().trim();
+            Bukkit.getScheduler().runTask(plugin,()->{
+                if(query.equalsIgnoreCase("annuler")){msg(sender,"Recherche boutique annulée.");openShop(sender);return;}
+                if(query.length()>40){msg(sender,"Recherche trop longue (40 caractères maximum).");openShop(sender);return;}
+                shopSearch.put(senderId,query);
+                openShop(sender);
+            });
+            return;
+        }
         if(awaitingSelectorSearch.remove(senderId)) {
             e.setCancelled(true);
             String query=e.getMessage().trim();
