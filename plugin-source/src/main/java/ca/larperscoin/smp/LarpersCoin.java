@@ -62,6 +62,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private LarpersFeatures features;
     private LarpersAntiCheat antiCheat;
     private LarpersAuth auth;
+    private LarpersModeration moderation;
     private File dataFile;
     private String globalAnnouncement = "";
     private final DecimalFormat money = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.CANADA_FRENCH));
@@ -94,6 +95,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         auth = new LarpersAuth(this);
         features = new LarpersFeatures(this);
         antiCheat = new LarpersAntiCheat(this);
+        moderation = new LarpersModeration(this);
         long lotteryEnd=data.getLong("lottery.ends-at",0L);
         if(data.getBoolean("lottery.active",false)) {
             long remaining=Math.max(1L,lotteryEnd-System.currentTimeMillis());
