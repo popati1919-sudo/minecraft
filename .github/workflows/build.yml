@@ -2,7 +2,7 @@ name: Build LarpersCoin
 
 on:
   push:
-    branches: [main, auth/velocity-replacement]
+    branches: [main, auth/velocity-replacement, ui/bedrock-friendly-menus]
   pull_request:
     branches: [main]
   workflow_dispatch:
