@@ -2,7 +2,7 @@ name: Package reseau complet Larpers Coin (Velocity + Lobby + SMP)
 
 on:
   push:
-    branches: [main, auth/velocity-replacement, ui/bedrock-friendly-menus]
+    branches: [main, auth/velocity-replacement, ui/bedrock-friendly-menus, fix/network-panel-auth]
     paths:
       - ".github/workflows/network-package.yml"
       - "plugin-source/**"
