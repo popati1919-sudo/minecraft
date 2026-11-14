@@ -188,8 +188,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         inv.setItem(10,item(Material.GOLD_INGOT,"Top argent","Classement des 10 plus grandes fortunes","/baltop"));
         inv.setItem(12,item(Material.SHIELD,"Top clans","Classement des clans","/clan top"));
         inv.setItem(14,item(Material.DIAMOND_SWORD,"Top primes","Joueurs avec les plus grosses primes","/bounty list"));
-        inv.setItem(16,item(Material.CLOCK,"Top activité","Classement du temps de jeu","Bientôt disponible"));
         inv.setItem(22,item(Material.BARRIER,"Fermer"));
+        LpcMenuTheme.frame(inv);
         p.openInventory(inv);
     }
 
