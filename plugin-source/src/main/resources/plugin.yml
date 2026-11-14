@@ -101,6 +101,20 @@ commands:
     description: Ouvrir le menu de modération
     usage: /mod
     permission: larpers.moderation
+  profile:
+    description: Affiche le profil et les statistiques d'un joueur
+    usage: /profile [joueur]
+  report:
+    description: Signaler un joueur au staff
+    usage: /report <joueur> <raison>
+  reports:
+    description: Ouvrir et gérer les signalements
+    usage: /reports [resolve <id>]
+    permission: larpers.reports
+  staffspec:
+    description: Observer un joueur en mode spectateur staff
+    usage: /staffspec <joueur|off>
+    permission: larpers.staff
   help:
     description: Aide LPC filtrée selon les permissions
     usage: /help
@@ -122,6 +136,9 @@ permissions:
     default: false
   larpers.moderation:
     description: Accès aux commandes de modération et à l'historique des sanctions
+    default: op
+  larpers.reports:
+    description: Consulter et traiter les signalements des joueurs
     default: op
   larpers.chat.bypass:
     description: Ignorer le délai anti-spam du chat
