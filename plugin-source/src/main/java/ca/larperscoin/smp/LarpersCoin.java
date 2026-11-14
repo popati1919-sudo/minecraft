@@ -11,11 +11,14 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -59,7 +62,10 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private LarpersFeatures features;
     private LarpersAntiCheat antiCheat;
     private LarpersAuth auth;
+    private LarpersModeration moderation;
+    private LarpersPlayerTools playerTools;
     private File dataFile;
+    private String globalAnnouncement = "";
     private final DecimalFormat money = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.CANADA_FRENCH));
 
     @Override
@@ -78,9 +84,20 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             }
         }
         getServer().getPluginManager().registerEvents(this, this);
+        Bukkit.getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
+        Bukkit.getMessenger().registerIncomingPluginChannel(this, "larperscoin:announce", (channel, source, payload) -> {
+            String announcement = new String(payload, StandardCharsets.UTF_8).trim();
+            if (announcement.isEmpty()) return;
+            if (announcement.length() > 100) announcement = announcement.substring(0, 100);
+            globalAnnouncement = announcement;
+            Bukkit.broadcastMessage(ChatColor.GOLD + "✦ ANNONCE LARPERS COIN ✦ " + ChatColor.YELLOW + announcement);
+            updatePlayerTags();
+        });
         auth = new LarpersAuth(this);
         features = new LarpersFeatures(this);
         antiCheat = new LarpersAntiCheat(this);
+        moderation = new LarpersModeration(this);
+        playerTools = new LarpersPlayerTools(this);
         long lotteryEnd=data.getLong("lottery.ends-at",0L);
         if(data.getBoolean("lottery.active",false)) {
             long remaining=Math.max(1L,lotteryEnd-System.currentTimeMillis());
@@ -100,6 +117,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     public void onDisable() {
         if (features != null) features.shutdown();
         if (antiCheat != null) antiCheat.shutdown();
+        if (playerTools != null) playerTools.shutdown();
         saveData();
     }
 
@@ -183,6 +201,84 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         sender.sendMessage(ChatColor.GOLD + "[LPC] " + ChatColor.RESET + message);
     }
 
+    void resetAuthPassword(CommandSender sender, String targetName) {
+        if (auth == null) {
+            reply(sender, "Le système d'authentification n'est pas disponible.");
+            return;
+        }
+        auth.resetPassword(sender, targetName);
+    }
+
+    void broadcastAnnouncement(CommandSender sender, String message) {
+        String clean = message == null ? "" : message.trim();
+        if (clean.isEmpty() || clean.length() > 100) {
+            reply(sender, "L'annonce doit contenir entre 1 et 100 caractères.");
+            return;
+        }
+        Player relay = sender instanceof Player player ? player : Bukkit.getOnlinePlayers().stream().findFirst().orElse(null);
+        if (relay == null) {
+            globalAnnouncement = clean;
+            Bukkit.broadcastMessage(ChatColor.GOLD + "✦ ANNONCE LARPERS COIN ✦ " + ChatColor.YELLOW + clean);
+            updatePlayerTags();
+            reply(sender, "Annonce locale publiée; aucun joueur en ligne ne peut relayer le message au réseau.");
+            return;
+        }
+        try {
+            byte[] payload = clean.getBytes(StandardCharsets.UTF_8);
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(bytes);
+            out.writeUTF("Forward");
+            out.writeUTF("ALL");
+            out.writeUTF("larperscoin:announce");
+            out.writeShort(payload.length);
+            out.write(payload);
+            relay.sendPluginMessage(this, "BungeeCord", bytes.toByteArray());
+            reply(sender, "Annonce envoyée à tous les serveurs du réseau.");
+        } catch (IOException ex) {
+            reply(sender, "Impossible d'envoyer l'annonce au réseau.");
+            getLogger().warning("Échec de l'annonce réseau: " + ex.getMessage());
+        }
+    }
+
+    void recordHistory(Player player, String event) {
+        if (player == null || event == null || event.isBlank()) return;
+        String path = "player-history." + key(player.getUniqueId());
+        List<String> records = data.getStringList(path);
+        records.add(System.currentTimeMillis() + "|" + event + "|" + player.getName());
+        if (records.size() > 100) records = new ArrayList<>(records.subList(records.size() - 100, records.size()));
+        data.set(path, records);
+        saveData();
+    }
+
+    private void checkSuspiciousTransfer(Player from, Player to, double amount) {
+        long now=System.currentTimeMillis();
+        List<String> records=data.getStringList("transactions");
+        int recentLarge=0;
+        for(int i=records.size()-1;i>=0;i--) {
+            String[] part=records.get(i).split("\\|");
+            if(part.length!=5)continue;
+            long stamp;
+            double value;
+            try { stamp=Long.parseLong(part[0]); value=Double.parseDouble(part[4]); }
+            catch(NumberFormatException ex) { continue; }
+            if(now-stamp>60_000L)break;
+            if(part[1].equals("PAY")&&part[2].equals(from.getUniqueId().toString())&&value>=1000.0)recentLarge++;
+        }
+        boolean suspicious=amount>=5000.0||recentLarge>=3;
+        if(!suspicious)return;
+        String detail=from.getName()+" -> "+to.getName()+" : "+format(amount)+" (transferts élevés sur 60 s: "+recentLarge+")";
+        List<String> alerts=data.getStringList("suspicious-transfers");
+        alerts.add(now+"|"+detail);
+        if(alerts.size()>500)alerts=new ArrayList<>(alerts.subList(alerts.size()-500,alerts.size()));
+        data.set("suspicious-transfers",alerts);
+        saveData();
+        getLogger().warning("[Économie] Transfert à vérifier: "+detail);
+        for(Player staff:Bukkit.getOnlinePlayers()) {
+            if(staff.isOp()||staff.hasPermission("larpers.economy.alerts")||staff.hasPermission("larpers.admin"))
+                staff.sendMessage(ChatColor.RED+"[LPC ÉCONOMIE] Transfert à vérifier: "+detail);
+        }
+    }
+
     private String format(double amount) {
         return money.format(amount) + " LPC";
     }
@@ -259,6 +355,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     credit(target.getUniqueId(), amount);
                     saveData();
                     recordTransaction("PAY", player.getUniqueId(), target.getUniqueId(), amount);
+                    checkSuspiciousTransfer(player, target, amount);
                     reply(player, "Tu as envoyé " + format(amount) + " à " + target.getName() + ".");
                     reply(target, "Tu as reçu " + format(amount) + " de " + player.getName() + ".");
                     return true;
@@ -278,9 +375,21 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         targetId = target.getUniqueId();
                         targetName = args[0];
                     }
+                    List<String> playerEvents = data.getStringList("player-history." + targetId);
+                    reply(sender, "Historique de " + targetName + " (connexions et sanctions) :");
+                    int eventCount = 0;
+                    for (int i = playerEvents.size() - 1; i >= 0 && eventCount < 10; i--) {
+                        String[] event = playerEvents.get(i).split("\\|", 3);
+                        if (event.length < 3) continue;
+                        long stamp;
+                        try { stamp = Long.parseLong(event[0]); } catch (NumberFormatException ex) { continue; }
+                        String date = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date(stamp));
+                        reply(sender, date + " " + event[1] + " (" + event[2] + ")");
+                        eventCount++;
+                    }
                     List<String> records = data.getStringList("transactions");
                     int shown = 0;
-                    reply(sender, "Historique LPC de " + targetName + " (10 dernières opérations) :");
+                    reply(sender, "Transactions LPC (10 dernières) :");
                     for (int i = records.size() - 1; i >= 0 && shown < 10; i--) {
                         String[] parts = records.get(i).split("\\|");
                         if (parts.length != 5) continue;
@@ -293,6 +402,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         shown++;
                     }
                     if (shown == 0) reply(sender, "Aucune transaction enregistrée.");
+                    if (eventCount == 0) reply(sender, "Aucun événement de connexion ou de sanction enregistré.");
                     return true;
                 }
                 case "baltop" -> {
@@ -431,7 +541,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         Player player=requirePlayer(sender);if(player==null)return true;
                         if(!lotteryActive()){reply(sender,"Aucune loterie en cours. Attends l'annonce d'un administrateur.");return true;}
                         int count=args.length>=2?Integer.parseInt(args[1]):1;
-                        if(count<1||count>10){reply(sender,"Tu peux acheter de 1 à 10 tickets.");return true;}
+                        if(count<1||count>10000){reply(sender,"Achète entre 1 et 10 000 tickets par commande; tu peux refaire plusieurs achats sans limite totale.");return true;}
                         double cost=count*25.0,nextPot=lotteryPot()+cost;
                         if(!Double.isFinite(nextPot)){reply(sender,"Le jackpot dépasserait la limite numérique.");return true;}
                         if(!debit(player.getUniqueId(),cost)){reply(sender,"Fonds insuffisants : "+format(cost)+".");return true;}
@@ -453,7 +563,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         if(!isLpcAdminSender(sender)){reply(sender,"Seuls les administrateurs peuvent terminer une loterie.");return true;}
                         finishLottery(false);reply(sender,"La loterie a été terminée.");return true;
                     }
-                    reply(sender,"Usage : /lottery [menu] | buy [1-10] | start [minutes] (admin) | draw (admin)");return true;
+                    reply(sender,"Usage : /lottery [menu] | buy [quantité] | start [minutes] (admin) | draw (admin)");return true;
                 }
                 default -> {
                     return false;
@@ -471,6 +581,15 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
 
     public double lotteryPot(){return Math.max(0.0,data.getDouble("lottery.pot",0.0));}
     public int lotteryTicketCount(){return data.getStringList("lottery.tickets").size();}
+    public int lotteryPlayerTicketCount(UUID playerId){
+        int count=0;
+        for(String ticket:data.getStringList("lottery.tickets"))if(ticket.equals(playerId.toString()))count++;
+        return count;
+    }
+    public double lotteryChancePercent(UUID playerId){
+        int total=lotteryTicketCount();
+        return total==0?0.0:(lotteryPlayerTicketCount(playerId)*100.0/total);
+    }
     public boolean lotteryActive(){return data.getBoolean("lottery.active",false);}
     public long lotteryEndsAt(){return data.getLong("lottery.ends-at",0L);}
     private boolean isLpcAdminSender(CommandSender sender){return sender.isOp()||sender.hasPermission("larpers.admin");}
@@ -505,13 +624,21 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private void updatePlayerTags() {
         for(Player p:Bukkit.getOnlinePlayers()) {
             p.setPlayerListName(rankPrefix(p)+ChatColor.WHITE+p.getName());
-            if(lotteryActive())p.setPlayerListHeaderFooter(ChatColor.LIGHT_PURPLE+"✦ LOTERIE LPC EN COURS ✦",ChatColor.YELLOW+"/lottery • Jackpot: "+format(lotteryPot()));
-            else p.setPlayerListHeaderFooter(ChatColor.GOLD+"Larpers Coin SMP",ChatColor.GRAY+"Bonne chance et bon jeu!");
+            String header = globalAnnouncement.isBlank() ? ChatColor.GOLD+"Larpers Coin SMP"
+                    : ChatColor.GOLD+"✦ "+globalAnnouncement+" ✦";
+            if(lotteryActive()) header += "\n"+ChatColor.LIGHT_PURPLE+"✦ LOTERIE LPC EN COURS ✦";
+            p.setPlayerListHeaderFooter(header, lotteryActive()
+                    ? ChatColor.YELLOW+"/lottery • Jackpot: "+format(lotteryPot())
+                    : ChatColor.GRAY+"Bonne chance et bon jeu!");
         }
     }
     @EventHandler public void onPlayerJoin(PlayerJoinEvent e) {
         Bukkit.getScheduler().runTask(this,()->updatePlayerTags());
         e.getPlayer().sendMessage(ChatColor.GOLD+"Bienvenue sur Larpers Coin SMP!");
+        recordHistory(e.getPlayer(), "CONNEXION");
+    }
+    @EventHandler public void onPlayerQuit(PlayerQuitEvent e) {
+        recordHistory(e.getPlayer(), "DÉCONNEXION");
     }
     @EventHandler public void onPlayerChat(AsyncPlayerChatEvent e) {
         e.setFormat(rankPrefix(e.getPlayer())+ChatColor.WHITE+"%1$s"+ChatColor.DARK_GRAY+" » "+ChatColor.RESET+"%2$s");

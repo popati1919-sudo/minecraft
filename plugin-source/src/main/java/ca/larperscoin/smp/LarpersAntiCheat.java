@@ -41,7 +41,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Larpers Coin AntiCheat v1.1.
- * Conservative detection and staff alerts only. No automatic punishments.
+ * Conservative movement/combat checks, staff alerts, persistent violation counts and configurable sanctions.
  */
 public final class LarpersAntiCheat implements Listener, CommandExecutor {
     private static final String PREFIX = ChatColor.DARK_RED + "[LPC AC] " + ChatColor.RESET;
@@ -72,7 +72,8 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         if (plugin.getCommand("ac") != null) plugin.getCommand("ac").setExecutor(this);
         for (Player player : Bukkit.getOnlinePlayers()) grantGrace(player);
         plugin.getServer().getScheduler().runTaskTimer(plugin, this::saveViolations, 20L * 300L, 20L * 300L);
-        plugin.getLogger().info("LPC AntiCheat v1.0 chargé — alertes et journal activés, sanctions automatiques désactivées.");
+        plugin.getLogger().info("LPC AntiCheat chargé — détections actives; sanctions automatiques: "
+                + plugin.getConfig().getBoolean("anticheat.auto-punish.enabled", true) + ".");
     }
 
     private void applyDefaults() {
@@ -320,6 +321,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         switch (tier) {
             case 1 -> {
                 reason = "Anti-cheat LPC: seuil de violations atteint (kick).";
+                recordSanction(player, reason);
                 player.kickPlayer(ChatColor.RED + reason);
                 plugin.getLogger().warning("[AntiCheat] Kick automatique: " + player.getName()
                         + " (" + totalViolations + " VL)");
@@ -340,9 +342,16 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
             default -> { return; }
         }
         Bukkit.getBanList(BanList.Type.NAME).addBan(player.getName(), reason, expires, "LarpersAntiCheat");
+        recordSanction(player, reason);
         player.kickPlayer(ChatColor.RED + reason);
         plugin.getLogger().warning("[AntiCheat] " + reason + " Joueur: " + player.getName()
                 + " (" + totalViolations + " VL)");
+    }
+
+    private void recordSanction(Player player, String reason) {
+        if (plugin instanceof LarpersCoin core) {
+            core.recordHistory(player, "SANCTION: " + reason);
+        }
     }
 
     private boolean isAdmin(CommandSender sender) {
