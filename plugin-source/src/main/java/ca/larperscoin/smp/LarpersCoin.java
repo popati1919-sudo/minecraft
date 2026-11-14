@@ -183,6 +183,14 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         sender.sendMessage(ChatColor.GOLD + "[LPC] " + ChatColor.RESET + message);
     }
 
+    void resetAuthPassword(CommandSender sender, String targetName) {
+        if (auth == null) {
+            reply(sender, "Le système d'authentification n'est pas disponible.");
+            return;
+        }
+        auth.resetPassword(sender, targetName);
+    }
+
     private String format(double amount) {
         return money.format(amount) + " LPC";
     }
