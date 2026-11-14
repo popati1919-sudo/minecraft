@@ -1,6 +1,7 @@
 package ca.larperscoin.smp;
 
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
@@ -188,6 +189,53 @@ final class LarpersAuth implements Listener {
             return true;
         }
         return false;
+    }
+
+    void resetPassword(CommandSender sender, String targetName) {
+        if (targetName == null || !targetName.matches("[A-Za-z0-9_]{3,16}")) {
+            sender.sendMessage(ChatColor.RED + "Pseudo invalide.");
+            return;
+        }
+        Player target = Bukkit.getPlayerExact(targetName);
+        String accountName = target == null ? targetName : target.getName();
+        String path = accountPath(accountName);
+        if (!accounts.contains(path + ".hash")) {
+            sender.sendMessage(ChatColor.RED + "Aucun mot de passe Java crack enregistré pour " + accountName + ".");
+            return;
+        }
+        if (target != null && (isFloodgate(target) || isPremium(target))) {
+            sender.sendMessage(ChatColor.RED + "Ce joueur utilise une authentification automatique; aucun mot de passe LPC à réinitialiser.");
+            return;
+        }
+
+        accounts.set(path, null);
+        save();
+        sender.sendMessage(ChatColor.GREEN + "Mot de passe réinitialisé pour " + accountName + ".");
+
+        if (target == null) {
+            sender.sendMessage(ChatColor.YELLOW + accountName + " devra refaire /register <motdepasse> à sa prochaine connexion.");
+            return;
+        }
+
+        String reason = "Mot de passe réinitialisé par un administrateur. Reconnecte-toi et utilise /register <motdepasse>.";
+        target.sendMessage(ChatColor.RED + "Ton mot de passe a été réinitialisé par un administrateur.");
+        target.sendMessage(ChatColor.YELLOW + "Tu seras déconnecté dans 10 secondes. À ta prochaine connexion, utilise /register <motdepasse>.");
+        target.sendTitle("MOT DE PASSE RÉINITIALISÉ", "Déconnexion dans 10 secondes", 0, 30, 5);
+        int[] remaining = {10};
+        Bukkit.getScheduler().runTaskTimer(plugin, task -> {
+            if (!target.isOnline()) {
+                task.cancel();
+                return;
+            }
+            if (remaining[0] <= 1) {
+                target.sendTitle("MOT DE PASSE RÉINITIALISÉ", "Déconnexion maintenant", 0, 20, 0);
+                target.kickPlayer(reason);
+                task.cancel();
+                return;
+            }
+            remaining[0]--;
+            target.sendTitle("MOT DE PASSE RÉINITIALISÉ", "Déconnexion dans " + remaining[0] + " secondes", 0, 25, 5);
+        }, 20L, 20L);
     }
 
     private void markAuthenticated(Player player) {
