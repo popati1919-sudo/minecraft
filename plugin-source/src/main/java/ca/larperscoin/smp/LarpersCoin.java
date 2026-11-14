@@ -17,6 +17,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
@@ -61,6 +63,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private LarpersAntiCheat antiCheat;
     private LarpersAuth auth;
     private File dataFile;
+    private String globalAnnouncement = "";
     private final DecimalFormat money = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.CANADA_FRENCH));
 
     @Override
@@ -79,6 +82,15 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             }
         }
         getServer().getPluginManager().registerEvents(this, this);
+        Bukkit.getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
+        Bukkit.getMessenger().registerIncomingPluginChannel(this, "larperscoin:announce", (channel, source, payload) -> {
+            String announcement = new String(payload, StandardCharsets.UTF_8).trim();
+            if (announcement.isEmpty()) return;
+            if (announcement.length() > 100) announcement = announcement.substring(0, 100);
+            globalAnnouncement = announcement;
+            Bukkit.broadcastMessage(ChatColor.GOLD + "✦ ANNONCE LARPERS COIN ✦ " + ChatColor.YELLOW + announcement);
+            updatePlayerTags();
+        });
         auth = new LarpersAuth(this);
         features = new LarpersFeatures(this);
         antiCheat = new LarpersAntiCheat(this);
@@ -190,6 +202,37 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             return;
         }
         auth.resetPassword(sender, targetName);
+    }
+
+    void broadcastAnnouncement(CommandSender sender, String message) {
+        String clean = message == null ? "" : message.trim();
+        if (clean.isEmpty() || clean.length() > 100) {
+            reply(sender, "L'annonce doit contenir entre 1 et 100 caractères.");
+            return;
+        }
+        Player relay = sender instanceof Player player ? player : Bukkit.getOnlinePlayers().stream().findFirst().orElse(null);
+        if (relay == null) {
+            globalAnnouncement = clean;
+            Bukkit.broadcastMessage(ChatColor.GOLD + "✦ ANNONCE LARPERS COIN ✦ " + ChatColor.YELLOW + clean);
+            updatePlayerTags();
+            reply(sender, "Annonce locale publiée; aucun joueur en ligne ne peut relayer le message au réseau.");
+            return;
+        }
+        try {
+            byte[] payload = clean.getBytes(StandardCharsets.UTF_8);
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            DataOutputStream out = new DataOutputStream(bytes);
+            out.writeUTF("Forward");
+            out.writeUTF("ALL");
+            out.writeUTF("larperscoin:announce");
+            out.writeShort(payload.length);
+            out.write(payload);
+            relay.sendPluginMessage(this, "BungeeCord", bytes.toByteArray());
+            reply(sender, "Annonce envoyée à tous les serveurs du réseau.");
+        } catch (IOException ex) {
+            reply(sender, "Impossible d'envoyer l'annonce au réseau.");
+            getLogger().warning("Échec de l'annonce réseau: " + ex.getMessage());
+        }
     }
 
     void recordHistory(Player player, String event) {
@@ -537,8 +580,12 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private void updatePlayerTags() {
         for(Player p:Bukkit.getOnlinePlayers()) {
             p.setPlayerListName(rankPrefix(p)+ChatColor.WHITE+p.getName());
-            if(lotteryActive())p.setPlayerListHeaderFooter(ChatColor.LIGHT_PURPLE+"✦ LOTERIE LPC EN COURS ✦",ChatColor.YELLOW+"/lottery • Jackpot: "+format(lotteryPot()));
-            else p.setPlayerListHeaderFooter(ChatColor.GOLD+"Larpers Coin SMP",ChatColor.GRAY+"Bonne chance et bon jeu!");
+            String header = globalAnnouncement.isBlank() ? ChatColor.GOLD+"Larpers Coin SMP"
+                    : ChatColor.GOLD+"✦ "+globalAnnouncement+" ✦";
+            if(lotteryActive()) header += "\n"+ChatColor.LIGHT_PURPLE+"✦ LOTERIE LPC EN COURS ✦";
+            p.setPlayerListHeaderFooter(header, lotteryActive()
+                    ? ChatColor.YELLOW+"/lottery • Jackpot: "+format(lotteryPot())
+                    : ChatColor.GRAY+"Bonne chance et bon jeu!");
         }
     }
     @EventHandler public void onPlayerJoin(PlayerJoinEvent e) {
