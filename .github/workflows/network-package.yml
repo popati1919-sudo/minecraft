@@ -286,7 +286,7 @@ jobs:
             copy /Y "%FGKEY%" "%%S\\plugins\\floodgate\\key.pem" >nul
           )
           echo Cle Floodgate partagee avec Lobby et SMP.
-          echo Les joueurs Java premium/crack doivent creer un compte avec /register puis /login; Bedrock passe par Floodgate.
+          echo Java Premium: connexion automatique apres verification de session Microsoft. Java crack: /register puis /login. Bedrock: Floodgate sans mot de passe.
           echo Les joueurs Bedrock passent par Floodgate.
           pause
           EOF
@@ -330,11 +330,11 @@ jobs:
           =============================
           Contenu:
           - Velocity proxy: port public Java 25565
-          - Lobby Paper separe: 127.0.0.1:25566 (authentification /register et /login pour Java premium et crack)
+          - Lobby Paper separe: 127.0.0.1:25566 (authentification LPC pour Java crack; Java Premium deja verifie au proxy)
           - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
           - Geyser + Floodgate installes sur Velocity, Floodgate aussi sur Lobby et SMP pour reconnaitre les joueurs Bedrock
-          - Authentification offline: Java premium et crack peuvent rejoindre; dans cette version, tous les comptes Java utilisent /register puis /login; Bedrock sans mot de passe via Floodgate
-          - Lobby: les joueurs Java premium et crack doivent utiliser /register <motdepasse> puis /login <motdepasse>; Bedrock est authentifie via Floodgate
+          - Authentification hybride native LPC: Java Premium verifie par Mojang sans mot de passe; Java crack avec /register et /login; Bedrock via Floodgate sans mot de passe
+          - Lobby: Java crack utilise /register <motdepasse> puis /login <motdepasse>; Java Premium est auto-authentifie par le proxy; Bedrock est authentifie via Floodgate
           - Apres authentification, transfert automatique vers le SMP
           - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend
           - Geyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login
@@ -353,7 +353,7 @@ jobs:
           10. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
 
           IMPORTANT:
-          - FastLoginPlus est retire. Velocity est en online-mode=false pour accepter Java premium et crack. Les comptes Java doivent utiliser /register puis /login; Bedrock passe par Floodgate.
+          - FastLoginPlus est retire. Le plugin maison Velocity garde online-mode=false et choisit le mode par connexion: si Mojang connait le pseudo, forceOnlineMode exige une vraie session Microsoft; sinon forceOfflineMode autorise le compte crack avec /register et /login. Bedrock est traite via Floodgate.
           - Garde le forwarding moderne et le secret prive identiques sur les deux Paper. Le mode online-mode du proxy et proxies.velocity.online-mode dans Paper doivent rester false pour accepter les comptes crack; les server.properties Paper restent en offline-mode derriere Velocity.
           - Bedrock doit passer par Geyser auth-type floodgate + NetherNet; la meme cle Floodgate doit etre partagee avec les deux backends.
           - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
