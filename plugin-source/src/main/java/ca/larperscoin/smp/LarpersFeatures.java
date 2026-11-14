@@ -95,7 +95,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         seedQuizQuestion("faces","Combien de faces possède un bloc standard?","6",List.of("4","6","8"));
         seedQuizQuestion("creeper","Quel mob explose près du joueur?","creeper",List.of("creeper","zombie","squelette"));
         save();
-        for (String cmd : List.of("clan","quest","quests","quiz","shop","admin","vanish","invsee","freeze","staffchat","ah","trade")) {
+        for (String cmd : List.of("clan","quest","quests","quiz","shop","admin","announce","vanish","invsee","freeze","staffchat","ah","trade")) {
             PluginCommand c = plugin.getCommand(cmd);
             if (c != null) { c.setExecutor(this); c.setTabCompleter(this); }
         }
@@ -216,6 +216,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             inv.setItem(53,item(Material.ARROW,"Page suivante"));
         } else {
             inv.setItem(10,item(Material.COMMAND_BLOCK,"Gestion OP","Donner ou retirer OP à un joueur en ligne","Confirmation obligatoire"));
+            inv.setItem(12,item(Material.TRIPWIRE_HOOK,"Réinitialiser mot de passe","Le joueur sera averti et kick après 10 secondes","/admin reset <joueur>"));
             inv.setItem(45,item(Material.ARROW,"Page précédente"));
         }
         inv.setItem(49,item(Material.BARRIER,"Fermer"));
@@ -342,7 +343,23 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 case "quest", "quests" -> { return quests(sender,a); }
                 case "quiz" -> { return quiz(sender,a); }
                 case "shop" -> { return shop(sender,a); }
-                case "admin" -> { Player p=player(sender); if(p!=null){if(!staff(p))msg(p,"Permission insuffisante.");else openAdmin(p);} return true; }
+                case "announce" -> {
+                    if (!(sender.isOp() || sender.hasPermission("larpers.admin"))) { msg(sender,"Permission insuffisante."); return true; }
+                    if (a.length == 0) { msg(sender,"Usage : /announce <message>"); return true; }
+                    core.broadcastAnnouncement(sender,String.join(" ",a));
+                    return true;
+                }
+                case "admin" -> {
+                    if (a.length > 0 && a[0].equalsIgnoreCase("reset")) {
+                        if (!(sender.isOp() || sender.hasPermission("larpers.admin"))) { msg(sender,"Seuls les administrateurs peuvent réinitialiser un mot de passe."); return true; }
+                        if (a.length != 2) { msg(sender,"Usage : /admin reset <joueur>"); return true; }
+                        core.resetAuthPassword(sender,a[1]);
+                        return true;
+                    }
+                    Player p=player(sender);
+                    if(p!=null){if(!staff(p))msg(p,"Permission insuffisante.");else openAdmin(p);}
+                    return true;
+                }
                 case "vanish" -> {
                     Player p=player(sender); if(p==null)return true; if(!staff(p)){msg(p,"Permission insuffisante.");return true;}
                     if(vanished.remove(p.getUniqueId())) { for(Player x:Bukkit.getOnlinePlayers())x.showPlayer(plugin,p); msg(p,"Vanish désactivé."); }
@@ -797,9 +814,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 case 16 -> {p.closeInventory();p.performCommand("baltop");}
                 default -> { }
             } else if(page==2&&slot==10) openPlayerSelector(p,"op/deop");
+            else if(page==2&&slot==12) {
+                if(!core.isLpcAdmin(p)){msg(p,"Seuls les administrateurs peuvent réinitialiser un mot de passe.");return;}
+                openPlayerSelector(p,"reset");
+            }
             return;
         }
-        if(title.equals("LPC | Sélection invsee")||title.equals("LPC | Sélection freeze")||title.equals("LPC | Sélection op/deop")) {
+        if(title.equals("LPC | Sélection invsee")||title.equals("LPC | Sélection freeze")||title.equals("LPC | Sélection op/deop")||title.equals("LPC | Sélection reset")) {
             e.setCancelled(true);
             if(e.getRawSlot()>=e.getView().getTopInventory().getSize()) return;
             if(!(e.getWhoClicked() instanceof Player viewer)||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
@@ -808,6 +829,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(target==null) { msg(viewer,"Ce joueur n'est plus en ligne.");viewer.closeInventory();return; }
             if(title.endsWith("invsee")) viewer.openInventory(target.getInventory());
             else if(title.endsWith("op/deop")) openOpConfirm(viewer,target);
+            else if(title.endsWith("reset")) { viewer.closeInventory();viewer.performCommand("admin reset "+target.getName()); }
             else { viewer.closeInventory();viewer.performCommand("freeze "+target.getName()); }
         }
         if(title.equals("LPC | Confirmer OP")) {

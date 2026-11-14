@@ -1,6 +1,7 @@
 package ca.larperscoin.smp;
 
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.configuration.ConfigurationSection;
@@ -23,7 +24,6 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
-import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import javax.crypto.SecretKeyFactory;
@@ -46,7 +46,7 @@ final class LarpersAuth implements Listener {
     private static final long LOCK_MILLIS = 15 * 60_000L;
     private final JavaPlugin plugin;
     private final File file;
-    private final YamlConfiguration accounts;
+    private YamlConfiguration accounts;
     private final SecureRandom random = new SecureRandom();
     private final Map<UUID, Boolean> authenticated = new ConcurrentHashMap<>();
     private final Map<UUID, Location> joinLocations = new ConcurrentHashMap<>();
@@ -55,11 +55,15 @@ final class LarpersAuth implements Listener {
 
     LarpersAuth(JavaPlugin plugin) {
         this.plugin = plugin;
-        this.file = new File(plugin.getDataFolder(), "auth.yml");
-        this.accounts = YamlConfiguration.loadConfiguration(file);
-        plugin.getConfig().addDefault("auth.proxy-authenticated", true);
-        plugin.getConfig().addDefault("auth.remember-ip", false);
+        plugin.getConfig().addDefault("auth.storage-file", "");
+        plugin.getConfig().addDefault("auth.proxy-authenticated", false);
+        plugin.getConfig().addDefault("auth.remember-ip", true);
         plugin.getConfig().addDefault("auth.connect-to-smp", false);
+        String configuredStorage = plugin.getConfig().getString("auth.storage-file", "");
+        this.file = configuredStorage == null || configuredStorage.isBlank()
+                ? new File(plugin.getDataFolder(), "auth.yml")
+                : new File(configuredStorage).getAbsoluteFile();
+        this.accounts = YamlConfiguration.loadConfiguration(file);
         Bukkit.getMessenger().registerOutgoingPluginChannel(plugin, "BungeeCord");
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
@@ -73,12 +77,21 @@ final class LarpersAuth implements Listener {
         player.sendMessage(ChatColor.YELLOW + "Vérification de ton compte...");
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!player.isOnline() || authenticated.containsKey(player.getUniqueId())) return;
-            // Le backend est privé derrière Velocity: le proxy valide les comptes Java
-            // en mode online et Floodgate valide les comptes Bedrock.
-            if (plugin.getConfig().getBoolean("auth.proxy-authenticated", false)
-                    || isFloodgate(player) || isPremium(player)) {
+            // Le proxy Velocity en mode premium authentifie les comptes Java.
+            // Floodgate authentifie les joueurs Bedrock. Le backend reste prive.
+            // Bedrock est validé par Floodgate. Java Premium doit aussi créer
+            // un mot de passe LPC une première fois; son IP peut ensuite être mémorisée.
+            if (isFloodgate(player)) {
                 markAuthenticated(player);
-                player.sendMessage(ChatColor.GREEN + "Connexion automatique réussie.");
+                player.sendMessage(ChatColor.GREEN + "Connexion Bedrock vérifiée par Floodgate.");
+                return;
+            }
+            // Les comptes Java Crack sont volontairement en mode sans réservation de pseudo :
+            // un joueur crack peut rejoindre même si ce nom existe déjà dans auth.yml.
+            // Seuls les comptes Java Premium vérifiés par Velocity passent par le mot de passe LPC.
+            if (!isPremium(player)) {
+                markAuthenticated(player);
+                player.sendMessage(ChatColor.GREEN + "Connexion Java Crack autorisée. Aucun mot de passe requis.");
                 return;
             }
             String path = accountPath(player.getName());
@@ -93,7 +106,7 @@ final class LarpersAuth implements Listener {
             if (accounts.contains(path + ".hash")) {
                 player.sendMessage(ChatColor.RED + "Connecte-toi avec /login <motdepasse>.");
             } else {
-                player.sendMessage(ChatColor.YELLOW + "Crée ton compte avec /register <motdepasse> <confirmation>.");
+                player.sendMessage(ChatColor.YELLOW + "Crée ton compte avec /register <motdepasse>.");
             }
             player.sendMessage(ChatColor.GRAY + "Tu restes dans le lobby jusqu'à ton authentification.");
         }, 40L);
@@ -105,8 +118,8 @@ final class LarpersAuth implements Listener {
 
     boolean command(Player player, String label, String[] args) {
         if (label.equalsIgnoreCase("register")) {
-            if (args.length != 2) {
-                player.sendMessage(ChatColor.YELLOW + "Usage : /register <motdepasse> <confirmation>");
+            if (args.length != 1) {
+                player.sendMessage(ChatColor.YELLOW + "Usage : /register <motdepasse>");
                 return true;
             }
             if (isAuthenticated(player)) {
@@ -116,10 +129,6 @@ final class LarpersAuth implements Listener {
             String path = accountPath(player.getName());
             if (accounts.contains(path + ".hash")) {
                 player.sendMessage(ChatColor.RED + "Ce pseudo possède déjà un compte. Utilise /login.");
-                return true;
-            }
-            if (!args[0].equals(args[1])) {
-                player.sendMessage(ChatColor.RED + "Les deux mots de passe ne correspondent pas.");
                 return true;
             }
             if (args[0].length() < 8 || args[0].length() > 64) {
@@ -160,7 +169,7 @@ final class LarpersAuth implements Listener {
             }
             String path = accountPath(player.getName());
             if (!accounts.contains(path + ".hash")) {
-                player.sendMessage(ChatColor.RED + "Aucun compte trouvé. Utilise /register <motdepasse> <confirmation>.");
+                player.sendMessage(ChatColor.RED + "Aucun compte trouvé. Utilise /register <motdepasse>.");
                 return true;
             }
             try {
@@ -195,6 +204,56 @@ final class LarpersAuth implements Listener {
         return false;
     }
 
+    void resetPassword(CommandSender sender, String targetName) {
+        // Le SMP recharge le fichier partage avant le reset afin de ne pas utiliser
+        // une copie devenue obsolete depuis l'inscription effectuee dans le Lobby.
+        accounts = YamlConfiguration.loadConfiguration(file);
+        if (targetName == null || !targetName.matches("[A-Za-z0-9_]{3,16}")) {
+            sender.sendMessage(ChatColor.RED + "Pseudo invalide.");
+            return;
+        }
+        Player target = Bukkit.getPlayerExact(targetName);
+        String accountName = target == null ? targetName : target.getName();
+        String path = accountPath(accountName);
+        if (!accounts.contains(path + ".hash")) {
+            sender.sendMessage(ChatColor.RED + "Aucun mot de passe Java crack enregistré pour " + accountName + ".");
+            return;
+        }
+        if (target != null && (isFloodgate(target) || isPremium(target))) {
+            sender.sendMessage(ChatColor.RED + "Ce joueur utilise une authentification automatique; aucun mot de passe LPC à réinitialiser.");
+            return;
+        }
+
+        accounts.set(path, null);
+        save();
+        sender.sendMessage(ChatColor.GREEN + "Mot de passe réinitialisé pour " + accountName + ".");
+
+        if (target == null) {
+            sender.sendMessage(ChatColor.YELLOW + accountName + " devra refaire /register <motdepasse> à sa prochaine connexion.");
+            return;
+        }
+
+        String reason = "Mot de passe réinitialisé par un administrateur. Reconnecte-toi et utilise /register <motdepasse>.";
+        target.sendMessage(ChatColor.RED + "Ton mot de passe a été réinitialisé par un administrateur.");
+        target.sendMessage(ChatColor.YELLOW + "Tu seras déconnecté dans 10 secondes. À ta prochaine connexion, utilise /register <motdepasse>.");
+        target.sendTitle("MOT DE PASSE RÉINITIALISÉ", "Déconnexion dans 10 secondes", 0, 30, 5);
+        int[] remaining = {10};
+        Bukkit.getScheduler().runTaskTimer(plugin, task -> {
+            if (!target.isOnline()) {
+                task.cancel();
+                return;
+            }
+            if (remaining[0] <= 1) {
+                target.sendTitle("MOT DE PASSE RÉINITIALISÉ", "Déconnexion maintenant", 0, 20, 0);
+                target.kickPlayer(reason);
+                task.cancel();
+                return;
+            }
+            remaining[0]--;
+            target.sendTitle("MOT DE PASSE RÉINITIALISÉ", "Déconnexion dans " + remaining[0] + " secondes", 0, 25, 5);
+        }, 20L, 20L);
+    }
+
     private void markAuthenticated(Player player) {
         authenticated.put(player.getUniqueId(), true);
         joinLocations.remove(player.getUniqueId());
@@ -216,7 +275,10 @@ final class LarpersAuth implements Listener {
     }
 
     private void rememberIp(Player player, String path) {
-        if (plugin.getConfig().getBoolean("auth.remember-ip", false)) {
+        // Le bypass par IP est réservé aux comptes Java Premium dont l'identité
+        // a été validée par Velocity. Ne jamais mémoriser l'IP d'un compte crack:
+        // un autre joueur sur le même réseau pourrait sinon usurper son pseudo.
+        if (plugin.getConfig().getBoolean("auth.remember-ip", true) && isPremium(player)) {
             accounts.set(path + ".ip-hash", ipHash(player));
         }
     }
@@ -268,25 +330,13 @@ final class LarpersAuth implements Listener {
     }
 
     private boolean isPremium(Player player) {
-        Plugin fastLogin = Bukkit.getPluginManager().getPlugin("FastLoginPlus");
-        if (fastLogin == null || !fastLogin.isEnabled()) return false;
-        // Seul le statut verifie par FastLoginPlus peut dispenser du mot de passe.
-        Plugin papi = Bukkit.getPluginManager().getPlugin("PlaceholderAPI");
-        if (papi == null || !papi.isEnabled()) return false;
-        try {
-            Class<?> api = Class.forName("me.clip.placeholderapi.PlaceholderAPI");
-            Object premium = api.getMethod("setPlaceholders",
-                    org.bukkit.OfflinePlayer.class, String.class)
-                    .invoke(null, player, "%fastloginplus_is_premium%");
-            if (premium != null && premium.toString().equalsIgnoreCase("true")) return true;
-            Object status = api.getMethod("setPlaceholders",
-                    org.bukkit.OfflinePlayer.class, String.class)
-                    .invoke(null, player, "%fastloginplus_status%");
-            return status != null && status.toString().equalsIgnoreCase("premium");
-        } catch (ReflectiveOperationException | LinkageError ex) {
-            plugin.getLogger().fine("Statut FastLoginPlus indisponible pour " + player.getName());
-            return false;
-        }
+        // Avec Velocity en modern forwarding, le proxy Premium transmet l'UUID
+        // authentifie par Microsoft/Mojang. Le proxy Crack transmet l'UUID offline.
+        // Ne jamais activer cette detection si le backend est accessible directement
+        // ou si le forwarding moderne et son secret ne sont pas configures.
+        UUID offlineId = UUID.nameUUIDFromBytes(
+                ("OfflinePlayer:" + player.getName()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return !player.getUniqueId().equals(offlineId);
     }
 
     private boolean exempt(Player player) {

@@ -5,11 +5,11 @@ load: STARTUP
 api-version: '26.3'
 author: Larpers Coin SMP
 description: "Plugin SMP LPC: économie, clans, quêtes, commerce, modération et anti-triche."
-softdepend: [FastLoginPlus, PlaceholderAPI, floodgate]
+softdepend: [floodgate]
 commands:
   register:
     description: Crée un compte joueur
-    usage: /register <motdepasse> <confirmation>
+    usage: /register <motdepasse>
   login:
     description: Connecte un compte joueur
     usage: /login <motdepasse>
@@ -53,8 +53,13 @@ commands:
     description: Recherche et achat LPC dans la boutique
     usage: /shop [search <objet>|buy <clé> [quantité]]
   admin:
-    description: Menu graphique du staff
+    description: Menu graphique du staff et réinitialisation de compte
+    usage: /admin [reset <joueur>]
     permission: larpers.staff
+  announce:
+    description: Annonce globale dans le chat et le TAB du réseau
+    usage: /announce <message>
+    permission: larpers.admin
   vanish:
     description: Invisibilité du staff
     permission: larpers.staff

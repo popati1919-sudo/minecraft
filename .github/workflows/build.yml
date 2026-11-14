@@ -2,7 +2,7 @@ name: Build LarpersCoin
 
 on:
   push:
-    branches: [main]
+    branches: [main, auth/velocity-replacement]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -30,10 +30,20 @@ jobs:
       - name: Compile and test
         working-directory: plugin-source
         run: gradle --no-daemon clean build
-      - name: Upload plugin JAR
+      - name: Build Velocity companion plugin
+        working-directory: velocity-plugin
+        run: gradle --no-daemon clean build
+      - name: Upload Paper plugin
         uses: actions/upload-artifact@v4
         with:
           name: LarpersCoin-Paper-26.3
           path: plugin-source/build/libs/LarpersCoin-*.jar
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload Velocity plugin
+        uses: actions/upload-artifact@v4
+        with:
+          name: LarpersCoin-Velocity
+          path: velocity-plugin/build/libs/LarpersCoinVelocity-*.jar
           if-no-files-found: error
           retention-days: 30
