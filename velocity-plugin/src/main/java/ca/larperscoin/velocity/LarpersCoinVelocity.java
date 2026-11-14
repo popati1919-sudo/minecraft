@@ -84,16 +84,28 @@ public final class LarpersCoinVelocity {
     public EventTask onPreLogin(PreLoginEvent event) {
         return EventTask.async(() -> {
             String username = event.getUsername();
-            if (username == null || !username.matches("[A-Za-z0-9_]{3,16}")) {
+            if (username == null) {
                 event.setResult(PreLoginEvent.PreLoginComponentResult.denied(
                         Component.text("Pseudo Minecraft invalide.")));
                 return;
             }
 
-            // Les pseudos Floodgate sont préfixés ('.' par défaut) et leur identité
-            // est déjà vérifiée par la clé Floodgate partagée entre proxy et Paper.
+            // Les pseudos Floodgate sont préfixés ('.' par défaut). On vérifie le
+            // suffixe séparément, puis on laisse Floodgate valider la clé Bedrock.
             if (username.startsWith(bedrockPrefix)) {
+                String bedrockName = username.substring(bedrockPrefix.length());
+                if (!bedrockName.matches("[A-Za-z0-9_]{1,16}")) {
+                    event.setResult(PreLoginEvent.PreLoginComponentResult.denied(
+                            Component.text("Pseudo Bedrock invalide.")));
+                    return;
+                }
                 event.setResult(PreLoginEvent.PreLoginComponentResult.forceOfflineMode());
+                return;
+            }
+
+            if (!username.matches("[A-Za-z0-9_]{3,16}")) {
+                event.setResult(PreLoginEvent.PreLoginComponentResult.denied(
+                        Component.text("Pseudo Minecraft invalide.")));
                 return;
             }
 
