@@ -57,7 +57,7 @@ final class LarpersAuth implements Listener {
         this.plugin = plugin;
         plugin.getConfig().addDefault("auth.storage-file", "");
         plugin.getConfig().addDefault("auth.proxy-authenticated", false);
-        plugin.getConfig().addDefault("auth.remember-ip", false);
+        plugin.getConfig().addDefault("auth.remember-ip", true);
         plugin.getConfig().addDefault("auth.connect-to-smp", false);
         String configuredStorage = plugin.getConfig().getString("auth.storage-file", "");
         this.file = configuredStorage == null || configuredStorage.isBlank()
@@ -79,10 +79,11 @@ final class LarpersAuth implements Listener {
             if (!player.isOnline() || authenticated.containsKey(player.getUniqueId())) return;
             // Le proxy Velocity en mode premium authentifie les comptes Java.
             // Floodgate authentifie les joueurs Bedrock. Le backend reste prive.
-            if (plugin.getConfig().getBoolean("auth.proxy-authenticated", false)
-                    || isFloodgate(player) || isPremium(player)) {
+            // Bedrock est validé par Floodgate. Java Premium doit aussi créer
+            // un mot de passe LPC une première fois; son IP peut ensuite être mémorisée.
+            if (isFloodgate(player)) {
                 markAuthenticated(player);
-                player.sendMessage(ChatColor.GREEN + "Connexion automatique réussie.");
+                player.sendMessage(ChatColor.GREEN + "Connexion Bedrock vérifiée par Floodgate.");
                 return;
             }
             String path = accountPath(player.getName());
@@ -266,7 +267,10 @@ final class LarpersAuth implements Listener {
     }
 
     private void rememberIp(Player player, String path) {
-        if (plugin.getConfig().getBoolean("auth.remember-ip", false)) {
+        // Le bypass par IP est réservé aux comptes Java Premium dont l'identité
+        // a été validée par Velocity. Ne jamais mémoriser l'IP d'un compte crack:
+        // un autre joueur sur le même réseau pourrait sinon usurper son pseudo.
+        if (plugin.getConfig().getBoolean("auth.remember-ip", true) && isPremium(player)) {
             accounts.set(path + ".ip-hash", ipHash(player));
         }
     }
