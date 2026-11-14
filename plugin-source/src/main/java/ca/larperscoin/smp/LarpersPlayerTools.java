@@ -6,7 +6,6 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.Statistic;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -52,6 +51,7 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
         this.core = (LarpersCoin) plugin;
         this.file = new File(plugin.getDataFolder(), "player-tools.yml");
         this.data = YamlConfiguration.loadConfiguration(file);
+        recoverSessions();
         for (String name : List.of("profile", "report", "reports", "staffspec")) {
             PluginCommand command = plugin.getCommand(name);
             if (command != null) {
@@ -89,6 +89,23 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
         return stored + (session > 0L ? Math.max(0L, System.currentTimeMillis() - session) : 0L);
     }
 
+    private void recoverSessions() {
+        var players = data.getConfigurationSection("players");
+        if (players == null) return;
+        long now = System.currentTimeMillis();
+        for (String rawId : players.getKeys(false)) {
+            UUID id;
+            try { id = UUID.fromString(rawId); } catch (IllegalArgumentException ex) { continue; }
+            long started = data.getLong(path(id, "session-start"), 0L);
+            if (started <= 0L) continue;
+            Player online = Bukkit.getPlayer(id);
+            long end = online == null ? data.getLong(path(id, "last-seen"), started) : now;
+            data.set(path(id, "playtime-ms"), data.getLong(path(id, "playtime-ms"), 0L) + Math.max(0L, end - started));
+            data.set(path(id, "session-start"), online == null ? null : now);
+        }
+        save();
+    }
+
     private void saveOnlineSessions() {
         long now = System.currentTimeMillis();
         for (Player player : Bukkit.getOnlinePlayers()) {
@@ -124,7 +141,7 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
         inv.setItem(4, item(Material.PLAYER_HEAD, "Profil de " + name,
                 online == null ? "Statut: hors ligne" : "Statut: en ligne",
                 "Solde: " + String.format(Locale.ROOT, "%.2f", core.balance(id)) + " LPC"));
-        inv.setItem(10, item(Material.IRON_SWORD, "Éliminations", "Joueurs: " + data.getInt(path(id, "kills"), 0)));
+        inv.setItem(10, item(Material.IRON_SWORD, "Éliminations", "Joueurs: " + data.getInt(path(id, "kills"), 0) + " (suivis LPC)"));
         inv.setItem(12, item(Material.SKELETON_SKULL, "Morts", "Total: " + data.getInt(path(id, "deaths"), 0)));
         inv.setItem(14, item(Material.CLOCK, "Temps de jeu", duration(playtime(id))));
         long lastSeen = data.getLong(path(id, "last-seen"), target.getLastPlayed());
@@ -201,7 +218,6 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
         staff.setGameMode(GameMode.SPECTATOR);
         staff.teleport(target.getLocation());
         tell(staff, "Mode spectateur activé sur " + target.getName() + ". Fais /staffspec off pour revenir.");
-        target.sendMessage(ChatColor.GRAY + "Un membre du staff observe actuellement le serveur.");
         List<String> audit = data.getStringList("staff-actions");
         audit.add(System.currentTimeMillis() + "|" + staff.getName() + "|SPECTATE|" + target.getName());
         if (audit.size() > 500) audit = new ArrayList<>(audit.subList(audit.size() - 500, audit.size()));
