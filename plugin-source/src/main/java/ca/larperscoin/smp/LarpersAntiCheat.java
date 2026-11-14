@@ -91,7 +91,9 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
             config.set("anticheat.checks.reach.max-distance", 3.75D);
         config.addDefault("anticheat.alert-cooldown-seconds", 4);
         config.addDefault("anticheat.evidence-limit", MAX_EVIDENCE);
-        config.addDefault("anticheat.auto-punish.enabled", true);
+        config.addDefault("anticheat.auto-punish.enabled", false);
+        // Keep automatic punishments disabled until detection has been validated on live Java and Bedrock clients.
+        config.set("anticheat.auto-punish.enabled", false);
         config.addDefault("anticheat.auto-punish.thresholds.kick", 12);
         config.addDefault("anticheat.auto-punish.thresholds.ban-1d", 24);
         config.addDefault("anticheat.auto-punish.thresholds.ban-7d", 36);
@@ -158,8 +160,18 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         return plugin.getConfig().getBoolean("anticheat.enabled", true);
     }
 
+    private boolean isBedrockPlayer(Player player) {
+        try {
+            Class<?> api = Class.forName("org.geysermc.floodgate.api.FloodgateApi");
+            Object instance = api.getMethod("getInstance").invoke(null);
+            return (boolean) api.getMethod("isFloodgatePlayer", UUID.class).invoke(instance, player.getUniqueId());
+        } catch (ReflectiveOperationException | LinkageError ex) {
+            return false;
+        }
+    }
+
     private boolean movementExempt(Player p) {
-        return p.isDead() || p.isInsideVehicle() || p.isFlying() || p.getAllowFlight()
+        return isBedrockPlayer(p) || p.isDead() || p.isInsideVehicle() || p.isFlying() || p.getAllowFlight()
                 || p.isGliding() || p.isSwimming() || p.isRiptiding()
                 || p.isInWater() || p.isClimbing() || p.isSleeping()
                 || p.hasPotionEffect(PotionEffectType.LEVITATION)
@@ -263,7 +275,8 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     public void onDamage(EntityDamageByEntityEvent event) {
         if (!globallyEnabled() || !plugin.getConfig().getBoolean("anticheat.checks.reach.enabled", true)) return;
         if (!(event.getDamager() instanceof Player attacker) || !(event.getEntity() instanceof Player victim)) return;
-        if (attacker.getWorld() != victim.getWorld() || bypass(attacker) || inGrace(attacker)) return;
+        if (attacker.getWorld() != victim.getWorld() || bypass(attacker) || inGrace(attacker)
+                || isBedrockPlayer(attacker) || isBedrockPlayer(victim)) return;
         double distance = attacker.getEyeLocation().distance(victim.getLocation().add(0.0D, 1.0D, 0.0D));
         double limit = plugin.getConfig().getDouble("anticheat.checks.reach.max-distance", 4.45D);
         if (distance > limit) {
