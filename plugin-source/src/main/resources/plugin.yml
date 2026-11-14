@@ -41,7 +41,7 @@ commands:
     usage: /lottery [menu|buy [1-10]|start [minutes]|draw]
   clan:
     description: Système de clans
-    usage: /clan <create|invite|join|leave|transfer|disband|role|bank|top|allies|level|chest|audit|stats|leaderboard>
+    usage: /clan <create|invite|join|leave|transfer|disband|role|bank|top|allies|level|chest|quests|audit|stats|leaderboard>
   quest:
     description: Quêtes quotidiennes
     aliases: [quests]
