@@ -181,7 +181,9 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                 lobby.setSpawnLocation(0, 100, 0);
             }
         }, 1L);
-        if (getConfig().getBoolean("panel.enabled", false)) {
+        boolean panelEnabled = getConfig().getBoolean("panel.enabled",
+                !getConfig().getBoolean("network.auth-only", false));
+        if (panelEnabled) {
             webPanel = new LarpersWebPanel(this);
             webPanel.start();
         } else {
