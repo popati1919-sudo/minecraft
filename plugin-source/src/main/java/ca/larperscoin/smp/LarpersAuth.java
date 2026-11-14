@@ -227,7 +227,7 @@ final class LarpersAuth implements Listener {
         String reason = "Mot de passe réinitialisé par un administrateur. Reconnecte-toi et utilise /register <motdepasse>.";
         target.sendMessage(ChatColor.RED + "Ton mot de passe a été réinitialisé par un administrateur.");
         target.sendMessage(ChatColor.YELLOW + "Tu seras déconnecté dans 10 secondes. À ta prochaine connexion, utilise /register <motdepasse>.");
-        target.sendTitle("MOT DE PASSE RÉINITIALISÉ", "Déconnexion dans 10 secondes", 0, 30, 5);
+        target.sendTitle("", "Mot de passe réinitialisé • déconnexion dans 10 s", 0, 30, 5);
         int[] remaining = {10};
         Bukkit.getScheduler().runTaskTimer(plugin, task -> {
             if (!target.isOnline()) {
@@ -235,13 +235,13 @@ final class LarpersAuth implements Listener {
                 return;
             }
             if (remaining[0] <= 1) {
-                target.sendTitle("MOT DE PASSE RÉINITIALISÉ", "Déconnexion maintenant", 0, 20, 0);
+                target.sendTitle("", "Déconnexion maintenant", 0, 20, 0);
                 target.kickPlayer(reason);
                 task.cancel();
                 return;
             }
             remaining[0]--;
-            target.sendTitle("MOT DE PASSE RÉINITIALISÉ", "Déconnexion dans " + remaining[0] + " secondes", 0, 25, 5);
+            target.sendTitle("", "Déconnexion dans " + remaining[0] + " s", 0, 25, 5);
         }, 20L, 20L);
     }
 
