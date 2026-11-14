@@ -349,7 +349,7 @@ jobs:
           10. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
 
           IMPORTANT:
-          - FastLoginPlus est retire. Tous les joueurs Java doivent faire /register puis /login; aucun compte premium n'est automatiquement reconnu.
+          - FastLoginPlus est retire. Java premium est authentifie automatiquement par Velocity en online-mode=true; Bedrock passe par Floodgate. Les comptes Java crackes sont refuses.
           - Garde le forwarding moderne et le secret prive identiques sur les deux Paper. Le mode online-mode du proxy et celui de proxies.velocity.online-mode dans Paper doivent rester true; les server.properties Paper restent en offline-mode derriere Velocity.
           - Bedrock doit passer par Geyser auth-type floodgate + NetherNet; la meme cle Floodgate doit etre partagee avec les deux backends.
           - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
