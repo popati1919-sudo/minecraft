@@ -183,6 +183,16 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         p.openInventory(inv);
     }
 
+    private void openTopMenu(Player p) {
+        Inventory inv=Bukkit.createInventory(null,27,"LPC | Classements");
+        inv.setItem(10,item(Material.GOLD_INGOT,"Top argent","Classement des 10 plus grandes fortunes","/baltop"));
+        inv.setItem(12,item(Material.SHIELD,"Top clans","Classement des clans","/clan top"));
+        inv.setItem(14,item(Material.DIAMOND_SWORD,"Top primes","Joueurs avec les plus grosses primes","/bounty list"));
+        inv.setItem(16,item(Material.CLOCK,"Top activité","Classement du temps de jeu","Bientôt disponible"));
+        inv.setItem(22,item(Material.BARRIER,"Fermer"));
+        p.openInventory(inv);
+    }
+
     private void openClanMenu(Player p) {
         Inventory inv=Bukkit.createInventory(null,27,"LPC | Clan");
         inv.setItem(10,item(Material.BOOK,"Informations","/clan info"));
@@ -395,8 +405,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             switch (c) {
                 case "clan" -> { return clan(sender,a); }
                 case "quest", "quests" -> { return quests(sender,a); }
-                case "quiz" -> { return quiz(sender,a); }
-                case "shop" -> { return shop(sender,a); }
+                case "top" -> { Player p=player(sender); if(p!=null) openTopMenu(p); return true; }
                 case "announce" -> {
                     if (!(sender.isOp() || sender.hasPermission("larpers.admin"))) { msg(sender,"Permission insuffisante."); return true; }
                     if (a.length == 0) { msg(sender,"Usage : /announce <message>"); return true; }
@@ -551,6 +560,17 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             }
             case "chest" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
+                if(a.length>1 && a[1].equalsIgnoreCase("upgrade")) {
+                    String cp=clanPath(own);
+                    int level=Math.max(1,db.getInt(cp+".chest-level",1));
+                    if(level>=7){msg(p,"Ton coffre a déjà sa capacité maximale.");return true;}
+                    double price=250.0*Math.pow(2,level-1);
+                    if(!charge(p,price)){msg(p,"Amélioration: "+price+" LPC. Fonds insuffisants.");return true;}
+                    db.set(cp+".chest-level",level+1);
+                    save();
+                    msg(p,"Coffre amélioré: "+(level==1?1:((level-1)*9))+" → "+(level*9)+" emplacements. Coût: "+price+" LPC.");
+                    return true;
+                }
                 UUID user=clanChestUsers.get(own);
                 if(user!=null&&!user.equals(p.getUniqueId())){msg(p,"Le coffre du clan est déjà utilisé par un autre membre.");return true;}
                 if(!db.getStringList(clanPath(own)+".members").contains(id(p))){msg(p,"Accès réservé aux membres du clan.");return true;}
@@ -561,9 +581,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     if(contents!=null)for(int i=0;i<Math.min(54,contents.size());i++)inv.setItem(i,contents.get(i));
                     clanChests.put(own,inv);
                 }
+                int unlocked=Math.max(1,Math.min(54,db.getInt(clanPath(own)+".chest-level",1)==1?1:db.getInt(clanPath(own)+".chest-level",1)*9));
+                for(int slot=unlocked;slot<54;slot++) inv.setItem(slot,item(Material.GRAY_STAINED_GLASS_PANE,"Emplacement verrouillé","/clan chest upgrade"));
                 clanChestUsers.put(own,p.getUniqueId());
                 clanChestSnapshots.put(own,Arrays.stream(inv.getContents()).map(x->x==null?null:x.clone()).toArray(ItemStack[]::new));
-                p.openInventory(inv);msg(p,"Coffre partagé ouvert. Les changements sont enregistrés et audités à la fermeture.");return true;
+                p.openInventory(inv);msg(p,"Coffre clan: "+unlocked+"/54 emplacements. Amélioration: /clan chest upgrade.");return true;
             }
             case "allies" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
@@ -836,6 +858,25 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onInvClick(InventoryClickEvent e) {
         String title=e.getView().getTitle();
+        if(title.equals("LPC | Classements")) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player viewer))return;
+            switch(e.getRawSlot()) {
+                case 10 -> {viewer.closeInventory();viewer.performCommand("baltop");}
+                case 12 -> {viewer.closeInventory();viewer.performCommand("clan top");}
+                case 14 -> {viewer.closeInventory();viewer.performCommand("bounty list");}
+                case 22 -> viewer.closeInventory();
+                default -> { }
+            }
+            return;
+        }
+        if(title.startsWith("Coffre clan:") && e.getRawSlot()>=0 && e.getRawSlot()<e.getView().getTopInventory().getSize()) {
+            String clan=title.substring("Coffre clan:".length());
+            int level=Math.max(1,db.getInt(clanPath(clan)+".chest-level",1));
+            int unlocked=Math.max(1,Math.min(54,level==1?1:level*9));
+            if(e.getRawSlot()>=unlocked){e.setCancelled(true);if(e.getWhoClicked() instanceof Player p)msg(p,"Emplacement verrouillé. Utilise /clan chest upgrade.");}
+            return;
+        }
         if(title.equals("LPC | Classement des clans")) {
             e.setCancelled(true);
             if(e.getRawSlot()==49 && e.getWhoClicked() instanceof Player p) p.closeInventory();
@@ -1109,10 +1150,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     @Override public List<String> onTabComplete(CommandSender s,Command c,String alias,String[] a) {
         String name=c.getName().toLowerCase(Locale.ROOT);
         if(name.equals("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","audit","stats","leaderboard");
+        if(name.equals("clan")&&a.length==2&&a[0].equalsIgnoreCase("chest"))return List.of("upgrade");
         if(name.equals("ah")&&a.length==1)return List.of("list","search","sell","buy");
         if(name.equals("ah")&&a.length==2&&a[0].equalsIgnoreCase("search"))return List.of("clear");
-        if(name.equals("shop")&&a.length==1)return List.of("search","buy");
-        if(name.equals("quiz")&&a.length==1)return List.of("top");
         if(name.equals("admin")&&a.length==1&&s.hasPermission("larpers.admin"))return List.of("reset");
         if(name.equals("lottery")&&a.length==2&&a[0].equalsIgnoreCase("buy"))return List.of("1","5","10","25","50","100","500","1000");
         if(List.of("invsee","freeze","admin").contains(name)&&a.length==(name.equals("admin")?2:1))
