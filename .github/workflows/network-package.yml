@@ -108,8 +108,8 @@ jobs:
           bind = "0.0.0.0:25565"
           motd = "<gold>Larpers Coin Network</gold>"
           show-max-players = 100
-          online-mode = true
-          force-key-authentication = true
+          online-mode = false
+          force-key-authentication = false
           player-info-forwarding-mode = "modern"
           forwarding-secret-file = "forwarding.secret"
           announce-forge = false
@@ -183,7 +183,7 @@ jobs:
           proxies:
             velocity:
               enabled: true
-              online-mode: true
+              online-mode: false
               secret: "$SECRET"
           EOF
           done
@@ -200,7 +200,7 @@ jobs:
           network:
             auth-only: true
           auth:
-            proxy-authenticated: true
+            proxy-authenticated: false
             remember-ip: false
             connect-to-smp: true
           EOF
@@ -282,7 +282,7 @@ jobs:
             copy /Y "%FGKEY%" "%%S\\plugins\\floodgate\\key.pem" >nul
           )
           echo Cle Floodgate partagee avec Lobby et SMP.
-          echo Les joueurs Java premium et Bedrock se connectent automatiquement sans mot de passe.
+          echo Les joueurs Java premium/crack doivent creer un compte avec /register puis /login; Bedrock passe par Floodgate.
           echo Les joueurs Bedrock passent par Floodgate.
           pause
           EOF
@@ -326,11 +326,11 @@ jobs:
           =============================
           Contenu:
           - Velocity proxy: port public Java 25565
-          - Lobby Paper separe: 127.0.0.1:25566 (connexion automatique des comptes Java premium et Bedrock)
+          - Lobby Paper separe: 127.0.0.1:25566 (authentification /register et /login pour Java premium et crack)
           - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
           - Geyser + Floodgate installes sur Velocity, Floodgate aussi sur Lobby et SMP pour reconnaitre les joueurs Bedrock
-          - Aucun FastLoginPlus: Java premium sans mot de passe via authentification Velocity; Bedrock sans mot de passe via Floodgate; Java cracke refuse
-          - Lobby: Java premium et Bedrock sont authentifies automatiquement; aucune commande /register ou /login requise
+          - Authentification offline: Java premium et crack peuvent rejoindre; tous les comptes Java utilisent /register puis /login; Bedrock sans mot de passe via Floodgate
+          - Lobby: les joueurs Java premium et crack doivent utiliser /register <motdepasse> puis /login <motdepasse>; Bedrock est authentifie via Floodgate
           - Apres authentification, transfert automatique vers le SMP
           - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend
           - Geyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login
@@ -349,11 +349,11 @@ jobs:
           10. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
 
           IMPORTANT:
-          - FastLoginPlus est retire. Java premium est authentifie automatiquement par Velocity en online-mode=true; Bedrock passe par Floodgate. Les comptes Java crackes sont refuses.
-          - Garde le forwarding moderne et le secret prive identiques sur les deux Paper. Le mode online-mode du proxy et celui de proxies.velocity.online-mode dans Paper doivent rester true; les server.properties Paper restent en offline-mode derriere Velocity.
+          - FastLoginPlus est retire. Velocity est en online-mode=false pour accepter Java premium et crack. Les comptes Java doivent utiliser /register puis /login; Bedrock passe par Floodgate.
+          - Garde le forwarding moderne et le secret prive identiques sur les deux Paper. Le mode online-mode du proxy et proxies.velocity.online-mode dans Paper doivent rester false pour accepter les comptes crack; les server.properties Paper restent en offline-mode derriere Velocity.
           - Bedrock doit passer par Geyser auth-type floodgate + NetherNet; la meme cle Floodgate doit etre partagee avec les deux backends.
           - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
-          - Ne repasse pas le proxy en offline-mode: cela permettrait l\x27usurpation des pseudos Java. Ne rends jamais les ports backend publics.
+          - Le mode offline accepte les comptes crack mais ne valide pas l'identite Microsoft des comptes Java: un joueur peut usurper un pseudo si l'authentification du plugin est contournee. Garde les backends prives et impose /register + /login.
           - Le plugin anticheat utilise des seuils de sanctions progressives configurables; ajuste-les apres tests.
           - Les mondes et donnees existants ne sont pas inclus: ce ZIP est un paquet serveur propre.
           - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
