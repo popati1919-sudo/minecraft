@@ -181,8 +181,14 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                 lobby.setSpawnLocation(0, 100, 0);
             }
         }, 1L);
-        webPanel = new LarpersWebPanel(this);
-        webPanel.start();
+        boolean panelEnabled = getConfig().getBoolean("panel.enabled",
+                !getConfig().getBoolean("network.auth-only", false));
+        if (panelEnabled) {
+            webPanel = new LarpersWebPanel(this);
+            webPanel.start();
+        } else {
+            getLogger().info("Panel web non demarre sur ce serveur (panel.enabled=false).");
+        }
         getLogger().info("LarpersCoin 1.0.8 actif. Aucun claim ni protection de parcelle n'est enregistré.");
     }
 

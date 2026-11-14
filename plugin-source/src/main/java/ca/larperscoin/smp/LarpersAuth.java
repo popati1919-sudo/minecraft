@@ -57,7 +57,10 @@ final class LarpersAuth implements Listener {
         this.plugin = plugin;
         plugin.getConfig().addDefault("auth.storage-file", "");
         plugin.getConfig().addDefault("auth.proxy-authenticated", false);
-        plugin.getConfig().addDefault("auth.remember-ip", false);
+        plugin.getConfig().addDefault("auth.remember-ip", true);
+        // Le réseau doit reconnaître un compte déjà validé depuis la même IP.
+        // L'identifiant du joueur est aussi inclus dans le hash pour séparer les comptes.
+        plugin.getConfig().set("auth.remember-ip", true);
         plugin.getConfig().addDefault("auth.connect-to-smp", false);
         String configuredStorage = plugin.getConfig().getString("auth.storage-file", "");
         this.file = configuredStorage == null || configuredStorage.isBlank()

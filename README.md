@@ -21,11 +21,12 @@ Le workflow **Package reseau complet Larpers Coin (Velocity + Lobby + SMP)** pro
 - Velocity public sur TCP 25565.
 - Lobby Paper privé sur 127.0.0.1:25566.
 - SMP Paper privé sur 127.0.0.1:25567.
-- FastLoginPlus sur Velocity et les backends pour distinguer les comptes Java premium des comptes non premium.
+- Authentification personnalisée des comptes Java par `/register` et `/login`, avec reconnaissance du même compte depuis la même adresse IP après la première connexion.
 - Geyser + Floodgate sur Velocity, Floodgate sur les backends.
+- Panneau web admin activé uniquement sur le SMP; HTML également fourni dans `PANEL-WEB/index.html`.
 - Clé de forwarding Velocity, scripts Windows de démarrage, configuration Bedrock et ouverture du pare-feu.
 
-Dans GitHub, ouvre **Actions** puis **Package reseau complet Larpers Coin (Velocity + Lobby + SMP)** et télécharge l'artefact `LarpersCoin-Network`. Suis impérativement `LISEZ-MOI.txt` et exécute `CONFIGURER-RESEAU.bat` après le premier démarrage de Velocity. Les ports backend 25566/25567 ne doivent jamais être exposés à Internet.
+Dans GitHub, ouvre **Actions** puis **Package reseau complet Larpers Coin (Velocity + Lobby + SMP)** et télécharge l'artefact `LarpersCoin-Network`. Suis impérativement `LISEZ-MOI.txt`, exécute `CONFIGURER-RESEAU.bat` après le premier démarrage de Velocity, puis démarre avec `START-NETWORK.bat` et saisis le secret masqué du panneau. Les ports backend 25566/25567 ne doivent jamais être exposés à Internet.
 
 Le pack est un déploiement initial: accepte l'EULA toi-même, configure la redirection des ports du routeur et teste une connexion Java premium, Java non premium et Bedrock avant l'ouverture publique.
 

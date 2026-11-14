@@ -2,7 +2,7 @@ name: Package reseau complet Larpers Coin (Velocity + Lobby + SMP)
 
 on:
   push:
-    branches: [main, auth/velocity-replacement, ui/bedrock-friendly-menus]
+    branches: [main, auth/velocity-replacement, ui/bedrock-friendly-menus, fix/network-panel-auth]
     paths:
       - ".github/workflows/network-package.yml"
       - "plugin-source/**"
@@ -40,10 +40,12 @@ jobs:
         run: |
           set -euo pipefail
           ROOT="package/LarpersCoin-Network"
-          mkdir -p "$ROOT/Velocity/plugins" "$ROOT/Lobby/plugins" "$ROOT/SMP/plugins"
+          mkdir -p "$ROOT/Velocity/plugins" "$ROOT/Lobby/plugins" "$ROOT/SMP/plugins" "$ROOT/PANEL-WEB"
+          cp plugin-source/src/main/resources/panel/index.html "$ROOT/PANEL-WEB/index.html"
           cp SUPERVISEUR-RESEAU.ps1 "$ROOT/SUPERVISEUR-RESEAU.ps1"
           cp PANEL-WEB-DISTANT.md "$ROOT/PANEL-WEB-DISTANT.md"
           cp DEMARRER-PANEL-DISTANT.bat "$ROOT/DEMARRER-PANEL-DISTANT.bat"
+          cp DEMARRER-RESEAU.ps1 "$ROOT/DEMARRER-RESEAU.ps1"
 
           paper_meta="$(curl -fsSL -H 'User-Agent: LarpersCoin-Packager/1.0' "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds?channel=STABLE&limit=1")"
           paper_url="$(echo "$paper_meta" | jq -r '.[0].downloads["server:default"].url // empty')"
@@ -206,8 +208,10 @@ jobs:
             enabled: true
           auth:
             proxy-authenticated: false
-            remember-ip: false
+            remember-ip: true
             connect-to-smp: true
+          panel:
+            enabled: false
           anticheat:
             enabled: false
           EOF
@@ -216,7 +220,9 @@ jobs:
             # Le SMP lit le même fichier que le Lobby pour /admin reset.
             storage-file: ../Lobby/plugins/LarpersCoin/auth.yml
             proxy-authenticated: true
-            remember-ip: false
+            remember-ip: true
+          panel:
+            enabled: true
           anticheat:
             enabled: true
             auto-punish:
@@ -242,8 +248,10 @@ jobs:
             )
           )
           if not exist "SUPERVISEUR-RESEAU.ps1" (echo Fichier superviseur introuvable.& pause & exit /b 1)
+          if not exist "DEMARRER-RESEAU.ps1" (echo Lanceur reseau introuvable.& pause & exit /b 1)
+          echo Le mot de passe du panneau sera demande de facon masquee.
           echo Le superviseur gere Lobby, SMP et Velocity. /redemarrer relance les trois serveurs.
-          powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0SUPERVISEUR-RESEAU.ps1"
+          powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0DEMARRER-RESEAU.ps1"
           pause
           EOF
 
@@ -334,8 +342,8 @@ jobs:
           - Lobby Paper separe: 127.0.0.1:25566 (monde vide sans plateforme, spawn a Y=100, vol permanent, joueurs invisibles entre eux)
           - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
           - Geyser + Floodgate installes sur Velocity, Floodgate aussi sur Lobby et SMP pour reconnaitre les joueurs Bedrock
-          - Authentification offline: Java premium et crack peuvent rejoindre; dans cette version, tous les comptes Java utilisent /register puis /login; Bedrock sans mot de passe via Floodgate
-          - Lobby: les joueurs Java premium et crack doivent utiliser /register <motdepasse> puis /login <motdepasse>; Bedrock est authentifie via Floodgate
+          - Java premium et crack sont acceptes en mode offline; dans cette configuration, les comptes Java utilisent /register puis /login; Bedrock passe par Floodgate sans mot de passe
+          - Lobby: les comptes Java utilisent /register <motdepasse> puis /login <motdepasse>; apres la premiere connexion, le meme pseudo depuis la meme IP est reconnu automatiquement; Bedrock est authentifie via Floodgate
           - Apres authentification, transfert automatique vers le SMP
           - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend
           - Geyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login
