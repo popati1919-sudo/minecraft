@@ -40,7 +40,8 @@ jobs:
         run: |
           set -euo pipefail
           ROOT="package/LarpersCoin-Network"
-          mkdir -p "$ROOT/Velocity/plugins" "$ROOT/Lobby/plugins" "$ROOT/SMP/plugins"
+          mkdir -p "$ROOT/Velocity/plugins" "$ROOT/Lobby/plugins" "$ROOT/SMP/plugins" "$ROOT/PANEL-WEB"
+          cp plugin-source/src/main/resources/panel/index.html "$ROOT/PANEL-WEB/index.html"
           cp SUPERVISEUR-RESEAU.ps1 "$ROOT/SUPERVISEUR-RESEAU.ps1"
           cp PANEL-WEB-DISTANT.md "$ROOT/PANEL-WEB-DISTANT.md"
           cp DEMARRER-PANEL-DISTANT.bat "$ROOT/DEMARRER-PANEL-DISTANT.bat"
