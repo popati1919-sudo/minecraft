@@ -355,6 +355,25 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     if (player != null) auth.command(player, name, args);
                     return true;
                 }
+                case "redemarrer" -> {
+                    if (!isStaff(sender)) {
+                        reply(sender, "Permission insuffisante. Seuls les administrateurs peuvent redémarrer le réseau.");
+                        return true;
+                    }
+                    saveData();
+                    try {
+                        Path networkRoot = getDataFolder().toPath().toAbsolutePath().getParent().getParent().getParent();
+                        Path request = networkRoot.resolve("restart.request");
+                        Files.writeString(request, "requested-by=" + sender.getName() + System.lineSeparator(),
+                                StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+                        Bukkit.broadcastMessage(ChatColor.GOLD + "[LPC] Redémarrage du réseau demandé. Lobby, SMP et Velocity vont redémarrer.");
+                        getLogger().warning("Redémarrage global demandé par " + sender.getName());
+                    } catch (IOException | RuntimeException ex) {
+                        reply(sender, "Impossible de demander le redémarrage global. Vérifie que le réseau est lancé avec START-NETWORK.bat.");
+                        getLogger().severe("Échec de la demande de redémarrage: " + ex.getMessage());
+                    }
+                    return true;
+                }
                 case "balance" -> {
                     if (args.length == 0) {
                         Player player = requirePlayer(sender);
