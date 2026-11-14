@@ -56,6 +56,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<UUID, Map<Integer, String>> ahSlots = new HashMap<>();
     private final Map<UUID, String> ahSearch = new HashMap<>();
     private final Set<UUID> awaitingAhSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<UUID> awaitingLotteryAmount = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<UUID> awaitingBountySearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<UUID, UUID> pendingBountyTarget = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<UUID, UUID> pendingOpTarget = new HashMap<>();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
@@ -105,6 +107,15 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
 
     private void save() {
+        if (saveQueued || !plugin.isEnabled()) return;
+        saveQueued = true;
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            saveQueued = false;
+            saveNow();
+        }, 100L);
+    }
+
+    private void saveNow() {
         for(var entry:clanChests.entrySet())db.set(clanPath(entry.getKey())+".chest",Arrays.asList(entry.getValue().getContents()));
         Path target=file.toPath(),temporary=target.resolveSibling(target.getFileName()+".tmp");
         try {
@@ -129,7 +140,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             db.set(path+".choices",choices);
         }
     }
-    public void shutdown() { save(); }
+    public void shutdown() { saveNow(); }
     private void msg(CommandSender s, String m) { s.sendMessage(PREFIX + m); }
     private boolean staff(CommandSender s) { return s.isOp() || s.hasPermission("larpers.staff") || s.hasPermission("larpers.admin"); }
     private Player player(CommandSender s) { if (s instanceof Player p) return p; msg(s,"Commande réservée aux joueurs."); return null; }
@@ -157,11 +168,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         boolean active=core.lotteryActive();
         inv.setItem(10,item(Material.PAPER,"Acheter 1 ticket","Prix: 25 LPC","Clique pour acheter"));
         inv.setItem(12,item(Material.GOLD_INGOT,"Acheter 5 tickets","Prix: 125 LPC","Clique pour acheter"));
-        inv.setItem(14,item(Material.EMERALD,"Jackpot: "+core.lotteryPot()+" LPC",
-            "Tickets vendus: "+core.lotteryTicketCount(),
-            active?"Loterie en cours":"Aucune loterie en cours"));
-        inv.setItem(16,item(Material.CLOCK,active?"Loterie en cours":"En attente d'un admin",
-            active?"Fin: "+new java.text.SimpleDateFormat("HH:mm:ss").format(new java.util.Date(core.lotteryEndsAt())):"Un administrateur doit la démarrer"));
+        inv.setItem(14,item(Material.EMERALD,"Acheter 64 tickets","Prix: 1 600 LPC","Jackpot: "+core.lotteryPot()+" LPC","Tickets vendus: "+core.lotteryTicketCount()));
+        inv.setItem(16,item(Material.NAME_TAG,"Quantité personnalisée","Clique puis écris le nombre de tickets dans le chat","Maximum par achat: 1 milliard"));
         if(core.isLpcAdmin(p)) {
             inv.setItem(22,item(Material.COMMAND_BLOCK,active?"Tirage / terminer":"Démarrer la loterie",
                 active?"Clique pour terminer maintenant":"Démarre une loterie de 10 minutes",
@@ -283,17 +291,23 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
         if(entries.isEmpty())inv.setItem(22,item(Material.PAPER,"Aucune prime active","Place une prime sur un joueur en ligne."));
         inv.setItem(45,item(Material.TARGET,"Placer une prime","Choisir un joueur en ligne"));
+        inv.setItem(46,item(Material.COMPASS,"Rechercher un joueur","Recherche par pseudo, compatible Java et Bedrock"));
         inv.setItem(49,item(Material.BARRIER,"Fermer"));
         inv.setItem(53,item(Material.SUNFLOWER,"Actualiser",entries.size()+" prime(s) active(s)"));
         viewer.openInventory(inv);
     }
-    private void openBountyTargets(Player viewer) {
+    private void openBountyTargets(Player viewer) { openBountyTargets(viewer, ""); }
+    private void openBountyTargets(Player viewer, String query) {
         Inventory inv=Bukkit.createInventory(null,54,"LPC | Choisir une cible");
         int slot=0;
+        String filter=query.toLowerCase(Locale.ROOT).trim();
         for(Player target:Bukkit.getOnlinePlayers()) {
             if(target.equals(viewer)||slot>=45)continue;
+            if(!filter.isEmpty()&&!target.getName().toLowerCase(Locale.ROOT).contains(filter))continue;
             inv.setItem(slot++,item(Material.PLAYER_HEAD,target.getName(),"Prime actuelle: "+core.bountyAmount(target.getUniqueId())+" LPC","Clique pour choisir"));
         }
+        if(slot==0)inv.setItem(22,item(Material.BARRIER,"Aucun joueur trouvé","Recherche: "+(filter.isEmpty()?"aucune":filter)));
+        inv.setItem(45,item(Material.COMPASS,"Rechercher","Pseudo actuel: "+(filter.isEmpty()?"tous":filter)));
         inv.setItem(49,item(Material.ARROW,"Retour aux primes"));
         viewer.openInventory(inv);
     }
@@ -766,6 +780,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             switch(e.getRawSlot()) {
                 case 10 -> {p.closeInventory();p.performCommand("lottery buy 1");Bukkit.getScheduler().runTaskLater(plugin,()->openLotteryMenu(p),2L);}
                 case 12 -> {p.closeInventory();p.performCommand("lottery buy 5");Bukkit.getScheduler().runTaskLater(plugin,()->openLotteryMenu(p),2L);}
+                case 14 -> {p.closeInventory();p.performCommand("lottery buy 64");Bukkit.getScheduler().runTaskLater(plugin,()->openLotteryMenu(p),2L);}
+                case 16 -> {p.closeInventory();awaitingLotteryAmount.add(p.getUniqueId());msg(p,"Écris le nombre de tickets à acheter (1 à 1 000 000 000), ou 'annuler'.");}
                 case 22 -> {
                     if(!core.isLpcAdmin(p)){msg(p,"Seuls les administrateurs peuvent démarrer ou terminer une loterie.");return;}
                     p.closeInventory();
@@ -831,6 +847,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             int slot=e.getRawSlot();
             if(slot==49){viewer.closeInventory();return;}
             if(slot==45){openBountyTargets(viewer);return;}
+            if(slot==46){viewer.closeInventory();awaitingBountySearch.add(viewer.getUniqueId());msg(viewer,"Écris le pseudo du joueur à rechercher (ou 'annuler').");return;}
             if(slot==53){openBountyMenu(viewer);return;}
             return;
         }
@@ -838,6 +855,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player viewer))return;
             if(e.getRawSlot()==49){openBountyMenu(viewer);return;}
+            if(e.getRawSlot()==45){viewer.closeInventory();awaitingBountySearch.add(viewer.getUniqueId());msg(viewer,"Écris le pseudo du joueur à rechercher (ou 'annuler').");return;}
             if(e.getRawSlot()<0||e.getRawSlot()>=45||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta())return;
             String targetName=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName());
             Player target=Bukkit.getPlayerExact(targetName);
@@ -950,11 +968,34 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) {
         UUID id=e.getPlayer().getUniqueId();
-        frozen.remove(id);awaitingAhSearch.remove(id);pendingBountyTarget.remove(id);
+        frozen.remove(id);awaitingAhSearch.remove(id);awaitingLotteryAmount.remove(id);awaitingBountySearch.remove(id);pendingBountyTarget.remove(id);
     }
     @EventHandler public void onChatSearch(org.bukkit.event.player.AsyncPlayerChatEvent e) {
         Player sender=e.getPlayer();
         UUID senderId=sender.getUniqueId();
+        if(awaitingBountySearch.remove(senderId)) {
+            e.setCancelled(true);
+            String query=e.getMessage().trim();
+            Bukkit.getScheduler().runTask(plugin,()->{
+                if(query.equalsIgnoreCase("annuler")){msg(sender,"Recherche de prime annulée.");openBountyMenu(sender);return;}
+                openBountyTargets(sender,query);
+            });
+            return;
+        }
+        if(awaitingLotteryAmount.remove(senderId)) {
+            e.setCancelled(true);
+            String amount=e.getMessage().trim();
+            Bukkit.getScheduler().runTask(plugin,()->{
+                if(amount.equalsIgnoreCase("annuler")){msg(sender,"Achat de tickets annulé.");return;}
+                try {
+                    long count=Long.parseLong(amount);
+                    if(count<1L||count>1_000_000_000L){msg(sender,"Entre un nombre entre 1 et 1 000 000 000.");return;}
+                    sender.performCommand("lottery buy "+count);
+                    openLotteryMenu(sender);
+                } catch(NumberFormatException ex) { msg(sender,"Nombre invalide. Écris uniquement un nombre entier."); }
+            });
+            return;
+        }
         if(awaitingAhSearch.remove(senderId)) {
             e.setCancelled(true);
             String query=e.getMessage().trim();

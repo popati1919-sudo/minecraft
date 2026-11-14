@@ -60,6 +60,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private LarpersAntiCheat antiCheat;
     private LarpersAuth auth;
     private File dataFile;
+    private boolean dataSaveQueued = false;
     private final DecimalFormat money = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.CANADA_FRENCH));
 
     @Override
@@ -71,6 +72,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         }
         dataFile = new File(getDataFolder(), "data.yml");
         data = YamlConfiguration.loadConfiguration(dataFile);
+        migrateLegacyLotteryTickets();
         for (String name : getDescription().getCommands().keySet()) {
             if (getCommand(name) != null) {
                 getCommand(name).setExecutor(this);
@@ -93,17 +95,27 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                 lobby.setSpawnLocation(8, 81, 8);
             }
         }, 1L);
-        getLogger().info("LarpersCoin 1.0.3 actif. Aucun claim ni protection de parcelle n'est enregistré.");
+        getLogger().info("LarpersCoin 1.0.5 actif. Aucun claim ni protection de parcelle n'est enregistré.");
     }
 
     @Override
     public void onDisable() {
         if (features != null) features.shutdown();
         if (antiCheat != null) antiCheat.shutdown();
-        saveData();
+        flushData();
     }
 
     void saveData() {
+        if (dataSaveQueued || !isEnabled()) return;
+        dataSaveQueued = true;
+        getServer().getScheduler().runTaskLater(this, () -> {
+            dataSaveQueued = false;
+            flushData();
+        }, 100L);
+    }
+
+    private void flushData() {
+        if (dataFile == null || data == null) return;
         Path target=dataFile.toPath();
         Path temporary=target.resolveSibling(target.getFileName()+".tmp");
         try {
@@ -430,13 +442,16 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     if(args[0].equalsIgnoreCase("buy")) {
                         Player player=requirePlayer(sender);if(player==null)return true;
                         if(!lotteryActive()){reply(sender,"Aucune loterie en cours. Attends l'annonce d'un administrateur.");return true;}
-                        int count=args.length>=2?Integer.parseInt(args[1]):1;
-                        if(count<1||count>10){reply(sender,"Tu peux acheter de 1 à 10 tickets.");return true;}
+                        long count=args.length>=2?Long.parseLong(args[1]):1L;
+                        if(count<1L||count>1_000_000_000L){reply(sender,"Quantité autorisée par achat : 1 à 1 000 000 000 tickets.");return true;}
+                        long currentTickets=lotteryTicketCount();
+                        if(Long.MAX_VALUE-currentTickets<count){reply(sender,"La limite numérique totale de tickets est atteinte.");return true;}
                         double cost=count*25.0,nextPot=lotteryPot()+cost;
-                        if(!Double.isFinite(nextPot)){reply(sender,"Le jackpot dépasserait la limite numérique.");return true;}
+                        if(!Double.isFinite(cost)||!Double.isFinite(nextPot)){reply(sender,"Le coût ou le jackpot dépasserait la limite numérique.");return true;}
                         if(!debit(player.getUniqueId(),cost)){reply(sender,"Fonds insuffisants : "+format(cost)+".");return true;}
-                        List<String> tickets=data.getStringList("lottery.tickets");for(int i=0;i<count;i++)tickets.add(key(player.getUniqueId()));
-                        data.set("lottery.tickets",tickets);data.set("lottery.pot",nextPot);saveData();
+                        String ticketPath="lottery.ticket-counts."+key(player.getUniqueId());
+                        data.set(ticketPath,data.getLong(ticketPath,0L)+count);
+                        data.set("lottery.pot",nextPot);saveData();
                         recordTransaction("LOTTERY_BUY",player.getUniqueId(),new UUID(0L,0L),cost);
                         reply(sender,"Tickets achetés : "+count+". Jackpot : "+format(nextPot));
                         Bukkit.broadcastMessage(ChatColor.LIGHT_PURPLE+"[LOTERIE] "+player.getName()+" vient d'acheter "+count+" ticket(s)!");
@@ -469,8 +484,34 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         }
     }
 
+    private void migrateLegacyLotteryTickets() {
+        List<String> legacy = data.getStringList("lottery.tickets");
+        if (legacy.isEmpty() || data.contains("lottery.ticket-counts")) return;
+        for (String raw : legacy) {
+            try {
+                UUID id = UUID.fromString(raw);
+                String path = "lottery.ticket-counts." + id;
+                data.set(path, data.getLong(path, 0L) + 1L);
+            } catch (IllegalArgumentException ignored) {
+                getLogger().warning("Ticket de loterie invalide ignoré pendant la migration.");
+            }
+        }
+        data.set("lottery.tickets", null);
+        saveData();
+    }
+
     public double lotteryPot(){return Math.max(0.0,data.getDouble("lottery.pot",0.0));}
-    public int lotteryTicketCount(){return data.getStringList("lottery.tickets").size();}
+    public long lotteryTicketCount(){
+        var section = data.getConfigurationSection("lottery.ticket-counts");
+        if (section == null) return 0L;
+        long total = 0L;
+        for (String id : section.getKeys(false)) {
+            long count = Math.max(0L, section.getLong(id, 0L));
+            if (Long.MAX_VALUE - total < count) return Long.MAX_VALUE;
+            total += count;
+        }
+        return total;
+    }
     public boolean lotteryActive(){return data.getBoolean("lottery.active",false);}
     public long lotteryEndsAt(){return data.getLong("lottery.ends-at",0L);}
     private boolean isLpcAdminSender(CommandSender sender){return sender.isOp()||sender.hasPermission("larpers.admin");}
@@ -489,8 +530,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private void finishLottery(boolean automatic) {
         if(!lotteryActive())return;
         data.set("lottery.active",false);data.set("lottery.ends-at",0L);saveData();
-        List<String> tickets=data.getStringList("lottery.tickets");
-        if(tickets.isEmpty()) {
+        if(lotteryTicketCount()<=0L) {
             Bukkit.broadcastMessage(ChatColor.LIGHT_PURPLE+"[LOTERIE] Fin du tirage: aucun ticket vendu. Le jackpot est conservé.");
             return;
         }
@@ -518,9 +558,18 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     }
 
     private void drawLottery() {
-        List<String> tickets = data.getStringList("lottery.tickets");
-        if (tickets.isEmpty()) return;
-        String winnerId = tickets.get(ThreadLocalRandom.current().nextInt(tickets.size()));
+        long totalTickets = lotteryTicketCount();
+        if (totalTickets <= 0L) return;
+        long draw = ThreadLocalRandom.current().nextLong(totalTickets);
+        String winnerId = null;
+        var ticketSection = data.getConfigurationSection("lottery.ticket-counts");
+        if (ticketSection == null) return;
+        for (String id : ticketSection.getKeys(false)) {
+            long count = Math.max(0L, ticketSection.getLong(id, 0L));
+            if (draw < count) { winnerId = id; break; }
+            draw -= count;
+        }
+        if (winnerId == null) return;
         double jackpot = data.getDouble("lottery.pot", 0.0);
         UUID winnerUuid = UUID.fromString(winnerId);
         if (!Double.isFinite(jackpot) || jackpot <= 0.0 || !Double.isFinite(balance(winnerUuid) + jackpot)) {
@@ -528,7 +577,8 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             return;
         }
         credit(winnerUuid, jackpot);
-        data.set("lottery.tickets", new ArrayList<String>());
+        data.set("lottery.ticket-counts", null);
+        data.set("lottery.tickets", null);
         data.set("lottery.pot", 0.0);
         saveData();
         recordTransaction("LOTTERY_WIN", new UUID(0L,0L), winnerUuid, jackpot);

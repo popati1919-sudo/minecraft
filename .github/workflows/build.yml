@@ -30,6 +30,9 @@ jobs:
       - name: Compile and test
         working-directory: plugin-source
         run: gradle --no-daemon clean build
+      - name: Verify expected plugin artifact
+        working-directory: plugin-source
+        run: test -s build/libs/LarpersCoin-1.0.5.jar
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
         with:

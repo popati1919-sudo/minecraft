@@ -1,11 +1,11 @@
 name: LarpersCoin
-version: 1.0.4
+version: 1.0.5
 main: ca.larperscoin.smp.LarpersCoin
 load: STARTUP
 api-version: '26.3'
 author: Larpers Coin SMP
 description: "Plugin SMP LPC: économie, clans, quêtes, commerce, modération et anti-triche."
-softdepend: [FastLoginPlus, PlaceholderAPI, floodgate]
+softdepend: [PlaceholderAPI, floodgate]
 commands:
   register:
     description: Crée un compte joueur
@@ -38,7 +38,7 @@ commands:
     permission: larpers.admin
   lottery:
     description: Menu de loterie LPC; démarrage réservé aux administrateurs
-    usage: /lottery [menu|buy [1-10]|start [minutes]|draw]
+    usage: /lottery [menu|buy [quantité]|start [minutes]|draw]
   clan:
     description: Système de clans
     usage: /clan <create|invite|join|leave|transfer|disband|role|bank|top|allies|level|chest|audit|stats|leaderboard>

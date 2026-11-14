@@ -217,7 +217,7 @@ jobs:
           anticheat:
             enabled: true
             auto-punish:
-              enabled: true
+              enabled: false
               thresholds:
                 kick: 12
                 ban-1d: 24
