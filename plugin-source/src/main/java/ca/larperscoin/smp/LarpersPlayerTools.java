@@ -143,7 +143,7 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
     private void openReports(Player viewer) {
         Inventory inv = Bukkit.createInventory(null, 54, REPORTS_TITLE);
         List<Map<?, ?>> rows = new ArrayList<>(reports());
-        rows.sort(Comparator.comparingLong(row -> ((Number) value(row, "timestamp", 0L)).longValue()).reversed());
+        rows.sort(Comparator.comparingLong((Map<?, ?> row) -> ((Number) value(row, "timestamp", 0L)).longValue()).reversed());
         int slot = 0;
         for (Map<?, ?> row : rows) {
             if (slot >= 45) break;
