@@ -69,10 +69,47 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private String globalAnnouncement = "";
     private final DecimalFormat money = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.CANADA_FRENCH));
 
+    /**
+     * Crée une copie de sécurité des fichiers YAML avant chaque chargement du plugin.
+     * Les sauvegardes restent indépendantes du JAR et les 10 plus récentes sont conservées.
+     */
+    private boolean backupPluginData() {
+        File[] yamlFiles = getDataFolder().listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".yml"));
+        if (yamlFiles == null || yamlFiles.length == 0) return true;
+        Path backupRoot = getDataFolder().toPath().resolve("backups");
+        Path backupDir = backupRoot.resolve("backup-" + System.currentTimeMillis());
+        try {
+            Files.createDirectories(backupDir);
+            for (File yaml : yamlFiles) {
+                Files.copy(yaml.toPath(), backupDir.resolve(yaml.getName()), StandardCopyOption.COPY_ATTRIBUTES);
+            }
+            try (var backups = Files.list(backupRoot)) {
+                for (Path oldBackup : backups.filter(Files::isDirectory)
+                        .sorted(Comparator.comparing(path -> path.getFileName().toString()).reversed())
+                        .skip(10).toList()) {
+                    try (var oldFiles = Files.list(oldBackup)) {
+                        for (Path oldFile : oldFiles.toList()) Files.deleteIfExists(oldFile);
+                    }
+                    Files.deleteIfExists(oldBackup);
+                }
+            }
+            getLogger().info("Sauvegarde de sécurité créée : " + backupDir.getFileName());
+            return true;
+        } catch (IOException ex) {
+            getLogger().severe("Impossible de créer la sauvegarde de sécurité : " + ex.getMessage());
+            return false;
+        }
+    }
+
     @Override
     public void onEnable() {
         if (!getDataFolder().exists() && !getDataFolder().mkdirs()) {
             getLogger().severe("Impossible de créer le dossier de données.");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        if (!backupPluginData()) {
+            getLogger().severe("Sauvegarde de sécurité impossible : démarrage annulé pour protéger les données.");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
