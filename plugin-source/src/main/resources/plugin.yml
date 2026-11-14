@@ -9,7 +9,7 @@ softdepend: [floodgate]
 commands:
   register:
     description: Crée un compte joueur
-    usage: /register <motdepasse> <confirmation>
+    usage: /register <motdepasse>
   login:
     description: Connecte un compte joueur
     usage: /login <motdepasse>
