@@ -11,6 +11,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -191,6 +192,16 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         auth.resetPassword(sender, targetName);
     }
 
+    void recordHistory(Player player, String event) {
+        if (player == null || event == null || event.isBlank()) return;
+        String path = "player-history." + key(player.getUniqueId());
+        List<String> records = data.getStringList(path);
+        records.add(System.currentTimeMillis() + "|" + event + "|" + player.getName());
+        if (records.size() > 100) records = new ArrayList<>(records.subList(records.size() - 100, records.size()));
+        data.set(path, records);
+        saveData();
+    }
+
     private String format(double amount) {
         return money.format(amount) + " LPC";
     }
@@ -286,9 +297,21 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         targetId = target.getUniqueId();
                         targetName = args[0];
                     }
+                    List<String> playerEvents = data.getStringList("player-history." + targetId);
+                    reply(sender, "Historique de " + targetName + " (connexions et sanctions) :");
+                    int eventCount = 0;
+                    for (int i = playerEvents.size() - 1; i >= 0 && eventCount < 10; i--) {
+                        String[] event = playerEvents.get(i).split("\\|", 3);
+                        if (event.length < 3) continue;
+                        long stamp;
+                        try { stamp = Long.parseLong(event[0]); } catch (NumberFormatException ex) { continue; }
+                        String date = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date(stamp));
+                        reply(sender, date + " " + event[1] + " (" + event[2] + ")");
+                        eventCount++;
+                    }
                     List<String> records = data.getStringList("transactions");
                     int shown = 0;
-                    reply(sender, "Historique LPC de " + targetName + " (10 dernières opérations) :");
+                    reply(sender, "Transactions LPC (10 dernières) :");
                     for (int i = records.size() - 1; i >= 0 && shown < 10; i--) {
                         String[] parts = records.get(i).split("\\|");
                         if (parts.length != 5) continue;
@@ -301,6 +324,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         shown++;
                     }
                     if (shown == 0) reply(sender, "Aucune transaction enregistrée.");
+                    if (eventCount == 0) reply(sender, "Aucun événement de connexion ou de sanction enregistré.");
                     return true;
                 }
                 case "baltop" -> {
@@ -520,6 +544,10 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     @EventHandler public void onPlayerJoin(PlayerJoinEvent e) {
         Bukkit.getScheduler().runTask(this,()->updatePlayerTags());
         e.getPlayer().sendMessage(ChatColor.GOLD+"Bienvenue sur Larpers Coin SMP!");
+        recordHistory(e.getPlayer(), "CONNEXION");
+    }
+    @EventHandler public void onPlayerQuit(PlayerQuitEvent e) {
+        recordHistory(e.getPlayer(), "DÉCONNEXION");
     }
     @EventHandler public void onPlayerChat(AsyncPlayerChatEvent e) {
         e.setFormat(rankPrefix(e.getPlayer())+ChatColor.WHITE+"%1$s"+ChatColor.DARK_GRAY+" » "+ChatColor.RESET+"%2$s");
