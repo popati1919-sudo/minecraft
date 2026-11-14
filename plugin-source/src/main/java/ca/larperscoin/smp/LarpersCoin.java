@@ -719,8 +719,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             p.setPlayerListName(rankPrefix(p)+ChatColor.WHITE+p.getName());
             String header = globalAnnouncement.isBlank() ? ChatColor.GOLD+"Larpers Coin SMP"
                     : ChatColor.GOLD+"✦ "+globalAnnouncement+" ✦";
-            if(lotteryActive()) header += "
-"+ChatColor.LIGHT_PURPLE+"✦ LOTERIE LPC EN COURS ✦";
+            if(lotteryActive()) header += "\n"+ChatColor.LIGHT_PURPLE+"✦ LOTERIE LPC EN COURS ✦";
             p.setPlayerListHeaderFooter(header, lotteryActive()
                     ? ChatColor.YELLOW+"/lottery • Jackpot: "+format(lotteryPot())
                     : ChatColor.GRAY+"Bonne chance et bon jeu!");
