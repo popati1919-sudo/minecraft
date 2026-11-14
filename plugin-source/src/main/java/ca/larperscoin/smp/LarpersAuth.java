@@ -86,6 +86,14 @@ final class LarpersAuth implements Listener {
                 player.sendMessage(ChatColor.GREEN + "Connexion Bedrock vérifiée par Floodgate.");
                 return;
             }
+            // Les comptes Java Crack sont volontairement en mode sans réservation de pseudo :
+            // un joueur crack peut rejoindre même si ce nom existe déjà dans auth.yml.
+            // Seuls les comptes Java Premium vérifiés par Velocity passent par le mot de passe LPC.
+            if (!isPremium(player)) {
+                markAuthenticated(player);
+                player.sendMessage(ChatColor.GREEN + "Connexion Java Crack autorisée. Aucun mot de passe requis.");
+                return;
+            }
             String path = accountPath(player.getName());
             if (plugin.getConfig().getBoolean("auth.remember-ip", false)
                     && accounts.contains(path + ".ip-hash")
