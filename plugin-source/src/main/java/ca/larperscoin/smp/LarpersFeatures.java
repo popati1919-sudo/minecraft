@@ -567,6 +567,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     double price=250.0*Math.pow(2,level-1);
                     if(!charge(p,price)){msg(p,"Amélioration: "+price+" LPC. Fonds insuffisants.");return true;}
                     db.set(cp+".chest-level",level+1);
+                    Inventory cached=clanChests.get(own);
+                    if(cached!=null){int oldSlots=level==1?1:(level-1)*9;int newSlots=level*9;for(int slot=oldSlots;slot<newSlots;slot++)cached.clear(slot);}
                     save();
                     msg(p,"Coffre amélioré: "+(level==1?1:((level-1)*9))+" → "+(level*9)+" emplacements. Coût: "+price+" LPC.");
                     return true;
@@ -581,7 +583,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     if(contents!=null)for(int i=0;i<Math.min(54,contents.size());i++)inv.setItem(i,contents.get(i));
                     clanChests.put(own,inv);
                 }
-                int unlocked=Math.max(1,Math.min(54,db.getInt(clanPath(own)+".chest-level",1)==1?1:db.getInt(clanPath(own)+".chest-level",1)*9));
+                int chestLevel=Math.max(1,db.getInt(clanPath(own)+".chest-level",1));
+                int unlocked=Math.max(1,Math.min(54,chestLevel==1?1:(chestLevel-1)*9));
                 for(int slot=unlocked;slot<54;slot++) inv.setItem(slot,item(Material.GRAY_STAINED_GLASS_PANE,"Emplacement verrouillé","/clan chest upgrade"));
                 clanChestUsers.put(own,p.getUniqueId());
                 clanChestSnapshots.put(own,Arrays.stream(inv.getContents()).map(x->x==null?null:x.clone()).toArray(ItemStack[]::new));
@@ -873,7 +876,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(title.startsWith("Coffre clan:") && e.getRawSlot()>=0 && e.getRawSlot()<e.getView().getTopInventory().getSize()) {
             String clan=title.substring("Coffre clan:".length());
             int level=Math.max(1,db.getInt(clanPath(clan)+".chest-level",1));
-            int unlocked=Math.max(1,Math.min(54,level==1?1:level*9));
+            int unlocked=Math.max(1,Math.min(54,level==1?1:(level-1)*9));
             if(e.getRawSlot()>=unlocked){e.setCancelled(true);if(e.getWhoClicked() instanceof Player p)msg(p,"Emplacement verrouillé. Utilise /clan chest upgrade.");}
             return;
         }
@@ -1065,6 +1068,14 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 if(command!=null){viewer.closeInventory();viewer.performCommand(command);}
             }
         }
+    }
+    @EventHandler public void onClanChestDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
+        String title=e.getView().getTitle();
+        if(!title.startsWith("Coffre clan:"))return;
+        String clan=title.substring("Coffre clan:".length());
+        int level=Math.max(1,db.getInt(clanPath(clan)+".chest-level",1));
+        int unlocked=Math.max(1,Math.min(54,level==1?1:(level-1)*9));
+        for(int raw:e.getRawSlots()) if(raw<e.getView().getTopInventory().getSize()&&raw>=unlocked){e.setCancelled(true);return;}
     }
     @EventHandler public void onChestClose(org.bukkit.event.inventory.InventoryCloseEvent e) {
         String title=e.getView().getTitle();
