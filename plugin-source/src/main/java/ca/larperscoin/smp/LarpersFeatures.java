@@ -95,7 +95,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         seedQuizQuestion("faces","Combien de faces possède un bloc standard?","6",List.of("4","6","8"));
         seedQuizQuestion("creeper","Quel mob explose près du joueur?","creeper",List.of("creeper","zombie","squelette"));
         save();
-        for (String cmd : List.of("clan","quest","quests","quiz","shop","admin","vanish","invsee","freeze","staffchat","ah","trade")) {
+        for (String cmd : List.of("clan","quest","quests","quiz","shop","admin","announce","vanish","invsee","freeze","staffchat","ah","trade")) {
             PluginCommand c = plugin.getCommand(cmd);
             if (c != null) { c.setExecutor(this); c.setTabCompleter(this); }
         }
@@ -343,6 +343,12 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 case "quest", "quests" -> { return quests(sender,a); }
                 case "quiz" -> { return quiz(sender,a); }
                 case "shop" -> { return shop(sender,a); }
+                case "announce" -> {
+                    if (!(sender.isOp() || sender.hasPermission("larpers.admin"))) { msg(sender,"Permission insuffisante."); return true; }
+                    if (a.length == 0) { msg(sender,"Usage : /announce <message>"); return true; }
+                    core.broadcastAnnouncement(sender,String.join(" ",a));
+                    return true;
+                }
                 case "admin" -> {
                     if (a.length > 0 && a[0].equalsIgnoreCase("reset")) {
                         if (!(sender.isOp() || sender.hasPermission("larpers.admin"))) { msg(sender,"Seuls les administrateurs peuvent réinitialiser un mot de passe."); return true; }
