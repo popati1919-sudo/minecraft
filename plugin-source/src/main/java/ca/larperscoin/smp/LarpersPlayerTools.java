@@ -261,7 +261,7 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
         try {
             int id = Integer.parseInt(display.substring(1).split(" ")[0]);
             for (Map<?, ?> row : reports()) {
-                if (((Number) row.getOrDefault("id", 0)).intValue() == id) { showReport(viewer, row); return; }
+                if (((Number) value(row, "id", 0)).intValue() == id) { showReport(viewer, row); return; }
             }
         } catch (NumberFormatException ignored) { }
     }
@@ -352,7 +352,7 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         String name = command.getName().toLowerCase(Locale.ROOT);
         if (name.equals("reports") && args.length == 1 && staff(sender)) return List.of("resolve");
-        if (name.equals("reports") && args.length == 2 && args[0].equalsIgnoreCase("resolve")) return reports().stream().map(row -> "#" + row.get("id")).toList();
+        if (name.equals("reports") && args.length == 2 && args[0].equalsIgnoreCase("resolve")) return reports().stream().map(row -> String.valueOf(row.get("id"))).toList();
         if (name.equals("staffspec") && args.length == 1 && staff(sender)) {
             List<String> names = new ArrayList<>();
             names.add("off");
