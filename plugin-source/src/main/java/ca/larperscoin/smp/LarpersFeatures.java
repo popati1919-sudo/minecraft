@@ -180,6 +180,27 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         inv.setItem(22,item(Material.BARRIER,"Fermer"));
         p.openInventory(inv);
     }
+    private void openClanLeaderboard(Player p) {
+        var section=db.getConfigurationSection("clans");
+        List<String> names=new ArrayList<>();
+        if(section!=null) names.addAll(section.getKeys(false));
+        names.sort(Comparator.comparingDouble((String n)->db.getDouble(clanPath(n)+".bank")).reversed());
+        Inventory inv=Bukkit.createInventory(null,54,"LPC | Classement des clans");
+        int slot=0,rank=1;
+        for(String name:names) {
+            if(slot>=45)break;
+            String path=clanPath(name);
+            List<String> members=db.getStringList(path+".members");
+            inv.setItem(slot++,item(Material.EMERALD_BLOCK,"#"+rank+" "+db.getString(path+".name",name),
+                "Banque: "+db.getDouble(path+".bank")+" LPC",
+                "Niveau: "+db.getInt(path+".level",1),
+                "Membres: "+members.size()));
+            rank++;
+        }
+        if(names.isEmpty())inv.setItem(22,item(Material.PAPER,"Aucun clan","Crée le premier clan avec /clan create"));
+        inv.setItem(49,item(Material.BARRIER,"Fermer"));
+        p.openInventory(inv);
+    }
     private void openQuestMenu(Player p) {
         Inventory inv=Bukkit.createInventory(null,27,"LPC | Quêtes");
         inv.setItem(11,item(Material.CLOCK,"Quête quotidienne",
@@ -536,9 +557,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 msg(p,"Choisis request, accept ou remove.");return true;
             }
             case "top","leaderboard" -> {
-                var sec=db.getConfigurationSection("clans");if(sec==null){msg(p,"Aucun clan.");return true;}
-                List<String> names=new ArrayList<>(sec.getKeys(false));names.sort(Comparator.comparingDouble((String n)->db.getDouble(clanPath(n)+".bank")).reversed());
-                msg(p,"Classement des clans (banque):");int i=1;for(String n:names){if(i>10)break;msg(p,i+". "+db.getString(clanPath(n)+".name")+" — "+db.getDouble(clanPath(n)+".bank")+" LPC");i++;}return true;
+                openClanLeaderboard(p);
+                return true;
             }
             default -> {msg(p,"Sous-commande inconnue. /clan pour l'aide.");return true;}
         }
@@ -777,6 +797,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onInvClick(InventoryClickEvent e) {
         String title=e.getView().getTitle();
+        if(title.equals("LPC | Classement des clans")) {
+            e.setCancelled(true);
+            if(e.getRawSlot()==49 && e.getWhoClicked() instanceof Player p) p.closeInventory();
+            return;
+        }
         if(title.equals("LPC | Loterie")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player p)||e.getRawSlot()<0||e.getRawSlot()>=e.getView().getTopInventory().getSize())return;
