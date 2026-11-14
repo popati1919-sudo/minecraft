@@ -56,6 +56,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<UUID, Map<Integer, String>> ahSlots = new HashMap<>();
     private final Map<UUID, String> ahSearch = new HashMap<>();
     private final Set<UUID> awaitingAhSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<UUID> awaitingLotteryAmount = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<UUID, UUID> pendingBountyTarget = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<UUID, UUID> pendingOpTarget = new HashMap<>();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
@@ -166,11 +167,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         boolean active=core.lotteryActive();
         inv.setItem(10,item(Material.PAPER,"Acheter 1 ticket","Prix: 25 LPC","Clique pour acheter"));
         inv.setItem(12,item(Material.GOLD_INGOT,"Acheter 5 tickets","Prix: 125 LPC","Clique pour acheter"));
-        inv.setItem(14,item(Material.EMERALD,"Jackpot: "+core.lotteryPot()+" LPC",
-            "Tickets vendus: "+core.lotteryTicketCount(),
-            active?"Loterie en cours":"Aucune loterie en cours"));
-        inv.setItem(16,item(Material.CLOCK,active?"Loterie en cours":"En attente d'un admin",
-            active?"Fin: "+new java.text.SimpleDateFormat("HH:mm:ss").format(new java.util.Date(core.lotteryEndsAt())):"Un administrateur doit la démarrer"));
+        inv.setItem(14,item(Material.EMERALD,"Acheter 64 tickets","Prix: 1 600 LPC","Jackpot: "+core.lotteryPot()+" LPC","Tickets vendus: "+core.lotteryTicketCount()));
+        inv.setItem(16,item(Material.NAME_TAG,"Quantité personnalisée","Clique puis écris le nombre de tickets dans le chat","Maximum par achat: 1 milliard"));
         if(core.isLpcAdmin(p)) {
             inv.setItem(22,item(Material.COMMAND_BLOCK,active?"Tirage / terminer":"Démarrer la loterie",
                 active?"Clique pour terminer maintenant":"Démarre une loterie de 10 minutes",
@@ -775,6 +773,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             switch(e.getRawSlot()) {
                 case 10 -> {p.closeInventory();p.performCommand("lottery buy 1");Bukkit.getScheduler().runTaskLater(plugin,()->openLotteryMenu(p),2L);}
                 case 12 -> {p.closeInventory();p.performCommand("lottery buy 5");Bukkit.getScheduler().runTaskLater(plugin,()->openLotteryMenu(p),2L);}
+                case 14 -> {p.closeInventory();p.performCommand("lottery buy 64");Bukkit.getScheduler().runTaskLater(plugin,()->openLotteryMenu(p),2L);}
+                case 16 -> {p.closeInventory();awaitingLotteryAmount.add(p.getUniqueId());msg(p,"Écris le nombre de tickets à acheter (1 à 1 000 000 000), ou 'annuler'.");}
                 case 22 -> {
                     if(!core.isLpcAdmin(p)){msg(p,"Seuls les administrateurs peuvent démarrer ou terminer une loterie.");return;}
                     p.closeInventory();
@@ -959,11 +959,25 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) {
         UUID id=e.getPlayer().getUniqueId();
-        frozen.remove(id);awaitingAhSearch.remove(id);pendingBountyTarget.remove(id);
+        frozen.remove(id);awaitingAhSearch.remove(id);awaitingLotteryAmount.remove(id);pendingBountyTarget.remove(id);
     }
     @EventHandler public void onChatSearch(org.bukkit.event.player.AsyncPlayerChatEvent e) {
         Player sender=e.getPlayer();
         UUID senderId=sender.getUniqueId();
+        if(awaitingLotteryAmount.remove(senderId)) {
+            e.setCancelled(true);
+            String amount=e.getMessage().trim();
+            Bukkit.getScheduler().runTask(plugin,()->{
+                if(amount.equalsIgnoreCase("annuler")){msg(sender,"Achat de tickets annulé.");return;}
+                try {
+                    long count=Long.parseLong(amount);
+                    if(count<1L||count>1_000_000_000L){msg(sender,"Entre un nombre entre 1 et 1 000 000 000.");return;}
+                    sender.performCommand("lottery buy "+count);
+                    openLotteryMenu(sender);
+                } catch(NumberFormatException ex) { msg(sender,"Nombre invalide. Écris uniquement un nombre entier."); }
+            });
+            return;
+        }
         if(awaitingAhSearch.remove(senderId)) {
             e.setCancelled(true);
             String query=e.getMessage().trim();
