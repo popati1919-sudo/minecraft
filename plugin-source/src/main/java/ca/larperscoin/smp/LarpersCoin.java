@@ -85,7 +85,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             }
             try (var backups = Files.list(backupRoot)) {
                 for (Path oldBackup : backups.filter(Files::isDirectory)
-                        .sorted(Comparator.comparing(path -> path.getFileName().toString()).reversed())
+                        .sorted(Comparator.comparing((Path path) -> path.getFileName().toString()).reversed())
                         .skip(10).toList()) {
                     try (var oldFiles = Files.list(oldBackup)) {
                         for (Path oldFile : oldFiles.toList()) Files.deleteIfExists(oldFile);
