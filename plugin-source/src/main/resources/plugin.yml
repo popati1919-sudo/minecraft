@@ -81,6 +81,29 @@ commands:
   trade:
     description: Échange sécurisé avec double confirmation
     usage: /trade <joueur>|accept|item|money <montant>|confirm|cancel
+  ban:
+    description: Bannir un joueur avec durée et raison obligatoires
+    usage: /ban <joueur> <durée|permanent> <raison>
+    permission: larpers.moderation
+  unban:
+    description: Débannir un joueur
+    usage: /unban <joueur>
+    permission: larpers.moderation
+  banip:
+    description: Bannir l'adresse IP d'un joueur connecté
+    usage: /banip <joueur> <durée|permanent> <raison>
+    permission: larpers.moderation
+  sanctions:
+    description: Consulter l'historique des sanctions
+    usage: /sanctions <joueur>
+    permission: larpers.moderation
+  mod:
+    description: Ouvrir le menu de modération
+    usage: /mod
+    permission: larpers.moderation
+  help:
+    description: Aide LPC filtrée selon les permissions
+    usage: /help
 permissions:
   larpers.staff:
     description: Accès aux outils du staff LPC
@@ -96,6 +119,12 @@ permissions:
     default: op
   larpers.anticheat.mod:
     description: Accès modérateur aux commandes de consultation anti-triche
+    default: false
+  larpers.moderation:
+    description: Accès aux commandes de modération et à l'historique des sanctions
+    default: op
+  larpers.chat.bypass:
+    description: Ignorer le délai anti-spam du chat
     default: false
   larpers.admin:
     description: Administration complète LPC
