@@ -206,6 +206,8 @@ jobs:
           EOF
           cat > "$ROOT/SMP/plugins/LarpersCoin/config.yml" <<'EOF'
           auth:
+            # Le SMP lit le même fichier que le Lobby pour /admin reset.
+            storage-file: ../Lobby/plugins/LarpersCoin/auth.yml
             proxy-authenticated: true
             remember-ip: false
           anticheat:
