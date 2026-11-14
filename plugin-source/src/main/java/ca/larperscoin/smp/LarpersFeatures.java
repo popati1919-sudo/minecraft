@@ -618,8 +618,40 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 openClanLeaderboard(p);
                 return true;
             }
+            case "quests" -> { clanWeeklyQuests(p, a); return true; }
             default -> {msg(p,"Sous-commande inconnue. /clan pour l'aide.");return true;}
         }
+    }
+
+    private void clanWeeklyQuests(Player p,String[] args) {
+        String clan=clanOf(p.getUniqueId());
+        if(clan==null){msg(p,"Tu dois être dans un clan.");return;}
+        String base="clan-weekly."+weeklyQuestKey()+"."+clan;
+        int logs=db.getInt(base+".logs",0), skeletons=db.getInt(base+".skeletons",0);
+        if(args.length>1&&args[1].equalsIgnoreCase("claim")) {
+            String claim=base+".claimed";
+            if(db.getBoolean(claim,false)){msg(p,"La récompense hebdomadaire du clan a déjà été réclamée.");return;}
+            if(!clanLeaderOrOfficer(p,clan)){msg(p,"Seul le chef ou un officier peut réclamer la récompense.");return;}
+            if(logs<500&&skeletons<50){msg(p,"Le clan doit terminer au moins un objectif: 500 bûches ou 50 squelettes.");return;}
+            db.set(claim,true);
+            String bank=clanPath(clan)+".bank";
+            db.set(bank,db.getDouble(bank,0.0)+750.0);
+            save();
+            msg(p,"Quête hebdomadaire terminée! +750 LPC dans la banque du clan.");
+            return;
+        }
+        msg(p,"Quêtes hebdomadaires du clan — "+weeklyQuestKey());
+        msg(p,"Récolter des bûches: "+Math.min(logs,500)+"/500");
+        msg(p,"Vaincre des squelettes: "+Math.min(skeletons,50)+"/50");
+        msg(p,"Récompense: 750 LPC dans la banque du clan (un seul objectif suffit).");
+        msg(p,"Réclamer: /clan quests claim");
+    }
+    private void progressClanWeekly(Player p,String objective) {
+        String clan=clanOf(p.getUniqueId());
+        if(clan==null)return;
+        String path="clan-weekly."+weeklyQuestKey()+"."+clan+"."+objective;
+        db.set(path,db.getInt(path,0)+1);
+        saveSoon();
     }
 
     private String dailyQuestKey() { return LocalDate.now().toString(); }
@@ -701,6 +733,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         var b=e.getBlock();
         String loc=b.getWorld().getUID()+":"+b.getX()+":"+b.getY()+":"+b.getZ();
         if(playerPlacedBlocks.remove(loc)) return;
+        String material=b.getType().name();
+        if(material.endsWith("_LOG") || material.endsWith("_WOOD") || material.equals("CRIMSON_STEM") || material.equals("WARPED_STEM")) progressClanWeekly(p,"logs");
         if(b.getBlockData() instanceof Ageable age && age.getAge()>=age.getMaximumAge()) {
             progressQuest(p,"crops");
         } else if(!b.getType().isAir() && b.getType()!=Material.BEDROCK) {
@@ -709,7 +743,10 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuestMobKill(EntityDeathEvent e) {
         Player killer=e.getEntity().getKiller();
-        if(killer!=null) progressQuest(killer,"kills");
+        if(killer!=null) {
+            progressQuest(killer,"kills");
+            if(e.getEntity().getType()==org.bukkit.entity.EntityType.SKELETON) progressClanWeekly(killer,"skeletons");
+        }
     }
     @EventHandler public void onQuestFish(PlayerFishEvent e) {
         if(e.getState()==PlayerFishEvent.State.CAUGHT_FISH) progressQuest(e.getPlayer(),"fish");
@@ -1160,7 +1197,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @Override public List<String> onTabComplete(CommandSender s,Command c,String alias,String[] a) {
         String name=c.getName().toLowerCase(Locale.ROOT);
-        if(name.equals("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","audit","stats","leaderboard");
+        if(name.equals("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","audit","stats","leaderboard","quests");
         if(name.equals("clan")&&a.length==2&&a[0].equalsIgnoreCase("chest"))return List.of("upgrade");
         if(name.equals("ah")&&a.length==1)return List.of("list","search","sell","buy");
         if(name.equals("ah")&&a.length==2&&a[0].equalsIgnoreCase("search"))return List.of("clear");
