@@ -36,6 +36,7 @@ import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Map;
+import java.nio.file.Path;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -46,7 +47,7 @@ final class LarpersAuth implements Listener {
     private static final long LOCK_MILLIS = 15 * 60_000L;
     private final JavaPlugin plugin;
     private final File file;
-    private final YamlConfiguration accounts;
+    private YamlConfiguration accounts;
     private final SecureRandom random = new SecureRandom();
     private final Map<UUID, Boolean> authenticated = new ConcurrentHashMap<>();
     private final Map<UUID, Location> joinLocations = new ConcurrentHashMap<>();
@@ -55,8 +56,17 @@ final class LarpersAuth implements Listener {
 
     LarpersAuth(JavaPlugin plugin) {
         this.plugin = plugin;
-        this.file = new File(plugin.getDataFolder(), "auth.yml");
-        this.accounts = YamlConfiguration.loadConfiguration(file);
+        String storage = plugin.getConfig().getString("auth.storage-file", "auth.yml");
+        Path storagePath = Path.of(storage);
+        if (!storagePath.isAbsolute()) {
+            storagePath = storage.equals("auth.yml")
+                    ? plugin.getDataFolder().toPath().resolve(storage)
+                    : plugin.getServer().getWorldContainer().toPath().resolve(storage).normalize();
+        }
+        this.file = storagePath.toFile();
+        File parent = this.file.getParentFile();
+        if (parent != null && !parent.exists()) parent.mkdirs();
+        reloadAccounts();
         plugin.getConfig().addDefault("auth.proxy-authenticated", true);
         plugin.getConfig().addDefault("auth.remember-ip", false);
         plugin.getConfig().addDefault("auth.connect-to-smp", false);
@@ -66,7 +76,29 @@ final class LarpersAuth implements Listener {
         Bukkit.getPluginManager().registerEvents(this, plugin);
     }
 
+    private void reloadAccounts() {
+        accounts = YamlConfiguration.loadConfiguration(file);
+    }
+
+    boolean resetAccount(String playerName) {
+        reloadAccounts();
+        String path = accountPath(playerName);
+        if (!accounts.contains(path + ".hash")) return false;
+        accounts.set(path, null);
+        save();
+        Player online = Bukkit.getPlayerExact(playerName);
+        if (online != null) {
+            UUID id = online.getUniqueId();
+            authenticated.remove(id);
+            attempts.remove(id);
+            lockedUntil.remove(id);
+            online.kickPlayer(ChatColor.RED + "Ton mot de passe a été réinitialisé par l'administration. Rejoins le serveur et crée un nouveau mot de passe avec /register <motdepasse>.");
+        }
+        return true;
+    }
+
     void handleJoin(Player player) {
+        reloadAccounts();
         authenticated.remove(player.getUniqueId());
         joinLocations.put(player.getUniqueId(), player.getLocation().clone());
         player.sendMessage(ChatColor.GOLD + "Bienvenue sur Larpers Coin SMP.");
@@ -104,6 +136,7 @@ final class LarpersAuth implements Listener {
     }
 
     boolean command(Player player, String label, String[] args) {
+        reloadAccounts();
         if (label.equalsIgnoreCase("register")) {
             if (args.length != 1) {
                 player.sendMessage(ChatColor.YELLOW + "Usage : /register <motdepasse>");
