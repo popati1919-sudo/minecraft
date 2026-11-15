@@ -12,8 +12,7 @@ Dernière mise à jour: 2026-11-13 — version 1.0.4.
 - [x] Échanges joueurs: invitations, offres d'objets et de LPC, double confirmation, invalidation des confirmations après modification, contrôle du solde et de l'espace d'inventaire avant transfert. Les objets restent dans l'inventaire avant validation.
 - [x] Quêtes quotidiennes et hebdomadaires: suivi automatique des blocs cassés, cultures mûres récoltées, créatures vaincues et poissons pêchés; récompense unique par période.
 - [x] Clans: création, invitation, adhésion, départ, banque, coffre, XP et niveaux par activité, rôles leader/officer/member, alliances bilatérales sur demande et acceptation, statistiques et classements.
-- [x] Quiz Minecraft à choix multiples avec GUI et récompense.
-- [x] Menus GUI pour clans, quêtes, boutique, quiz et loterie; outils staff avec raccourcis invsee, vanish, freeze et staffchat.
+- [x] Menus GUI pour clans, quêtes, loterie, classements, primes et hôtel des ventes; bordures sobres et recherches par chat compatibles Bedrock.
 - [x] Rangs [ADMIN], [MOD], [VIP], [JOUEUR] visibles dans le chat et la liste des joueurs.
 - [x] Anti-triche v1.1: détections vitesse/vol/portée, exemptions de mouvement, alertes staff, journal, classement et compteurs persistants. Le code applique les sanctions progressives configurées (kick, ban 1 jour, 7 jours, 30 jours); les seuils doivent être calibrés avant ouverture publique.
 - [x] Workflow GitHub Actions et script de compilation Windows.
@@ -23,7 +22,6 @@ Dernière mise à jour: 2026-11-13 — version 1.0.4.
 - [x] Boutique: GUI par catégories, navigation paginée, quantités par clic, prix configurables et contrôle de capacité d'inventaire. Stock illimité (pas de gestion de stock).
 - [x] Clans: transfert du chef, dissolution avec confirmation, invitations UUID pouvant être acceptées hors ligne, rôles leader/officer/member et retraits de banque limités au chef/officier.
 - [x] Coffre de clan: contenu persistant, verrou contre les ouvertures concurrentes, accès membres et journal des changements consultable par chef/officiers.
-- [x] Quiz: banque de questions modifiable dans features.yml et classement des scores.
 - [x] Menu admin: deux pages paginées avec sélecteurs de joueurs, vanish, freeze, raccourcis économie et loterie.
 - [x] Écriture atomique de data.yml et features.yml: fichier temporaire, flush disque et remplacement atomique avec repli si le système de fichiers ne le permet pas.
 - [ ] Journal transactionnel commun aux deux fichiers: les écritures individuelles sont protégées, mais une coupure entre deux fichiers distincts peut encore interrompre une opération inter-systèmes.
@@ -36,7 +34,7 @@ Dernière mise à jour: 2026-11-13 — version 1.0.4.
 - Aucun claim / protection de terrain.
 - Aucun rang VIP.
 - Ne pas remplacer les commandes vanilla ni les sélecteurs vanilla.
-- Le workflow réseau génère Velocity + Lobby + SMP, avec l'authentification Java gérée par LarpersCoin (/register et /login) et Geyser/Floodgate pour Bedrock. Les connexions réelles et les transferts restent à valider sur une machine de test.
+- Le workflow réseau génère Velocity + Lobby + SMP, avec l'authentification Java gérée par LarpersCoin (/register <motdepasse> et /login <motdepasse>) et Geyser/Floodgate pour Bedrock. Les connexions réelles et les transferts restent à valider sur une machine de test.
 
 ## Commandes récemment ajoutées
 - /history [joueur] — historique économique (consultation d'un autre joueur réservée au staff).
@@ -51,3 +49,13 @@ Dernière mise à jour: 2026-11-13 — version 1.0.4.
 - /quiz top.
 - /ac status, /ac alerts, /ac info <joueur>, /ac top, /ac log, /ac reset <joueur>, /ac reload — diagnostic anti-triche réservé au staff.
 - /clan allies request|accept|remove <clan>.
+
+## Mise à jour 1.0.5 — Authentification, économie et menus Bedrock
+- Inscription simplifiée: une seule saisie avec /register <motdepasse>.
+- Récompense quotidienne ajustée à 60 + 10 LPC par jour de série (maximum 130 LPC).
+- Quêtes quotidiennes: 100 LPC; hebdomadaires: 400 LPC, avec objectifs hebdomadaires réduits.
+- Ticket de loterie: 50 LPC.
+- Menus LPC avec bordure grise discrète, recherche de joueurs par chat et menu /top.
+- Coffre de clan limité à 1 emplacement au départ, puis améliorations payantes jusqu'à 54 emplacements.
+- Commandes Quiz et Boutique retirées.
+- Compilation et essais en jeu Bedrock à confirmer après les workflows.
