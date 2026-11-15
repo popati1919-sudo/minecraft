@@ -47,8 +47,8 @@ commands:
     aliases: [quests]
     usage: /quests [claim|weekly [claim]]
   admin:
-    description: Menu graphique du staff
-    permission: larpers.staff
+    description: Menu graphique d'administration
+    permission: larpers.admin
   vanish:
     description: Invisibilité du staff
     permission: larpers.staff
