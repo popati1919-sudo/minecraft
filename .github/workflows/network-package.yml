@@ -6,6 +6,11 @@ on:
     paths:
       - ".github/workflows/network-package.yml"
       - "plugin-source/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/network-package.yml"
+      - "plugin-source/**"
   workflow_dispatch:
 
 permissions:
@@ -225,29 +230,170 @@ jobs:
                 ban-30d: 48
           EOF
 
+          cat > "$ROOT/SUPERVISEUR-RESEAU.ps1" <<'PSEOF'
+          $ErrorActionPreference = 'Stop'
+          $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
+          $Java = (Get-Command java.exe -ErrorAction Stop).Source
+          $Servers = @(
+            [pscustomobject]@{Name='Lobby';Folder='Lobby';Jar='paper.jar';Port=25566;Memory='-Xms512M -Xmx1G'},
+            [pscustomobject]@{Name='SMP';Folder='SMP';Jar='paper.jar';Port=25567;Memory='-Xms1G -Xmx4G'},
+            [pscustomobject]@{Name='Velocity';Folder='Velocity';Jar='velocity.jar';Port=25565;Memory='-Xms512M -Xmx1G'}
+          )
+          $Processes = @{}
+          $Subscriptions = @{}
+          function Test-Port([int]$Port) {
+            $c = [System.Net.Sockets.TcpClient]::new()
+            try {
+              $a = $c.BeginConnect('127.0.0.1',$Port,$null,$null)
+              if (-not $a.AsyncWaitHandle.WaitOne(250)) { return $false }
+              $c.EndConnect($a)
+              return $true
+            } catch { return $false } finally { $c.Dispose() }
+          }
+          function Start-One($Server) {
+            $folder = Join-Path $Root $Server.Folder
+            $jar = Join-Path $folder $Server.Jar
+            $log = Join-Path $folder 'superviseur-console.log'
+            if (-not (Test-Path $jar)) { throw "$($Server.Name): fichier absent: $jar" }
+            if (Test-Port $Server.Port) { throw "$($Server.Name): port $($Server.Port) deja utilise." }
+            $psi = [System.Diagnostics.ProcessStartInfo]::new()
+            $psi.FileName = $Java
+            $psi.WorkingDirectory = $folder
+            $psi.Arguments = $Server.Memory + ' -jar "' + $Server.Jar + '"' 
+            if ($Server.Name -ne 'Velocity') { $psi.Arguments += ' --nogui' }
+            $psi.UseShellExecute = $false
+            $psi.CreateNoWindow = $true
+            $psi.RedirectStandardInput = $true
+            $psi.RedirectStandardOutput = $true
+            $psi.RedirectStandardError = $true
+            $p = [System.Diagnostics.Process]::new()
+            $p.StartInfo = $psi
+            if (-not $p.Start()) { throw "Echec de lancement: $($Server.Name)" }
+            $Processes[$Server.Name] = $p
+            Add-Content -LiteralPath $log -Value "===== Lancement $(Get-Date -Format s) ====="
+            $action = {
+              $line = $Event.SourceEventArgs.Data
+              if ($null -ne $line) {
+                Add-Content -LiteralPath $Event.MessageData.Log -Value $line
+                Write-Host "[$($Event.MessageData.Name)] $line"
+              }
+            }
+            $Subscriptions[$Server.Name + 'out'] = Register-ObjectEvent $p OutputDataReceived -Action $action -MessageData @{Log=$log;Name=$Server.Name}
+            $Subscriptions[$Server.Name + 'err'] = Register-ObjectEvent $p ErrorDataReceived -Action $action -MessageData @{Log=$log;Name=$Server.Name}
+            $p.BeginOutputReadLine()
+            $p.BeginErrorReadLine()
+            Write-Host "Demarrage $($Server.Name), PID $($p.Id). Attente du port $($Server.Port)..."
+            $limit = (Get-Date).AddSeconds(180)
+            while ((Get-Date) -lt $limit) {
+              Wait-Event -Timeout 0.2 | Out-Null
+              if ($p.HasExited) {
+                Get-Content $log -Tail 30 -ErrorAction SilentlyContinue
+                throw "$($Server.Name) s'est arrete avant son ouverture de port. Voir $log"
+              }
+              if (Test-Port $Server.Port) {
+                Write-Host "$($Server.Name) pret sur 127.0.0.1:$($Server.Port)." -ForegroundColor Green
+                return
+              }
+            }
+            throw "Delai depasse pour $($Server.Name). Voir $log"
+          }
+          function Stop-All {
+            foreach ($name in @('Velocity','SMP','Lobby')) {
+              if ($Processes.ContainsKey($name)) {
+                $p = $Processes[$name]
+                if (-not $p.HasExited) {
+                  Write-Host "Arret propre de $name..."
+                  try { $p.StandardInput.WriteLine('stop'); $p.StandardInput.Flush() } catch {}
+                  if (-not $p.WaitForExit(30000)) {
+                    Write-Warning "$name ne repond pas; fermeture forcee."
+                    try { $p.Kill(); $p.WaitForExit() } catch {}
+                  }
+                }
+              }
+            }
+            foreach ($s in $Subscriptions.Values) {
+              try { Unregister-Event -SubscriptionId $s.Id -ErrorAction SilentlyContinue; Remove-Job -Id $s.Id -Force -ErrorAction SilentlyContinue } catch {}
+            }
+            $Processes.Clear()
+            $Subscriptions.Clear()
+          }
+          function Start-Network {
+            foreach ($s in $Servers) { Start-One $s }
+            Write-Host 'Reseau pret: Velocity TCP 25565; Lobby/SMP prives 25566/25567.' -ForegroundColor Green
+          }
+          function Show-Status {
+            foreach ($s in $Servers) {
+              $p = $Processes[$s.Name]
+              if ($null -eq $p) { Write-Host "$($s.Name): non lance" }
+              elseif ($p.HasExited) { Write-Host "$($s.Name): ARRETE, code $($p.ExitCode)" -ForegroundColor Red }
+              else { Write-Host "$($s.Name): actif, PID $($p.Id), port $($s.Port)" -ForegroundColor Green }
+            }
+          }
+          try {
+            Write-Host 'LARPERS COIN - SUPERVISEUR RESEAU'
+            Write-Host 'Demarrage sequentiel: Lobby -> SMP -> Velocity.'
+            Start-Network
+            Write-Host 'Commandes: /redemarrer, status, stop'
+            $buffer = ''
+            while ($true) {
+              Wait-Event -Timeout 0.2 | Out-Null
+              foreach ($s in $Servers) {
+                $p = $Processes[$s.Name]
+                if ($null -ne $p -and $p.HasExited) {
+                  Write-Warning "$($s.Name) s'est arrete (code $($p.ExitCode))."
+                  $Processes.Remove($s.Name)
+                }
+              }
+              while ([Console]::KeyAvailable) {
+                $k = [Console]::ReadKey($true)
+                if ($k.Key -eq 'Enter') {
+                  $cmd = $buffer.Trim().ToLowerInvariant()
+                  $buffer = ''
+                  if ($cmd -in @('/redemarrer','redemarrer','restart')) {
+                    Stop-All
+                    Start-Network
+                  } elseif ($cmd -in @('status','etat')) {
+                    Show-Status
+                  } elseif ($cmd -in @('stop','quitter','exit')) {
+                    Stop-All
+                    return
+                  } elseif ($cmd) {
+                    Write-Host 'Commande inconnue: /redemarrer, status ou stop.'
+                  }
+                  Write-Host -NoNewline '> '
+                } elseif ($k.Key -eq 'Backspace') {
+                  if ($buffer.Length -gt 0) { $buffer=$buffer.Substring(0,$buffer.Length-1) }
+                } elseif (-not [char]::IsControl($k.KeyChar)) {
+                  $buffer += $k.KeyChar
+                  Write-Host -NoNewline $k.KeyChar
+                }
+              }
+            }
+          } catch {
+            Write-Host "ERREUR: $_" -ForegroundColor Red
+            Stop-All
+            Write-Host 'Consulte superviseur-console.log dans le dossier du serveur concerne.'
+            Read-Host 'Appuie sur Entree pour fermer'
+            exit 1
+          } finally {
+            if ($Processes.Count -gt 0) { Stop-All }
+          }
+          PSEOF
           cat > "$ROOT/START-NETWORK.bat" <<'EOF'
           @echo off
+          setlocal
           cd /d "%~dp0"
-          where java >nul 2>nul
-          if errorlevel 1 (echo Java 25 est requis.& pause & exit /b 1)
-          for %%S in (Lobby SMP) do (
-            findstr /i /c:"eula=true" "%%S\eula.txt" >nul
-            if errorlevel 1 (
-              echo Accepte l'EULA dans %%S\eula.txt avant le demarrage.
-              pause
-              exit /b 1
-            )
-          )
-          start "Larpers Lobby" cmd /k "cd /d ""%~dp0Lobby"" && java -Xms512M -Xmx1G -jar paper.jar --nogui"
-          timeout /t 8 /nobreak >nul
-          start "Larpers SMP" cmd /k "cd /d ""%~dp0SMP"" && java -Xms1G -Xmx4G -jar paper.jar --nogui"
-          timeout /t 8 /nobreak >nul
-          start "Larpers Velocity" cmd /k "cd /d ""%~dp0Velocity"" && java -Xms512M -Xmx1G -jar velocity.jar"
-          echo Reseau demarre. Les joueurs se connectent sur le port Java 25565.
-          echo Bedrock: port UDP 19132 apres configuration Geyser.
-          pause
+          title Larpers Coin - Superviseur reseau
+          where java.exe >nul 2>nul
+          if errorlevel 1 (echo Java 25 est requis et doit etre dans PATH.& pause & exit /b 1)
+          if not exist "SUPERVISEUR-RESEAU.ps1" (echo Superviseur introuvable.& pause & exit /b 1)
+          powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0SUPERVISEUR-RESEAU.ps1"
+          if errorlevel 1 (echo Le superviseur s'est termine avec une erreur.& pause)
           EOF
-
+          cat > "$ROOT/DEMARRER-RESEAU.bat" <<'EOF'
+          @echo off
+          call "%~dp0START-NETWORK.bat"
+          EOF
           cat > "$ROOT/DEMARRER-VELOCITY-INITIAL.bat" <<'EOF'
           @echo off
           cd /d "%~dp0Velocity"
@@ -376,6 +522,17 @@ jobs:
           - Les mondes et donnees existants ne sont pas inclus: ce ZIP est un paquet serveur propre.
           - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
           EOF
+
+      - name: Valider la syntaxe du superviseur PowerShell
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("package/LarpersCoin-Network/SUPERVISEUR-RESEAU.ps1", [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List
+            exit 1
+          }
 
       - name: Creer le ZIP reseau
         run: |

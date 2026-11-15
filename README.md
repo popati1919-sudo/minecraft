@@ -25,7 +25,7 @@ Le workflow **Package reseau complet Larpers Coin (Velocity + Lobby + SMP)** pro
 - Geyser + Floodgate sur Velocity, Floodgate sur les backends.
 - Clé de forwarding Velocity, scripts Windows de démarrage, configuration Bedrock et ouverture du pare-feu.
 
-Dans GitHub, ouvre **Actions** puis **Package reseau complet Larpers Coin (Velocity + Lobby + SMP)** et télécharge l'artefact `LarpersCoin-Network`. Suis impérativement `LISEZ-MOI.txt` et exécute `CONFIGURER-RESEAU.bat` après le premier démarrage de Velocity. Les ports backend 25566/25567 ne doivent jamais être exposés à Internet.
+Dans GitHub, ouvre **Actions** puis **Package reseau complet Larpers Coin (Velocity + Lobby + SMP)** et télécharge l'artefact `LarpersCoin-Network`. Suis impérativement `LISEZ-MOI.txt` et exécute `CONFIGURER-RESEAU.bat` après le premier démarrage de Velocity. Pour démarrer le réseau, utilise `DEMARRER-RESEAU.bat` (ou `START-NETWORK.bat`): le superviseur lance Lobby, attend que le port 25566 réponde, lance SMP et attend 25567, puis lance Velocity sur 25565. Il reste ouvert; tape `/redemarrer` puis Entrée pour relancer les trois serveurs, `status` pour voir leur état, ou `stop` pour les arrêter proprement. Les journaux sont écrits dans `superviseur-console.log` dans chaque dossier de serveur. Les ports backend 25566/25567 ne doivent jamais être exposés à Internet.
 
 Le pack est un déploiement initial: accepte l'EULA toi-même, configure la redirection des ports du routeur et teste une connexion Java premium, Java non premium et Bedrock avant l'ouverture publique.
 
