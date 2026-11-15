@@ -21,7 +21,6 @@ Le workflow **Package reseau complet Larpers Coin (Velocity + Lobby + SMP)** pro
 - Velocity public sur TCP 25565.
 - Lobby Paper privé sur 127.0.0.1:25566.
 - SMP Paper privé sur 127.0.0.1:25567.
-- FastLoginPlus sur Velocity et les backends pour distinguer les comptes Java premium des comptes non premium.
 - Geyser + Floodgate sur Velocity, Floodgate sur les backends.
 - Clé de forwarding Velocity, scripts Windows de démarrage, configuration Bedrock et ouverture du pare-feu.
 
@@ -105,7 +104,7 @@ Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions, [docs/CO
 - Mots de passe stockés sous forme PBKDF2-HMAC-SHA256 avec sel individuel dans `plugins/LarpersCoin/auth.yml`.
 - Cinq tentatives incorrectes déclenchent un blocage temporaire de 15 minutes.
 - Les commandes et actions de jeu sont bloquées tant que le joueur n'est pas authentifié.
-- Les comptes Java premium sont vérifiés par FastLoginPlus; les comptes Bedrock sont reconnus par Floodgate.
+- Les comptes Bedrock sont reconnus par Floodgate; les autres joueurs utilisent l'authentification LarpersCoin.
 - Le paquet configuré pour les comptes crack utilise `online-mode=false`; ne l'expose jamais directement derrière un proxy non sécurisé et ne partage pas les ports avec un serveur non fiable.
 
 Cette fonctionnalité doit encore réussir la compilation CI et être testée en jeu avant d'être considérée prête pour la production.
