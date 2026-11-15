@@ -93,7 +93,7 @@ final class LarpersAuth implements Listener {
             if (accounts.contains(path + ".hash")) {
                 player.sendMessage(ChatColor.RED + "Connecte-toi avec /login <motdepasse>.");
             } else {
-                player.sendMessage(ChatColor.YELLOW + "Crée ton compte avec /register <motdepasse> <confirmation>.");
+                player.sendMessage(ChatColor.YELLOW + "Crée ton compte avec /register <motdepasse>.");
             }
             player.sendMessage(ChatColor.GRAY + "Tu restes dans le lobby jusqu'à ton authentification.");
         }, 40L);
@@ -105,8 +105,8 @@ final class LarpersAuth implements Listener {
 
     boolean command(Player player, String label, String[] args) {
         if (label.equalsIgnoreCase("register")) {
-            if (args.length != 2) {
-                player.sendMessage(ChatColor.YELLOW + "Usage : /register <motdepasse> <confirmation>");
+            if (args.length != 1) {
+                player.sendMessage(ChatColor.YELLOW + "Usage : /register <motdepasse>");
                 return true;
             }
             if (isAuthenticated(player)) {
@@ -118,11 +118,7 @@ final class LarpersAuth implements Listener {
                 player.sendMessage(ChatColor.RED + "Ce pseudo possède déjà un compte. Utilise /login.");
                 return true;
             }
-            if (!args[0].equals(args[1])) {
-                player.sendMessage(ChatColor.RED + "Les deux mots de passe ne correspondent pas.");
-                return true;
-            }
-            if (args[0].length() < 8 || args[0].length() > 64) {
+                        if (args[0].length() < 8 || args[0].length() > 64) {
                 player.sendMessage(ChatColor.RED + "Le mot de passe doit contenir entre 8 et 64 caractères.");
                 return true;
             }
@@ -160,7 +156,7 @@ final class LarpersAuth implements Listener {
             }
             String path = accountPath(player.getName());
             if (!accounts.contains(path + ".hash")) {
-                player.sendMessage(ChatColor.RED + "Aucun compte trouvé. Utilise /register <motdepasse> <confirmation>.");
+                player.sendMessage(ChatColor.RED + "Aucun compte trouvé. Utilise /register <motdepasse>.");
                 return true;
             }
             try {
