@@ -55,6 +55,47 @@ try {
             $processes[$server.Name] = Start-One $server
             Start-Sleep -Seconds 8
         }
+        # Initialisation idempotente des groupes LuckPerms via stdin du processus SMP.
+        # Aucun terminal Minecraft ni saisie manuelle n'est requis.
+        Write-Host "Attente du chargement de LuckPerms pour configurer les groupes..."
+        Start-Sleep -Seconds 25
+        $smpProc = $processes["SMP"]
+        if ($null -ne $smpProc -and !$smpProc.HasExited) {
+            $luckPermsCommands = @(
+                "lp creategroup joueur",
+                "lp group default parent add joueur",
+                "lp creategroup vip",
+                "lp group vip parent add joueur",
+                "lp group vip permission set larpers.vip true",
+                "lp creategroup moderateur",
+                "lp group moderateur parent add joueur",
+                "lp group moderateur permission set larpers.staff true",
+                "lp group moderateur permission set larpers.moderation true",
+                "lp group moderateur permission set larpers.anticheat.mod true",
+                "lp group moderateur permission set larpers.anticheat.use true",
+                "lp group moderateur permission set larpers.anticheat.alerts true",
+                "lp creategroup admin",
+                "lp group admin parent add moderateur",
+                "lp group admin permission set larpers.admin true",
+                "lp group admin permission set larpers.economy.alerts true",
+                "lp group admin permission set larpers.chat.bypass true",
+                "lp group admin permission set larpers.anticheat.bypass true",
+                "lp creategroup fondateur",
+                "lp group fondateur parent add admin"
+            )
+            foreach ($command in $luckPermsCommands) {
+                try {
+                    $smpProc.StandardInput.WriteLine($command)
+                    $smpProc.StandardInput.Flush()
+                    Start-Sleep -Milliseconds 350
+                } catch {
+                    Write-Warning ("Commande LuckPerms non envoyee: " + $command)
+                }
+            }
+            Write-Host "Commandes de configuration LuckPerms envoyees au SMP. Voir SMP/logs/superviseur-console.log."
+        } else {
+            Write-Warning "SMP indisponible: groupes LuckPerms non configures pour ce demarrage."
+        }
         Write-Host "Reseau actif. Ctrl+C arrete le superviseur."
         $restart = $false
         while (!$restart) {
