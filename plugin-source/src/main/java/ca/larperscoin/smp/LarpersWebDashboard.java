@@ -78,7 +78,7 @@ final class LarpersWebDashboard {
                 return;
             }
             if (path.equals("/api/status") && exchange.getRequestMethod().equals("GET")) {
-                send(exchange, 200, "application/json; charset=utf-8", statusJson());
+                send(exchange, 200, "application/json; charset=utf-8", statusJsonOnMainThread());
                 return;
             }
             if (path.equals("/api/reset-password") && exchange.getRequestMethod().equals("POST")) {
@@ -113,6 +113,11 @@ final class LarpersWebDashboard {
         }
         return supplied != null && java.security.MessageDigest.isEqual(
                 token.getBytes(StandardCharsets.UTF_8), supplied.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String statusJsonOnMainThread() throws IOException {
+        try { return Bukkit.getScheduler().callSyncMethod(plugin, this::statusJson).get(8, TimeUnit.SECONDS); }
+        catch (Exception ex) { throw new IOException("Impossible de lire l'état du serveur", ex); }
     }
 
     private String statusJson() {
