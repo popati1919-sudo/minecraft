@@ -168,6 +168,17 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 "Annonce envoyée à tout le serveur"));
         } else inv.setItem(22,item(Material.BARRIER,"Action réservée aux admins","Les joueurs peuvent acheter des tickets"));
         inv.setItem(26,item(Material.BARRIER,"Fermer"));
+        LpcMenuTheme.frame(inv);
+        p.openInventory(inv);
+    }
+
+    private void openTopMenu(Player p) {
+        Inventory inv=Bukkit.createInventory(null,27,"LPC | Classements");
+        inv.setItem(11,item(Material.GOLD_INGOT,"Fortunes LPC","Voir les 10 joueurs les plus riches","/baltop"));
+        inv.setItem(13,item(Material.EMERALD,"Classement des clans","Voir les clans les plus puissants","/clan top"));
+        inv.setItem(15,item(Material.TARGET,"Primes actives","Voir les primes sur les joueurs","/bounty list"));
+        inv.setItem(22,item(Material.BARRIER,"Fermer"));
+        LpcMenuTheme.frame(inv);
         p.openInventory(inv);
     }
 
@@ -178,6 +189,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         inv.setItem(14,item(Material.CHEST,"Coffre partagé","/clan chest"));
         inv.setItem(16,item(Material.EMERALD,"Classement","/clan top"));
         inv.setItem(22,item(Material.BARRIER,"Fermer"));
+        LpcMenuTheme.frame(inv);
         p.openInventory(inv);
     }
     private void openQuestMenu(Player p) {
@@ -187,14 +199,15 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             "Cultures: "+db.getInt(questPath(false,p,"crops"),0)+"/10",
             "Combats: "+db.getInt(questPath(false,p,"kills"),0)+"/5",
             "Pêche: "+db.getInt(questPath(false,p,"fish"),0)+"/3",
-            "Récompense: 150 LPC","Clique pour réclamer"));
+            "Récompense: 100 LPC","Clique pour réclamer"));
         inv.setItem(15,item(Material.DIAMOND,"Quête hebdomadaire",
-            "Blocs: "+db.getInt(questPath(true,p,"blocks"),0)+"/100",
-            "Cultures: "+db.getInt(questPath(true,p,"crops"),0)+"/50",
-            "Combats: "+db.getInt(questPath(true,p,"kills"),0)+"/25",
-            "Pêche: "+db.getInt(questPath(true,p,"fish"),0)+"/15",
-            "Récompense: 800 LPC","Clique pour réclamer"));
+            "Blocs: "+db.getInt(questPath(true,p,"blocks"),0)+"/75",
+            "Cultures: "+db.getInt(questPath(true,p,"crops"),0)+"/30",
+            "Combats: "+db.getInt(questPath(true,p,"kills"),0)+"/20",
+            "Pêche: "+db.getInt(questPath(true,p,"fish"),0)+"/10",
+            "Récompense: 400 LPC","Clique pour réclamer"));
         inv.setItem(22,item(Material.BARRIER,"Fermer"));
+        LpcMenuTheme.frame(inv);
         p.openInventory(inv);
     }
     private void openAdmin(Player p) { openAdmin(p,0); }
@@ -219,6 +232,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             inv.setItem(45,item(Material.ARROW,"Page précédente"));
         }
         inv.setItem(49,item(Material.BARRIER,"Fermer"));
+        LpcMenuTheme.frame(inv);
         p.openInventory(inv);
     }
     private void openAuction(Player p,int page) {
@@ -266,6 +280,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         inv.setItem(49,item(Material.BARRIER,"Fermer"));
         if(page<maxPage)inv.setItem(50,item(Material.ARROW,"Page suivante"));
         inv.setItem(53,item(Material.SUNFLOWER,"Actualiser",keys.size()+" annonce(s)"));
+        LpcMenuTheme.frame(inv);
         p.openInventory(inv);
     }
     public void openBountyMenu(CommandSender sender) {
@@ -285,6 +300,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         inv.setItem(45,item(Material.TARGET,"Placer une prime","Choisir un joueur en ligne"));
         inv.setItem(49,item(Material.BARRIER,"Fermer"));
         inv.setItem(53,item(Material.SUNFLOWER,"Actualiser",entries.size()+" prime(s) active(s)"));
+        LpcMenuTheme.frame(inv);
         viewer.openInventory(inv);
     }
     private void openBountyTargets(Player viewer) {
@@ -295,6 +311,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             inv.setItem(slot++,item(Material.PLAYER_HEAD,target.getName(),"Prime actuelle: "+core.bountyAmount(target.getUniqueId())+" LPC","Clique pour choisir"));
         }
         inv.setItem(49,item(Material.ARROW,"Retour aux primes"));
+        LpcMenuTheme.frame(inv);
         viewer.openInventory(inv);
     }
     private void openAuctionSell(Player p) {
@@ -304,6 +321,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         inv.setItem(14,item(Material.EMERALD,"100 LPC","Mettre l'objet en main en vente"));
         inv.setItem(16,item(Material.DIAMOND,"500 LPC","Mettre l'objet en main en vente"));
         inv.setItem(22,item(Material.BARRIER,"Annuler"));
+        LpcMenuTheme.frame(inv);
         p.openInventory(inv);
     }
     private void createAuction(Player p,double price) {
@@ -321,6 +339,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         Inventory inv=Bukkit.createInventory(null,27,"LPC | Confirmer OP");
         inv.setItem(11,item(Material.LIME_CONCRETE,target.isOp()?"Retirer OP":"Donner OP","Joueur: "+target.getName()));
         inv.setItem(15,item(Material.RED_CONCRETE,"Annuler","Aucun changement"));
+        LpcMenuTheme.frame(inv);
         p.openInventory(inv);
     }
     private void openPlayerSelector(Player viewer,String action) {
@@ -331,7 +350,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             inv.setItem(slot++,item(Material.PAPER,target.getName(),"Clique pour "+action));
         }
         if(slot==0) msg(viewer,"Aucun autre joueur en ligne.");
-        else viewer.openInventory(inv);
+        else { LpcMenuTheme.frame(inv); viewer.openInventory(inv); }
     }
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] a) {
@@ -340,8 +359,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             switch (c) {
                 case "clan" -> { return clan(sender,a); }
                 case "quest", "quests" -> { return quests(sender,a); }
-                case "quiz" -> { return quiz(sender,a); }
-                case "shop" -> { return shop(sender,a); }
+                case "top" -> { Player p=player(sender); if(p!=null)openTopMenu(p); return true; }
                 case "admin" -> { Player p=player(sender); if(p!=null){if(!staff(p))msg(p,"Permission insuffisante.");else openAdmin(p);} return true; }
                 case "vanish" -> {
                     Player p=player(sender); if(p==null)return true; if(!staff(p)){msg(p,"Permission insuffisante.");return true;}
@@ -564,7 +582,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     private boolean questReady(Player p, boolean weekly) {
         String[] names={"blocks","crops","kills","fish"};
-        int[] goals=weekly?new int[]{100,50,25,15}:new int[]{20,10,5,3};
+        int[] goals=weekly?new int[]{75,30,20,10}:new int[]{20,10,5,3};
         for(int i=0;i<names.length;i++) if(db.getInt(questPath(weekly,p,names[i]),0)>=goals[i]) return true;
         return false;
     }
@@ -578,7 +596,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             String claimPath="quest-claims."+(isWeekly?"weekly":"daily")+"."+period+"."+id(p);
             if(db.getBoolean(claimPath,false)){msg(p,"Cette récompense a déjà été réclamée pour cette période.");return true;}
             if(!questReady(p,isWeekly)){msg(p,"Objectifs incomplets. Fais /quests pour voir ta progression.");return true;}
-            double reward=isWeekly?800.0:150.0;
+            double reward=isWeekly?400.0:100.0;
             if(!Double.isFinite(core.balance(p.getUniqueId())+reward)){msg(p,"Ton solde ne peut pas recevoir cette récompense.");return true;}
             db.set(claimPath,true);
             give(p,reward);core.recordTransaction(isWeekly?"QUEST_WEEKLY":"QUEST_DAILY",new UUID(0L,0L),p.getUniqueId(),reward);save();
@@ -591,7 +609,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         String[] labels={"blocs cassés","cultures récoltées","créatures vaincues","poissons pêchés"};
         msg(p,(weekly?"Quêtes hebdomadaires ":"Quêtes quotidiennes ")+period+":");
         for(int i=0;i<names.length;i++) msg(p,labels[i]+": "+Math.min(db.getInt(questPath(weekly,p,names[i]),0),goals[i])+"/"+goals[i]);
-        msg(p,"Récompense: "+(weekly?"800":"150")+" LPC — valide un objectif pour réclamer.");
+        msg(p,"Récompense: "+(weekly?"400":"100")+" LPC — valide un objectif pour réclamer.");
         msg(p,weekly?"/quests weekly claim":"/quests claim");
         return true;
     }
@@ -760,6 +778,19 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onInvClick(InventoryClickEvent e) {
         String title=e.getView().getTitle();
+        if(title.equals("LPC | Classements")) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player viewer))return;
+            String command=switch(e.getRawSlot()) {
+                case 11 -> "baltop";
+                case 13 -> "clan top";
+                case 15 -> "bounty list";
+                default -> null;
+            };
+            if(e.getRawSlot()==22){viewer.closeInventory();return;}
+            if(command!=null){viewer.closeInventory();viewer.performCommand(command);}
+            return;
+        }
         if(title.equals("LPC | Loterie")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player p)||e.getRawSlot()<0||e.getRawSlot()>=e.getView().getTopInventory().getSize())return;
