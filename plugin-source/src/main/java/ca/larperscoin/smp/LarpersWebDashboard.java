@@ -79,7 +79,6 @@ final class LarpersWebDashboard {
                 @Override public void close() { }
             };
             Logger.getLogger("").addHandler(consoleHandler);
-            Logger.getLogger("Minecraft").addHandler(consoleHandler);
             server.start();
             plugin.getLogger().info("Dashboard LPC actif sur http://" + bind + ":" + port
                     + " (jeton dans plugins/LarpersCoin/web-admin.yml).");
@@ -92,7 +91,6 @@ final class LarpersWebDashboard {
         if (server != null) server.stop(1);
         if (consoleHandler != null) {
             Logger.getLogger("").removeHandler(consoleHandler);
-            Logger.getLogger("Minecraft").removeHandler(consoleHandler);
             consoleHandler.close();
         }
     }
@@ -115,15 +113,15 @@ final class LarpersWebDashboard {
             }
             if (path.equals("/api/command") && exchange.getRequestMethod().equals("POST")) {
                 String body = new String(exchange.getRequestBody().readNBytes(2048), StandardCharsets.UTF_8);
-                Matcher matcher = Pattern.compile("\\"command\\"\\s*:\\s*\\"([^\\r\\n]{1,512})\\"").matcher(body);
+                Matcher matcher = Pattern.compile("\"command\"\\s*:\\s*\"([^\\r\\n]{1,512})\"").matcher(body);
                 if (!matcher.find()) {
-                    send(exchange, 400, "application/json; charset=utf-8", "{\\"error\\":\\"Commande invalide (512 caractères maximum)\\"}");
+                    send(exchange, 400, "application/json; charset=utf-8", "{\"error\":\"Commande invalide (512 caractères maximum)\"}");
                     return;
                 }
                 String commandText = matcher.group(1).trim();
                 if (commandText.startsWith("/")) commandText = commandText.substring(1).trim();
-                if (commandText.isEmpty() || commandText.indexOf('\\n') >= 0 || commandText.indexOf('\\r') >= 0) {
-                    send(exchange, 400, "application/json; charset=utf-8", "{\\"error\\":\\"Commande invalide\\"}");
+                if (commandText.isEmpty() || commandText.indexOf('\n') >= 0 || commandText.indexOf('\r') >= 0) {
+                    send(exchange, 400, "application/json; charset=utf-8", "{\"error\":\"Commande invalide\"}");
                     return;
                 }
                 final String safeCommand = commandText;
@@ -137,10 +135,10 @@ final class LarpersWebDashboard {
                 try {
                     boolean accepted = result.get(10, TimeUnit.SECONDS);
                     send(exchange, accepted ? 200 : 400, "application/json; charset=utf-8",
-                            accepted ? "{\\"ok\\":true,\\"message\\":\\"Commande envoyée à la console.\\"}"
-                                     : "{\\"ok\\":false,\\"message\\":\\"Commande inconnue ou refusée; consulte la console.\\"}");
+                            accepted ? "{\"ok\":true,\"message\":\"Commande envoyée à la console.\"}"
+                                     : "{\"ok\":false,\"message\":\"Commande inconnue ou refusée; consulte la console.\"}");
                 } catch (Exception ex) {
-                    send(exchange, 503, "application/json; charset=utf-8", "{\\"error\\":\\"Console indisponible\\"}");
+                    send(exchange, 503, "application/json; charset=utf-8", "{\"error\":\"Console indisponible\"}");
                 }
                 return;
             }
