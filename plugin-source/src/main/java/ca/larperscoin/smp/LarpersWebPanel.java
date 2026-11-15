@@ -132,8 +132,7 @@ final class LarpersWebPanel {
                 String result = onMain(() -> {
                     StringBuilder out = new StringBuilder("{\"playersOnline\":").append(Bukkit.getOnlinePlayers().size())
                             .append(",\"maxPlayers\":").append(Bukkit.getMaxPlayers()).append(",\"events\":");
-                    String events = liveEventsJson();
-                    out.append(events.substring(events.indexOf(':') + 1));
+                    out.append(serverLogsJson());
                     return out.toString();
                 });
                 json(exchange, 200, result);
@@ -221,6 +220,42 @@ final class LarpersWebPanel {
         } finally {
             exchange.close();
         }
+    }
+
+    // Read the supervisor's real stdout/stderr logs so the website shows
+    // Paper and Velocity console output, not only Bukkit logger records.
+    private String serverLogsJson() {
+        Path root = plugin.getDataFolder().toPath().getParent().getParent();
+        String[] names = {"Lobby", "SMP", "Velocity"};
+        StringBuilder out = new StringBuilder("[");
+        boolean first = true;
+        for (String name : names) {
+            Path log = root.resolve(name).resolve("logs").resolve("superviseur-console.log");
+            if (!Files.isRegularFile(log)) continue;
+            try {
+                List<String> lines = Files.readAllLines(log, StandardCharsets.UTF_8);
+                int start = Math.max(0, lines.size() - 100);
+                for (int i = start; i < lines.size(); i++) {
+                    String line = "[" + name + "] " + lines.get(i);
+                    if (!first) out.append(',');
+                    first = false;
+                    out.append("\\\"").append(escape(line)).append("\\\"");
+                }
+            } catch (IOException ex) {
+                String line = "[" + name + "] Impossible de lire le journal: " + ex.getMessage();
+                if (!first) out.append(',');
+                first = false;
+                out.append("\\\"").append(escape(line)).append("\\\"");
+            }
+        }
+        synchronized (this) {
+            for (String event : liveEvents) {
+                if (!first) out.append(',');
+                first = false;
+                out.append("\\\"").append(escape(event)).append("\\\"");
+            }
+        }
+        return out.append("]").toString();
     }
 
     private String onMain(java.util.concurrent.Callable<String> task) throws Exception {
