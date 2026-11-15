@@ -233,7 +233,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         inv.setItem(23,item(Material.FIREWORK_ROCKET,"Loterie","Ouvrir le menu et gérer le tirage"));
         inv.setItem(25,item(Material.EMERALD,"Classements","Ouvrir /top"));
         inv.setItem(28,item(Material.COMMAND_BLOCK,"Gestion OP","Choisir un joueur","Confirmation obligatoire"));
-        inv.setItem(30,item(Material.COMPASS,"Adresse du serveur","IP actuelle: "+plugin.getConfig().getString("server-display.ip","Non configurée"),"Clique puis saisis: IP nom"));
+        inv.setItem(30,item(Material.COMPASS,"Adresse du serveur","IP actuelle: "+serverDisplay("ip","Non configurée"),"Clique puis saisis: IP nom"));
         inv.setItem(32,item(Material.SHIELD,"Anti-triche","/ac status"));
         inv.setItem(34,item(Material.SUNFLOWER,"Actualiser le menu"));
         inv.setItem(49,item(Material.BARRIER,"Fermer"));
@@ -423,6 +423,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
     }
 
+    private String serverDisplay(String key,String fallback) {
+        File lobbyData=new File(plugin.getServer().getWorldContainer(),"../Lobby/plugins/LarpersCoin");
+        File shared=new File(lobbyData,"server-display.yml");
+        if(shared.isFile())return YamlConfiguration.loadConfiguration(shared).getString("server-display."+key,fallback);
+        return plugin.getConfig().getString("server-display."+key,fallback);
+    }
+
     private boolean adminCommand(CommandSender sender,String[] args) {
         if(args.length==0) {
             Player p=player(sender);
@@ -448,7 +455,15 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             plugin.getConfig().set("server-display.ip",address);
             plugin.getConfig().set("server-display.name",serverName);
             plugin.saveConfig();
-            msg(sender,"Adresse affichée mise à jour: "+serverName+" — "+address+".");
+            File lobbyData=new File(plugin.getServer().getWorldContainer(),"../Lobby/plugins/LarpersCoin");
+            if(lobbyData.isDirectory()) {
+                YamlConfiguration display=YamlConfiguration.loadConfiguration(new File(lobbyData,"server-display.yml"));
+                display.set("server-display.ip",address);
+                display.set("server-display.name",serverName);
+                try { display.save(new File(lobbyData,"server-display.yml")); }
+                catch(IOException ex){plugin.getLogger().warning("Impossible de sauvegarder l'adresse TAB partagée: "+ex.getMessage());}
+            }
+            msg(sender,"Adresse affichée mise à jour sur le réseau: "+serverName+" — "+address+".");
             return true;
         }
         msg(sender,"Sous-commandes: /admin | /admin reset <joueur> | /admin ip <adresse:port> <nom>");
