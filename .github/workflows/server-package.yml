@@ -130,7 +130,7 @@ jobs:
             pause
             exit /b 1
           )
-          java -Xms2G -Xmx4G -jar paper.jar --nogui
+          java -Xms2G -Xmx4G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui
           pause
           EOF
           cat > "$ROOT/CONFIGURER-BEDROCK.bat" <<'EOF'
