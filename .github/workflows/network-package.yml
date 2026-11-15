@@ -288,48 +288,6 @@ jobs:
           pause
           EOF
 
-          # Les commandes LuckPerms sont fournies en texte pour etre collees dans la console SMP.
-          cat > "$ROOT/GROUPES-LUCKPERMS.txt" <<'EOF'
-          GROUPES LUCKPERMS - LARPERS COIN
-          =================================
-          Colle ces commandes dans la console du SMP, sans slash, dans l'ordre.
-
-          lp creategroup joueur
-          lp group default parent add joueur
-
-          lp creategroup vip
-          lp group vip parent add joueur
-          lp group vip permission set larpers.vip true
-
-          lp creategroup moderateur
-          lp group moderateur parent add joueur
-          lp group moderateur permission set larpers.staff true
-          lp group moderateur permission set larpers.moderation true
-          lp group moderateur permission set larpers.anticheat.mod true
-          lp group moderateur permission set larpers.anticheat.use true
-          lp group moderateur permission set larpers.anticheat.alerts true
-
-          lp creategroup admin
-          lp group admin parent add moderateur
-          lp group admin permission set larpers.admin true
-          lp group admin permission set larpers.economy.alerts true
-          lp group admin permission set larpers.chat.bypass true
-          lp group admin permission set larpers.anticheat.bypass true
-
-          lp creategroup fondateur
-          lp group fondateur parent add admin
-
-          EXEMPLES POUR ATTRIBUER UN GROUPE:
-          lp user PSEUDO parent set joueur
-          lp user PSEUDO parent set vip
-          lp user PSEUDO parent set moderateur
-          lp user PSEUDO parent set admin
-          lp user PSEUDO parent set fondateur
-
-          Le groupe default herite de joueur automatiquement.
-          Remplace PSEUDO par le pseudo exact. Admin et Fondateur sont reserves aux personnes de confiance.
-          EOF
-
           cat > "$ROOT/OUVRIR-PORTS-WINDOWS.bat" <<'EOF'
           @echo off
           net session >nul 2>&1
@@ -379,7 +337,7 @@ jobs:
           - /admin reset <joueur> supprime le mot de passe Java crack; si le joueur est en ligne, il reçoit un TITLE avec un compte à rebours de 10 secondes puis est kick. Il devra refaire /register à sa prochaine connexion.
           - Le fichier d'authentification du Lobby est partagé avec le SMP afin que /admin reset fonctionne depuis le SMP.
           - Les mondes et donnees existants ne sont pas inclus: ce ZIP est un paquet serveur propre.
-          - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
+          - Les groupes LuckPerms sont initialises automatiquement au demarrage; les commandes sont envoyees au processus SMP par le superviseur, sans console a ouvrir.\n          - Pour attribuer un groupe a un joueur plus tard, utilise le panneau web si la gestion LuckPerms y est disponible; sinon une commande admin LuckPerms devra etre ajoutee au panneau.\n          - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
           EOF
 
       - name: Creer le ZIP reseau
