@@ -96,6 +96,17 @@ jobs:
           white-list=false
           enforce-whitelist=false
           EOF
+          mkdir -p "$ROOT/plugins/LarpersCoin"
+          cat > "$ROOT/plugins/LarpersCoin/config.yml" <<'EOF'
+          auth:
+            proxy-authenticated: false
+            remember-ip: false
+          server-display:
+            name: Larpers Coin SMP
+            ip: Non configurée
+          anticheat:
+            enabled: true
+          EOF
           cat > "$ROOT/START-SERVER.bat" <<'EOF'
           @echo off
           cd /d "%~dp0"
