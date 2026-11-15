@@ -58,6 +58,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Set<UUID> awaitingAhSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<UUID, UUID> pendingBountyTarget = new java.util.concurrent.ConcurrentHashMap<>();
     private final Map<UUID, UUID> pendingOpTarget = new HashMap<>();
+    private final Map<UUID, String> selectorAction = new HashMap<>();
+    private final Map<UUID, String> selectorSearch = new HashMap<>();
+    private final Set<UUID> awaitingSelectorSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Map<UUID, String> bountySearch = new HashMap<>();
+    private final Set<UUID> awaitingBountySearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
     private static final Map<String, Material> SHOP = new LinkedHashMap<>();
     private static final Map<String, Double> SHOP_PRICES = new LinkedHashMap<>();
@@ -306,11 +311,17 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private void openBountyTargets(Player viewer) {
         Inventory inv=Bukkit.createInventory(null,54,"LPC | Choisir une cible");
         int slot=0;
+        String query=bountySearch.getOrDefault(viewer.getUniqueId(),"").toLowerCase(Locale.ROOT).trim();
         for(Player target:Bukkit.getOnlinePlayers()) {
             if(target.equals(viewer)||slot>=45)continue;
+            if(!query.isEmpty()&&!target.getName().toLowerCase(Locale.ROOT).contains(query))continue;
             inv.setItem(slot++,item(Material.PLAYER_HEAD,target.getName(),"Prime actuelle: "+core.bountyAmount(target.getUniqueId())+" LPC","Clique pour choisir"));
         }
+        if(slot==0)inv.setItem(22,item(Material.PAPER,"Aucun joueur trouvé",query.isEmpty()?"Aucun autre joueur en ligne":"Recherche: "+query));
+        inv.setItem(45,item(Material.COMPASS,"Rechercher un pseudo","Saisis le pseudo dans le chat"));
+        inv.setItem(47,item(Material.MILK_BUCKET,"Effacer la recherche"));
         inv.setItem(49,item(Material.ARROW,"Retour aux primes"));
+        inv.setItem(53,item(Material.SUNFLOWER,"Actualiser"));
         LpcMenuTheme.frame(inv);
         viewer.openInventory(inv);
     }
@@ -343,14 +354,22 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         p.openInventory(inv);
     }
     private void openPlayerSelector(Player viewer,String action) {
+        selectorAction.put(viewer.getUniqueId(),action);
         Inventory inv=Bukkit.createInventory(null,54,"LPC | Sélection "+action);
         int slot=0;
+        String query=selectorSearch.getOrDefault(viewer.getUniqueId(),"").toLowerCase(Locale.ROOT).trim();
         for(Player target:Bukkit.getOnlinePlayers()) {
-            if(target.equals(viewer) || slot>=54) continue;
-            inv.setItem(slot++,item(Material.PAPER,target.getName(),"Clique pour "+action));
+            if(target.equals(viewer) || slot>=45) continue;
+            if(!query.isEmpty()&&!target.getName().toLowerCase(Locale.ROOT).contains(query))continue;
+            inv.setItem(slot++,item(Material.PLAYER_HEAD,target.getName(),"Clique pour "+action));
         }
-        if(slot==0) msg(viewer,"Aucun autre joueur en ligne.");
-        else { LpcMenuTheme.frame(inv); viewer.openInventory(inv); }
+        if(slot==0)inv.setItem(22,item(Material.PAPER,"Aucun joueur trouvé",query.isEmpty()?"Aucun autre joueur en ligne":"Recherche: "+query));
+        inv.setItem(45,item(Material.COMPASS,"Rechercher un pseudo","Saisis le pseudo dans le chat"));
+        inv.setItem(47,item(Material.MILK_BUCKET,"Effacer la recherche"));
+        inv.setItem(49,item(Material.BARRIER,"Fermer"));
+        inv.setItem(53,item(Material.SUNFLOWER,"Actualiser"));
+        LpcMenuTheme.frame(inv);
+        viewer.openInventory(inv);
     }
 
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] a) {
@@ -498,6 +517,27 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             }
             case "chest" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
+                if(a.length>1 && a[1].equalsIgnoreCase("upgrade")) {
+                    String cp=clanPath(own);
+                    int level=Math.max(1,db.getInt(cp+".chest-level",1));
+                    if(level>=7){msg(p,"Ton coffre a déjà sa capacité maximale (54 emplacements).");return true;}
+                    double price=250.0*Math.pow(2,level-1);
+                    if(!charge(p,price)){msg(p,"Amélioration du coffre: "+price+" LPC. Fonds insuffisants.");return true;}
+                    db.set(cp+".chest-level",level+1);
+                    Inventory cached=clanChests.get(own);
+                    if(cached!=null) {
+                        int oldSlots=level==1?1:(level-1)*9;
+                        int newSlots=level*9;
+                        for(int slot=oldSlots;slot<newSlots;slot++) {
+                            ItemStack existing=cached.getItem(slot);
+                            if(existing!=null && existing.getType()==Material.GRAY_STAINED_GLASS_PANE
+                                    && existing.hasItemMeta() && "Emplacement verrouillé".equals(ChatColor.stripColor(existing.getItemMeta().getDisplayName()))) cached.clear(slot);
+                        }
+                    }
+                    save();
+                    msg(p,"Coffre amélioré à "+(level*9)+" emplacements. Coût: "+price+" LPC.");
+                    return true;
+                }
                 UUID user=clanChestUsers.get(own);
                 if(user!=null&&!user.equals(p.getUniqueId())){msg(p,"Le coffre du clan est déjà utilisé par un autre membre.");return true;}
                 if(!db.getStringList(clanPath(own)+".members").contains(id(p))){msg(p,"Accès réservé aux membres du clan.");return true;}
@@ -506,11 +546,21 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     inv=Bukkit.createInventory(null,54,"Coffre clan: "+own);
                     List<ItemStack> contents=(List<ItemStack>)db.getList(clanPath(own)+".chest");
                     if(contents!=null)for(int i=0;i<Math.min(54,contents.size());i++)inv.setItem(i,contents.get(i));
+                    int loadedLevel=Math.max(1,db.getInt(clanPath(own)+".chest-level",1));
+                    int loadedUnlocked=loadedLevel==1?1:(loadedLevel-1)*9;
+                    for(int slot=0;slot<loadedUnlocked;slot++) {
+                        ItemStack existing=inv.getItem(slot);
+                        if(existing!=null&&existing.getType()==Material.GRAY_STAINED_GLASS_PANE&&existing.hasItemMeta()
+                                &&"Emplacement verrouillé".equals(ChatColor.stripColor(existing.getItemMeta().getDisplayName()))) inv.clear(slot);
+                    }
                     clanChests.put(own,inv);
                 }
+                int chestLevel=Math.max(1,db.getInt(clanPath(own)+".chest-level",1));
+                int unlocked=Math.max(1,Math.min(54,chestLevel==1?1:(chestLevel-1)*9));
+                for(int slot=unlocked;slot<54;slot++) inv.setItem(slot,item(Material.GRAY_STAINED_GLASS_PANE,"Emplacement verrouillé","/clan chest upgrade"));
                 clanChestUsers.put(own,p.getUniqueId());
                 clanChestSnapshots.put(own,Arrays.stream(inv.getContents()).map(x->x==null?null:x.clone()).toArray(ItemStack[]::new));
-                p.openInventory(inv);msg(p,"Coffre partagé ouvert. Les changements sont enregistrés et audités à la fermeture.");return true;
+                p.openInventory(inv);msg(p,"Coffre partagé: "+unlocked+"/54 emplacements. Améliore avec /clan chest upgrade.");return true;
             }
             case "allies" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
@@ -778,6 +828,15 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onInvClick(InventoryClickEvent e) {
         String title=e.getView().getTitle();
+        if(title.startsWith("Coffre clan:") && e.isShiftClick() && e.getClickedInventory()!=null
+                && e.getClickedInventory().equals(e.getView().getBottomInventory())) { e.setCancelled(true); return; }
+        if(title.startsWith("Coffre clan:") && e.getRawSlot()>=0 && e.getRawSlot()<e.getView().getTopInventory().getSize()) {
+            String clan=title.substring("Coffre clan:".length());
+            int level=Math.max(1,db.getInt(clanPath(clan)+".chest-level",1));
+            int unlocked=Math.max(1,Math.min(54,level==1?1:(level-1)*9));
+            if(e.getRawSlot()>=unlocked){e.setCancelled(true);if(e.getWhoClicked() instanceof Player p)msg(p,"Emplacement verrouillé. Utilise /clan chest upgrade.");}
+            return;
+        }
         if(title.equals("LPC | Classements")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player viewer))return;
@@ -830,10 +889,16 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             } else if(page==2&&slot==10) openPlayerSelector(p,"op/deop");
             return;
         }
-        if(title.equals("LPC | Sélection invsee")||title.equals("LPC | Sélection freeze")||title.equals("LPC | Sélection op/deop")) {
+        if(title.startsWith("LPC | Sélection ")) {
             e.setCancelled(true);
-            if(e.getRawSlot()>=e.getView().getTopInventory().getSize()) return;
-            if(!(e.getWhoClicked() instanceof Player viewer)||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
+            if(!(e.getWhoClicked() instanceof Player viewer))return;
+            int slot=e.getRawSlot();
+            String action=selectorAction.getOrDefault(viewer.getUniqueId(),title.substring("LPC | Sélection ".length()));
+            if(slot==45){awaitingSelectorSearch.add(viewer.getUniqueId());viewer.closeInventory();msg(viewer,"Écris le pseudo à rechercher dans le chat (ou 'annuler').");return;}
+            if(slot==47){selectorSearch.remove(viewer.getUniqueId());openPlayerSelector(viewer,action);return;}
+            if(slot==49){viewer.closeInventory();return;}
+            if(slot==53){openPlayerSelector(viewer,action);return;}
+            if(slot<0||slot>=45||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
             String targetName=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName());
             Player target=Bukkit.getPlayerExact(targetName);
             if(target==null) { msg(viewer,"Ce joueur n'est plus en ligne.");viewer.closeInventory();return; }
@@ -868,7 +933,10 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(title.equals("LPC | Choisir une cible")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player viewer))return;
+            if(e.getRawSlot()==45){awaitingBountySearch.add(viewer.getUniqueId());viewer.closeInventory();msg(viewer,"Écris le pseudo à rechercher dans le chat (ou 'annuler').");return;}
+            if(e.getRawSlot()==47){bountySearch.remove(viewer.getUniqueId());openBountyTargets(viewer);return;}
             if(e.getRawSlot()==49){openBountyMenu(viewer);return;}
+            if(e.getRawSlot()==53){openBountyTargets(viewer);return;}
             if(e.getRawSlot()<0||e.getRawSlot()>=45||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta())return;
             String targetName=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName());
             Player target=Bukkit.getPlayerExact(targetName);
@@ -982,10 +1050,34 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     @EventHandler public void onQuit(PlayerQuitEvent e) {
         UUID id=e.getPlayer().getUniqueId();
         frozen.remove(id);awaitingAhSearch.remove(id);pendingBountyTarget.remove(id);
+        awaitingSelectorSearch.remove(id);awaitingBountySearch.remove(id);
+        selectorAction.remove(id);selectorSearch.remove(id);bountySearch.remove(id);
     }
     @EventHandler public void onChatSearch(org.bukkit.event.player.AsyncPlayerChatEvent e) {
         Player sender=e.getPlayer();
         UUID senderId=sender.getUniqueId();
+        if(awaitingSelectorSearch.remove(senderId)) {
+            e.setCancelled(true);
+            String query=e.getMessage().trim();
+            Bukkit.getScheduler().runTask(plugin,()->{
+                String action=selectorAction.get(senderId);
+                if(query.equalsIgnoreCase("annuler")){msg(sender,"Recherche annulée.");if(action!=null)openPlayerSelector(sender,action);return;}
+                if(query.length()>16){msg(sender,"Pseudo trop long (16 caractères maximum).");if(action!=null)openPlayerSelector(sender,action);return;}
+                selectorSearch.put(senderId,query);
+                if(action!=null)openPlayerSelector(sender,action);
+            });
+            return;
+        }
+        if(awaitingBountySearch.remove(senderId)) {
+            e.setCancelled(true);
+            String query=e.getMessage().trim();
+            Bukkit.getScheduler().runTask(plugin,()->{
+                if(query.equalsIgnoreCase("annuler")){msg(sender,"Recherche de prime annulée.");openBountyTargets(sender);return;}
+                if(query.length()>16){msg(sender,"Pseudo trop long.");openBountyTargets(sender);return;}
+                bountySearch.put(senderId,query);openBountyTargets(sender);
+            });
+            return;
+        }
         if(awaitingAhSearch.remove(senderId)) {
             e.setCancelled(true);
             String query=e.getMessage().trim();
