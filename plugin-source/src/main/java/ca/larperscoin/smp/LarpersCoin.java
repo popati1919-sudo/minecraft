@@ -474,10 +474,14 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         return ChatColor.GRAY+"[JOUEUR] ";
     }
     private void updatePlayerTags() {
+        File lobbyData = new File(getServer().getWorldContainer(), "../Lobby/plugins/LarpersCoin");
+        File sharedDisplayFile = new File(lobbyData, "server-display.yml");
+        YamlConfiguration display = sharedDisplayFile.isFile()
+                ? YamlConfiguration.loadConfiguration(sharedDisplayFile) : getConfig();
         for(Player p:Bukkit.getOnlinePlayers()) {
             p.setPlayerListName(rankPrefix(p)+ChatColor.WHITE+p.getName());
-            String serverName=getConfig().getString("server-display.name","Larpers Coin SMP");
-            String serverIp=getConfig().getString("server-display.ip","Non configurée");
+            String serverName=display.getString("server-display.name",getConfig().getString("server-display.name","Larpers Coin SMP"));
+            String serverIp=display.getString("server-display.ip",getConfig().getString("server-display.ip","Non configurée"));
             String status=lotteryActive()?ChatColor.LIGHT_PURPLE+"✦ LOTERIE • "+format(lotteryPot())+" LPC ✦":ChatColor.GRAY+"Bienvenue sur le SMP";
             p.setPlayerListHeaderFooter(ChatColor.GOLD+serverName,status+ChatColor.DARK_GRAY+" | "+ChatColor.YELLOW+"IP: "+serverIp+ChatColor.DARK_GRAY+" | "+ChatColor.GREEN+"Ping: "+p.getPing()+" ms");
         }
