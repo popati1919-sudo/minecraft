@@ -162,8 +162,9 @@ jobs:
           server-port=$PORT
           server-ip=127.0.0.1
           motd=Larpers Coin $SERVER
-          view-distance=8
-          simulation-distance=6
+          view-distance=$([ "$SERVER" = "Lobby" ] && echo 3 || echo 6)
+          simulation-distance=$([ "$SERVER" = "Lobby" ] && echo 2 || echo 4)
+          network-compression-threshold=512
           spawn-protection=0
           allow-flight=true
           white-list=false
@@ -194,11 +195,16 @@ jobs:
             proxy-authenticated: false
             remember-ip: true
             connect-to-smp: true
+            storage-file: plugins/LarpersCoin/auth.yml
           EOF
           cat > "$ROOT/SMP/plugins/LarpersCoin/config.yml" <<'EOF'
           auth:
             proxy-authenticated: true
             remember-ip: false
+            storage-file: ../Lobby/plugins/LarpersCoin/auth.yml
+          server-display:
+            name: Larpers Coin SMP
+            ip: Non configurée
           anticheat:
             enabled: true
             auto-punish:
@@ -223,9 +229,9 @@ jobs:
               exit /b 1
             )
           )
-          start "Larpers Lobby" cmd /k "cd /d ""%~dp0Lobby"" && java -Xms512M -Xmx1G -jar paper.jar --nogui"
+          start "Larpers Lobby" cmd /k "cd /d ""%~dp0Lobby"" && java -Xms512M -Xmx1G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
           timeout /t 8 /nobreak >nul
-          start "Larpers SMP" cmd /k "cd /d ""%~dp0SMP"" && java -Xms1G -Xmx4G -jar paper.jar --nogui"
+          start "Larpers SMP" cmd /k "cd /d ""%~dp0SMP"" && java -Xms1G -Xmx4G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
           timeout /t 8 /nobreak >nul
           start "Larpers Velocity" cmd /k "cd /d ""%~dp0Velocity"" && java -Xms512M -Xmx1G -jar velocity.jar"
           echo Reseau demarre. Les joueurs se connectent sur le port Java 25565.
