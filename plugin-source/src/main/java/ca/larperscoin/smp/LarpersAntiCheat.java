@@ -51,6 +51,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
 
     private final JavaPlugin plugin;
     private final File violationsFile;
+    private final File reportsFile;
     private final Map<UUID, Long> graceUntil = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> upwardTicks = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> airTicks = new ConcurrentHashMap<>();
@@ -66,6 +67,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     public LarpersAntiCheat(JavaPlugin plugin) {
         this.plugin = plugin;
         this.violationsFile = new File(plugin.getDataFolder(), "anticheat-violations.yml");
+        this.reportsFile = new File(plugin.getDataFolder(), "anticheat-reports.yml");
         loadViolations();
         applyDefaults();
         Bukkit.getPluginManager().registerEvents(this, plugin);
@@ -80,23 +82,32 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         var config = plugin.getConfig();
         config.addDefault("anticheat.enabled", true);
         config.addDefault("anticheat.checks.speed.enabled", true);
-        config.addDefault("anticheat.checks.speed.max-ground-blocks-per-tick", 0.65D);
+        config.addDefault("anticheat.checks.speed.max-ground-blocks-per-tick", 1.25D);
         config.addDefault("anticheat.checks.fly.enabled", true);
         config.addDefault("anticheat.checks.fly.upward-limit-per-tick", 0.72D);
         config.addDefault("anticheat.checks.fly.repeated-upward-ticks", 4);
         config.addDefault("anticheat.checks.reach.enabled", true);
-        config.addDefault("anticheat.checks.reach.max-distance", 3.75D);
-        if (config.getDouble("anticheat.checks.speed.max-ground-blocks-per-tick", 1.35D) == 1.35D)
-            config.set("anticheat.checks.speed.max-ground-blocks-per-tick", 0.65D);
+        config.addDefault("anticheat.checks.reach.max-distance", 4.15D);
+        if (config.getDouble("anticheat.checks.speed.max-ground-blocks-per-tick", 1.35D) == 1.35D || config.getDouble("anticheat.checks.speed.max-ground-blocks-per-tick", 1.25D) == 0.65D)
+            config.set("anticheat.checks.speed.max-ground-blocks-per-tick", 1.25D);
         if (config.getDouble("anticheat.checks.reach.max-distance", 4.45D) == 4.45D)
-            config.set("anticheat.checks.reach.max-distance", 3.75D);
+            config.set("anticheat.checks.reach.max-distance", 4.15D);
         config.addDefault("anticheat.alert-cooldown-seconds", 4);
         config.addDefault("anticheat.evidence-limit", MAX_EVIDENCE);
-        config.addDefault("anticheat.auto-punish.enabled", true);
-        config.addDefault("anticheat.auto-punish.thresholds.kick", 12);
-        config.addDefault("anticheat.auto-punish.thresholds.ban-1d", 24);
-        config.addDefault("anticheat.auto-punish.thresholds.ban-7d", 36);
-        config.addDefault("anticheat.auto-punish.thresholds.ban-30d", 48);
+        config.addDefault("anticheat.auto-punish.enabled", false);
+        config.addDefault("anticheat.auto-punish.thresholds.kick", 100);
+        config.addDefault("anticheat.auto-punish.thresholds.ban-1d", 180);
+        config.addDefault("anticheat.auto-punish.thresholds.ban-7d", 260);
+        config.addDefault("anticheat.auto-punish.thresholds.ban-30d", 400);
+        // Migration des anciens réglages trop sévères.
+        if (config.getInt("anticheat.auto-punish.thresholds.kick", 100) == 12
+                && config.getInt("anticheat.auto-punish.thresholds.ban-1d", 24) == 24) {
+            config.set("anticheat.auto-punish.enabled", false);
+            config.set("anticheat.auto-punish.thresholds.kick", 100);
+            config.set("anticheat.auto-punish.thresholds.ban-1d", 180);
+            config.set("anticheat.auto-punish.thresholds.ban-7d", 260);
+            config.set("anticheat.auto-punish.thresholds.ban-30d", 400);
+        }
         config.options().copyDefaults(true);
         plugin.saveConfig();
     }
@@ -281,6 +292,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         long previous = lastAlert.getOrDefault(key, 0L);
         if (now - previous < cooldown) return;
         lastAlert.put(key, now);
+        recordWebReport(player, check, detail, total, now);
 
         String plain = player.getName() + " | " + check + " | " + detail + " | VL " + total;
         synchronized (evidence) {
@@ -295,6 +307,25 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
             if (staff.hasPermission("larpers.anticheat.alerts") && alertsEnabled.getOrDefault(staff.getUniqueId(), true)) {
                 staff.sendMessage(message);
             }
+        }
+    }
+
+    private void recordWebReport(Player player, String check, String detail, int total, long timestamp) {
+        YamlConfiguration reports = YamlConfiguration.loadConfiguration(reportsFile);
+        String id = UUID.randomUUID().toString();
+        String base = "reports." + id + ".";
+        reports.set(base + "id", id);
+        reports.set(base + "timestamp", timestamp);
+        reports.set(base + "player", player.getName());
+        reports.set(base + "uuid", player.getUniqueId().toString());
+        reports.set(base + "check", check);
+        reports.set(base + "detail", detail);
+        reports.set(base + "violations", total);
+        reports.set(base + "status", "OPEN");
+        try {
+            reports.save(reportsFile);
+        } catch (IOException ex) {
+            plugin.getLogger().warning("Impossible de sauvegarder le signalement anti-triche: " + ex.getMessage());
         }
     }
 
