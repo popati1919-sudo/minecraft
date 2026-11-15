@@ -213,7 +213,7 @@ final class LarpersWebDashboard {
         for (String line : new ArrayList<>(consoleLines)) {
             if (!first) out.append(',');
             first = false;
-            out.append("\\\"").append(json(line)).append("\\\"");
+            out.append("\"").append(json(line)).append("\"");
         }
         return out.append("]}").toString();
     }
