@@ -95,13 +95,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         seedQuizQuestion("faces","Combien de faces possède un bloc standard?","6",List.of("4","6","8"));
         seedQuizQuestion("creeper","Quel mob explose près du joueur?","creeper",List.of("creeper","zombie","squelette"));
         save();
-        for (String cmd : List.of("clan","quest","quests","quiz","shop","admin","vanish","invsee","freeze","staffchat","ah","trade")) {
+        for (String cmd : List.of("clan","quest","quests","top","admin","vanish","invsee","freeze","staffchat","ah","trade")) {
             PluginCommand c = plugin.getCommand(cmd);
             if (c != null) { c.setExecutor(this); c.setTabCompleter(this); }
         }
         Bukkit.getPluginManager().registerEvents(this, plugin);
         Bukkit.getScheduler().runTaskTimer(plugin,this::save,1200L,1200L);
-        plugin.getLogger().info("Modules clans, quêtes, quiz, boutique et modération chargés.");
+        plugin.getLogger().info("Modules clans, quêtes, classements, commerce entre joueurs et modération chargés.");
     }
 
     private void save() {
@@ -155,8 +155,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     public void openLotteryMenu(Player p) {
         Inventory inv=Bukkit.createInventory(null,27,"LPC | Loterie");
         boolean active=core.lotteryActive();
-        inv.setItem(10,item(Material.PAPER,"Acheter 1 ticket","Prix: 25 LPC","Clique pour acheter"));
-        inv.setItem(12,item(Material.GOLD_INGOT,"Acheter 5 tickets","Prix: 125 LPC","Clique pour acheter"));
+        inv.setItem(10,item(Material.PAPER,"Acheter 1 ticket","Prix: 50 LPC","Clique pour acheter"));
+        inv.setItem(12,item(Material.GOLD_INGOT,"Acheter 5 tickets","Prix: 250 LPC","Clique pour acheter"));
         inv.setItem(14,item(Material.EMERALD,"Jackpot: "+core.lotteryPot()+" LPC",
             "Tickets vendus: "+core.lotteryTicketCount(),
             active?"Loterie en cours":"Aucune loterie en cours"));
@@ -604,7 +604,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             return true;
         }
         String period=weekly?weeklyQuestKey():dailyQuestKey();
-        int[] goals=weekly?new int[]{100,50,25,15}:new int[]{20,10,5,3};
+        int[] goals=weekly?new int[]{75,30,20,10}:new int[]{20,10,5,3};
         String[] names={"blocks","crops","kills","fish"};
         String[] labels={"blocs cassés","cultures récoltées","créatures vaincues","poissons pêchés"};
         msg(p,(weekly?"Quêtes hebdomadaires ":"Quêtes quotidiennes ")+period+":");
