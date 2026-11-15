@@ -87,6 +87,9 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                 lobby.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
                 lobby.setGameRule(org.bukkit.GameRule.DO_WEATHER_CYCLE, false);
                 lobby.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, false);
+                // Retire aussi l'ancienne plateforme des mondes de lobby déjà générés.
+                for(int x=3;x<=12;x++)for(int z=3;z<=12;z++)
+                    lobby.getBlockAt(x,80,z).setType(org.bukkit.Material.AIR,false);
             }
         }, 1L);
         getLogger().info("LarpersCoin 1.0.5 actif. Aucun claim ni protection de parcelle n'est enregistré.");
