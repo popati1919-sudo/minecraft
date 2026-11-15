@@ -88,8 +88,9 @@ jobs:
           server-port=25565
           server-ip=
           motd=Larpers Coin SMP
-          view-distance=8
-          simulation-distance=6
+          view-distance=6
+          simulation-distance=4
+          network-compression-threshold=512
           spawn-protection=0
           allow-flight=false
           white-list=false
