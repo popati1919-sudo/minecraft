@@ -53,6 +53,7 @@ final class LarpersAuth implements Listener {
     private final Map<UUID, Location> joinLocations = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> attempts = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lockedUntil = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> sessionJoinedAt = new ConcurrentHashMap<>();
 
     LarpersAuth(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -93,7 +94,7 @@ final class LarpersAuth implements Listener {
         String path = accountPath(playerName);
         if (!accounts.contains(path + ".hash")) return false;
         accounts.set(path, null);
-        accounts.set("revoked." + playerName.toLowerCase(Locale.ROOT), true);
+        accounts.set("revoked." + playerName.toLowerCase(Locale.ROOT), System.currentTimeMillis());
         save();
         Player online = null;
         for (Player candidate : Bukkit.getOnlinePlayers()) {
@@ -112,7 +113,8 @@ final class LarpersAuth implements Listener {
     void handleJoin(Player player) {
         reloadAccounts();
         authenticated.remove(player.getUniqueId());
-        boolean mustReRegister = accounts.getBoolean("revoked." + player.getName().toLowerCase(Locale.ROOT), false);
+        boolean mustReRegister = accounts.getLong("revoked." + player.getName().toLowerCase(Locale.ROOT), 0L) > 0L;
+        sessionJoinedAt.put(player.getUniqueId(), System.currentTimeMillis());
         joinLocations.put(player.getUniqueId(), player.getLocation().clone());
         player.sendMessage(ChatColor.GOLD + "Bienvenue sur Larpers Coin SMP.");
         player.sendMessage(ChatColor.YELLOW + "Vérification de ton compte...");
@@ -148,7 +150,10 @@ final class LarpersAuth implements Listener {
         reloadAccounts();
         for (Player player : Bukkit.getOnlinePlayers()) {
             String revokedPath = "revoked." + player.getName().toLowerCase(Locale.ROOT);
-            if (accounts.getBoolean(revokedPath, false) && authenticated.remove(player.getUniqueId()) != null) {
+            long revokedAt = accounts.getLong(revokedPath, 0L);
+            long joinedAt = sessionJoinedAt.getOrDefault(player.getUniqueId(), Long.MAX_VALUE);
+            if (revokedAt > 0L && joinedAt <= revokedAt) {
+                authenticated.remove(player.getUniqueId());
                 player.kickPlayer(ChatColor.RED + "Ton mot de passe a été réinitialisé. Rejoins et crée un nouveau mot de passe avec /register <motdepasse>.");
             }
         }
@@ -329,7 +334,7 @@ final class LarpersAuth implements Listener {
 
     @EventHandler public void onQuit(PlayerQuitEvent event) {
         UUID id = event.getPlayer().getUniqueId();
-        authenticated.remove(id); joinLocations.remove(id); attempts.remove(id); lockedUntil.remove(id);
+        authenticated.remove(id); joinLocations.remove(id); attempts.remove(id); lockedUntil.remove(id); sessionJoinedAt.remove(id);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
