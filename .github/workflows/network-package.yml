@@ -261,8 +261,8 @@ jobs:
           setlocal
           title LarpersCoin - Configuration du reseau
           cd /d "%~dp0"
-          if not exist "Velocity\\velocity.jar" (echo velocity.jar introuvable.& pause & exit /b 1)
-          if not exist "Velocity\\plugins\\Geyser-Velocity\\config.yml" (
+          if not exist "Velocity\velocity.jar" (echo velocity.jar introuvable.& pause & exit /b 1)
+          if not exist "Velocity\plugins\Geyser-Velocity\config.yml" (
             echo Premier lancement de Velocity pour generer Geyser et Floodgate.
             echo Attends le demarrage complet, puis ferme cette fenetre avec CTRL+C.
             cd /d "%~dp0Velocity"
@@ -272,13 +272,13 @@ jobs:
             pause
             exit /b 0
           )
-          set "FGKEY=%~dp0Velocity\\plugins\\floodgate\\key.pem"
+          set "FGKEY=%~dp0Velocity\plugins\floodgate\key.pem"
           if not exist "%FGKEY%" (echo Cle Floodgate introuvable. Verifie le premier lancement de Velocity.& pause & exit /b 1)
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='%~dp0Velocity\\plugins\\Geyser-Velocity\\config.yml'; $s=Get-Content -Raw $p; $s=[regex]::Replace($s,'(?m)^(\\s*auth-type\\s*:\\s*)[^\\r\\n]+','$1floodgate'); $s=[regex]::Replace($s,'(?m)^(\\s*transport\\s*:\\s*)[^\\r\\n]+','$1nethernet'); Set-Content -Path $p -Value $s -Encoding utf8"
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='%~dp0Velocity\plugins\Geyser-Velocity\config.yml'; $s=Get-Content -Raw $p; $s=[regex]::Replace($s,'(?m)^(\s*auth-type\s*:\s*)[^\r\n]+','$1floodgate'); $s=[regex]::Replace($s,'(?m)^(\s*transport\s*:\s*)[^\r\n]+','$1nethernet'); Set-Content -Path $p -Value $s -Encoding utf8"
           if errorlevel 1 (echo Echec de configuration Geyser.& pause & exit /b 1)
           for %%S in (Lobby SMP) do (
-            if not exist "%%S\\plugins\\floodgate" mkdir "%%S\\plugins\\floodgate"
-            copy /Y "%FGKEY%" "%%S\\plugins\\floodgate\\key.pem" >nul
+            if not exist "%%S\plugins\floodgate" mkdir "%%S\plugins\floodgate"
+            copy /Y "%FGKEY%" "%%S\plugins\floodgate\key.pem" >nul
           )
           if errorlevel 1 (echo Echec de copie de la cle Floodgate.& pause & exit /b 1)
           echo.
