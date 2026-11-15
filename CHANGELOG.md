@@ -30,3 +30,9 @@ Cette version est une base de développement. Elle n'est pas encore certifiée p
 - Recherche par pseudo dans les listes de joueurs, les primes et l'hôtel des ventes.
 - Lobby entièrement vide, sans plateforme; vol autorisé dans le lobby d'authentification.
 - Distances de rendu/simulation réduites et options G1GC pour diminuer la charge.
+
+
+## 1.0.7
+- Ajout d'un dashboard web administrateur protégé par jeton.
+- Réinitialisation des comptes disponible uniquement aux administrateurs autorisés.
+- Anti-triche en mode alertes uniquement : Fly, Speed, Reach et détection statistique X-Ray; aucun kick ou ban automatique.
