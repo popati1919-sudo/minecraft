@@ -64,7 +64,7 @@ function Wait-ServerReady($serverName, $timeoutSeconds = 240) {
     Write-Host ("Attente du demarrage complet de {0}..." -f $serverName)
     while ((Get-Date) -lt $deadline) {
         if ($null -eq $proc -or $proc.HasExited) {
-            Write-Warning ("{0} s'est arrete avant d'etre pret." -f $serverName)
+            Write-Warning ("{0} a ete arrete avant d'etre pret." -f $serverName)
             if (Test-Path $log) {
                 Get-Content $log -Tail 25 | ForEach-Object { Write-Host $_ }
             }
@@ -113,7 +113,7 @@ function Send-LuckPermsSetup {
     )
     foreach ($command in $luckPermsCommands) {
         if ($smpProc.HasExited) {
-            Write-Warning "SMP s'est arrete pendant la configuration LuckPerms."
+            Write-Warning "SMP a ete arrete pendant la configuration LuckPerms."
             return
         }
         try {
@@ -121,7 +121,7 @@ function Send-LuckPermsSetup {
             $smpProc.StandardInput.Flush()
             Start-Sleep -Milliseconds 500
         } catch {
-            Write-Warning ("Commande LuckPerms non envoyee: " + $command + " — " + $_.Exception.Message)
+            Write-Warning ("Commande LuckPerms non envoyee: " + $command + " - " + $_.Exception.Message)
         }
     }
     Write-Host "Groupes LuckPerms configures via la vraie console SMP. Voir SMP/logs/superviseur-console.log."
@@ -182,7 +182,7 @@ try {
                 if ($null -eq $proc -or $proc.HasExited) {
                     $crashedServer = $server.Name
                     if ($null -ne $proc) { $crashExitCode = $proc.ExitCode }
-                    Write-Warning ($server.Name + " s'est arrete (code " + $crashExitCode + "); collecte des dernieres lignes avant arret du reseau.")
+                    Write-Warning ($server.Name + " a ete arrete (code " + $crashExitCode + "); collecte des dernieres lignes avant arret du reseau.")
                     $restart = $true
                     break
                 }
