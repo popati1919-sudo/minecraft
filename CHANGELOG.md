@@ -36,3 +36,9 @@ Cette version est une base de développement. Elle n'est pas encore certifiée p
 - Ajout d'un dashboard web administrateur protégé par jeton.
 - Réinitialisation des comptes disponible uniquement aux administrateurs autorisés.
 - Anti-triche en mode alertes uniquement : Fly, Speed, Reach et détection statistique X-Ray; aucun kick ou ban automatique.
+
+
+## 1.0.8
+- Ajout de GrimAC avec alertes et logs uniquement; configuration sans kick/ban automatique.
+- Ajout de ViaVersion et ViaBackwards sur les backends Paper pour la compatibilité des versions Java.
+- Dashboard web: console du serveur en direct et exécution de commandes réservées au détenteur du jeton administrateur.
