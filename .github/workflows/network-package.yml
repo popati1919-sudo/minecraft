@@ -255,71 +255,79 @@ jobs:
           pause
           EOF
 
-          cat > "$ROOT/DEMARRER-VELOCITY-INITIAL.bat" <<'EOF'
-          @echo off
-          cd /d "%~dp0Velocity"
-          where java >nul 2>nul
-          if errorlevel 1 (echo Java 25 est requis.& pause & exit /b 1)
-          if not exist "velocity.jar" (echo velocity.jar introuvable.& pause & exit /b 1)
-          echo Premier lancement: attends que Geyser et Floodgate generent leurs fichiers.
-          echo Quand Velocity est pret, tape CTRL+C dans cette fenetre pour l'arreter.
-          java -Xms512M -Xmx1G -jar velocity.jar
-          pause
-          EOF
-
-          cat > "$ROOT/CONFIGURER-BEDROCK.bat" <<'EOF'
-          @echo off
-          cd /d "%~dp0Velocity"
-          if not exist "plugins\Geyser-Velocity\config.yml" (
-            echo Lance Velocity une fois, puis ferme-le avec CTRL+C.
-            pause
-            exit /b 1
-          )
-          powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='plugins\Geyser-Velocity\config.yml'; $s=Get-Content -Raw $p; $s=[regex]::Replace($s,'(?m)^(\s*auth-type\s*:\s*)[^\r\n]+','$1floodgate'); $s=[regex]::Replace($s,'(?m)^(\s*transport\s*:\s*)[^\r\n]+','$1nethernet'); Set-Content -Path $p -Value $s -Encoding utf8"
-          if errorlevel 1 (echo Echec de configuration Geyser.& pause & exit /b 1)
-          echo Geyser configure: Floodgate + NetherNet. Ouvre TCP et UDP 19132.
-          pause
-          EOF
-
+          # Un seul script regroupe le premier lancement de Velocity, Geyser/Floodgate et la configuration des backends.
           cat > "$ROOT/CONFIGURER-RESEAU.bat" <<'EOF'
           @echo off
+          setlocal
+          title LarpersCoin - Configuration du reseau
           cd /d "%~dp0"
-          set "FGKEY=%~dp0Velocity\\plugins\\floodgate\\key.pem"
-          if not exist "%FGKEY%" (
-            echo Cle Floodgate introuvable. Lance Velocity une fois puis ferme-le.
+          if not exist "Velocity\\velocity.jar" (echo velocity.jar introuvable.& pause & exit /b 1)
+          if not exist "Velocity\\plugins\\Geyser-Velocity\\config.yml" (
+            echo Premier lancement de Velocity pour generer Geyser et Floodgate.
+            echo Attends le demarrage complet, puis ferme cette fenetre avec CTRL+C.
+            cd /d "%~dp0Velocity"
+            java -Xms512M -Xmx1G -jar velocity.jar
+            echo.
+            echo Relance CONFIGURER-RESEAU.bat apres avoir ferme Velocity.
             pause
-            exit /b 1
+            exit /b 0
           )
+          set "FGKEY=%~dp0Velocity\\plugins\\floodgate\\key.pem"
+          if not exist "%FGKEY%" (echo Cle Floodgate introuvable. Verifie le premier lancement de Velocity.& pause & exit /b 1)
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='%~dp0Velocity\\plugins\\Geyser-Velocity\\config.yml'; $s=Get-Content -Raw $p; $s=[regex]::Replace($s,'(?m)^(\\s*auth-type\\s*:\\s*)[^\\r\\n]+','$1floodgate'); $s=[regex]::Replace($s,'(?m)^(\\s*transport\\s*:\\s*)[^\\r\\n]+','$1nethernet'); Set-Content -Path $p -Value $s -Encoding utf8"
+          if errorlevel 1 (echo Echec de configuration Geyser.& pause & exit /b 1)
           for %%S in (Lobby SMP) do (
             if not exist "%%S\\plugins\\floodgate" mkdir "%%S\\plugins\\floodgate"
             copy /Y "%FGKEY%" "%%S\\plugins\\floodgate\\key.pem" >nul
           )
-          echo Cle Floodgate partagee avec Lobby et SMP.
-          echo Les joueurs Java premium/crack doivent creer un compte avec /register puis /login; Bedrock passe par Floodgate.
-          echo Les joueurs Bedrock passent par Floodgate.
+          if errorlevel 1 (echo Echec de copie de la cle Floodgate.& pause & exit /b 1)
+          echo.
+          echo Configuration terminee: Geyser Floodgate + NetherNet.
+          echo La cle Floodgate est partagee avec Lobby et SMP.
+          echo Ouvre ensuite CONFIGURER-RESEAU une seule fois apres chaque mise a jour de Floodgate.
           pause
           EOF
 
-          cat > "$ROOT/CONFIGURER-LES-GROUPES.bat" <<'EOF'
-          @echo off
-          echo Entre ces commandes dans la console du SMP, sans slash:
-          echo.
-          echo lp creategroup admin
-          echo lp group admin permission set larpers.admin true
-          echo lp group admin permission set larpers.staff true
-          echo lp group admin permission set larpers.anticheat.use true
-          echo lp group admin permission set larpers.anticheat.alerts true
-          echo.
-          echo lp creategroup moderator
-          echo lp group moderator permission set larpers.staff true
-          echo lp group moderator permission set larpers.anticheat.mod true
-          echo lp group moderator permission set larpers.anticheat.use true
-          echo lp group moderator permission set larpers.anticheat.alerts true
-          echo.
-          echo lp user PSEUDO parent set admin
-          echo lp user PSEUDO parent set moderator
-          echo Remplace PSEUDO par le pseudo exact. Ne donne admin qu'aux personnes de confiance.
-          pause
+          # Les commandes LuckPerms sont fournies en texte pour etre collees dans la console SMP.
+          cat > "$ROOT/GROUPES-LUCKPERMS.txt" <<'EOF'
+          GROUPES LUCKPERMS - LARPERS COIN
+          =================================
+          Colle ces commandes dans la console du SMP, sans slash, dans l'ordre.
+
+          lp creategroup joueur
+          lp group default parent add joueur
+
+          lp creategroup vip
+          lp group vip parent add joueur
+          lp group vip permission set larpers.vip true
+
+          lp creategroup moderateur
+          lp group moderateur parent add joueur
+          lp group moderateur permission set larpers.staff true
+          lp group moderateur permission set larpers.moderation true
+          lp group moderateur permission set larpers.anticheat.mod true
+          lp group moderateur permission set larpers.anticheat.use true
+          lp group moderateur permission set larpers.anticheat.alerts true
+
+          lp creategroup admin
+          lp group admin parent add moderateur
+          lp group admin permission set larpers.admin true
+          lp group admin permission set larpers.economy.alerts true
+          lp group admin permission set larpers.chat.bypass true
+          lp group admin permission set larpers.anticheat.bypass true
+
+          lp creategroup fondateur
+          lp group fondateur parent add admin
+
+          EXEMPLES POUR ATTRIBUER UN GROUPE:
+          lp user PSEUDO parent set joueur
+          lp user PSEUDO parent set vip
+          lp user PSEUDO parent set moderateur
+          lp user PSEUDO parent set admin
+          lp user PSEUDO parent set fondateur
+
+          Le groupe default herite de joueur automatiquement.
+          Remplace PSEUDO par le pseudo exact. Admin et Fondateur sont reserves aux personnes de confiance.
           EOF
 
           cat > "$ROOT/OUVRIR-PORTS-WINDOWS.bat" <<'EOF'
