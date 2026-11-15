@@ -523,6 +523,17 @@ jobs:
           - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
           EOF
 
+      - name: Valider la syntaxe du superviseur PowerShell
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("package/LarpersCoin-Network/SUPERVISEUR-RESEAU.ps1", [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List
+            exit 1
+          }
+
       - name: Creer le ZIP reseau
         run: |
           cd package
