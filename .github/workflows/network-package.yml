@@ -7,6 +7,8 @@ on:
       - ".github/workflows/network-package.yml"
       - "plugin-source/**"
       - "velocity-plugin/**"
+      - "SUPERVISEUR-RESEAU.ps1"
+      - "DEMARRER-RESEAU.ps1"
   workflow_dispatch:
 
 permissions:
