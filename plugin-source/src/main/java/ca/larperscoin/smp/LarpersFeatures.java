@@ -193,7 +193,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         Inventory inv=Bukkit.createInventory(null,27,"LPC | Clan");
         inv.setItem(10,item(Material.BOOK,"Informations","/clan info"));
         inv.setItem(12,item(Material.GOLD_INGOT,"Banque","/clan bank"));
-        inv.setItem(14,item(Material.CHEST,"Coffre partagé","/clan chest"));
+        inv.setItem(14,item(Material.CHEST,"Coffre partagé","1 emplacement disponible au départ","/clan chest"));
+        String own=clanOf(p.getUniqueId());
+        int chestLevel=own==null?1:Math.max(1,db.getInt(clanPath(own)+".chest-level",1));
+        double upgradePrice=250.0*Math.pow(2,chestLevel-1);
+        inv.setItem(15,item(Material.ANVIL,"Améliorer le coffre","Capacité actuelle: "+(chestLevel==1?1:(chestLevel-1)*9)+"/54","Prochaine amélioration: "+upgradePrice+" LPC","Clique pour payer et agrandir"));
         inv.setItem(16,item(Material.EMERALD,"Classement","/clan top"));
         inv.setItem(22,item(Material.BARRIER,"Fermer"));
         LpcMenuTheme.frame(inv);
@@ -1063,7 +1067,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(!(e.getWhoClicked() instanceof Player viewer)) return;
             if(e.getRawSlot()==22) { viewer.closeInventory();return; }
             if(title.equals("LPC | Clan")) {
-                String command=switch(e.getRawSlot()) { case 10 -> "clan info";case 12 -> "clan bank";case 14 -> "clan chest";case 16 -> "clan top";default -> null; };
+                String command=switch(e.getRawSlot()) { case 10 -> "clan info";case 12 -> "clan bank";case 14 -> "clan chest";case 15 -> "clan chest upgrade";case 16 -> "clan top";default -> null; };
                 if(command!=null){viewer.closeInventory();viewer.performCommand(command);}
             } else {
                 String command=switch(e.getRawSlot()) { case 11 -> "quests claim";case 15 -> "quests weekly claim";default -> null; };
