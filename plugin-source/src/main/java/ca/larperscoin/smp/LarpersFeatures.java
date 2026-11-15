@@ -426,7 +426,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private boolean adminCommand(CommandSender sender,String[] args) {
         if(args.length==0) {
             Player p=player(sender);
-            if(p!=null){if(!staff(p))msg(p,"Permission insuffisante.");else openAdmin(p);}
+            if(p!=null){if(!core.isLpcAdmin(p))msg(p,"Le menu /admin est réservé aux administrateurs.");else openAdmin(p);}
             return true;
         }
         if(args[0].equalsIgnoreCase("reset")) {
@@ -588,9 +588,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     if(contents!=null)for(int i=0;i<Math.min(54,contents.size());i++)inv.setItem(i,contents.get(i));
                     int storedLevel=db.getInt(clanPath(own)+".chest-level",0);
                     if(storedLevel<=0) {
-                        boolean legacyItems=contents!=null && contents.size()>1
-                                && contents.subList(1,Math.min(54,contents.size())).stream().anyMatch(Objects::nonNull);
-                        storedLevel=legacyItems?7:1;
+                        // Un coffre déjà sauvegardé avant ce système conserve son ancienne capacité.
+                        storedLevel=db.contains(clanPath(own)+".chest")?7:1;
                         db.set(clanPath(own)+".chest-level",storedLevel);
                     }
                     int loadedLevel=Math.max(1,Math.min(7,storedLevel));
