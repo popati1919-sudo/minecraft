@@ -52,6 +52,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private YamlConfiguration data;
     private LarpersFeatures features;
     private LarpersAntiCheat antiCheat;
+    private LarpersWebDashboard webDashboard;
     private LarpersAuth auth;
     private File dataFile;
     private final DecimalFormat money = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.CANADA_FRENCH));
@@ -75,6 +76,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         auth = new LarpersAuth(this);
         features = new LarpersFeatures(this);
         antiCheat = new LarpersAntiCheat(this);
+        webDashboard = new LarpersWebDashboard(this, this);
         long lotteryEnd=data.getLong("lottery.ends-at",0L);
         if(data.getBoolean("lottery.active",false)) {
             long remaining=Math.max(1L,lotteryEnd-System.currentTimeMillis());
@@ -100,6 +102,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     public void onDisable() {
         if (features != null) features.shutdown();
         if (antiCheat != null) antiCheat.shutdown();
+        if (webDashboard != null) webDashboard.shutdown();
         saveData();
     }
 
@@ -441,6 +444,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     }
 
     public boolean resetAuthAccount(String playerName){return auth!=null&&auth.resetAccount(playerName);}
+    LarpersAntiCheat getAntiCheat(){return antiCheat;}
     public double lotteryPot(){return Math.max(0.0,data.getDouble("lottery.pot",0.0));}
     public int lotteryTicketCount(){return data.getStringList("lottery.tickets").size();}
     public boolean lotteryActive(){return data.getBoolean("lottery.active",false);}
