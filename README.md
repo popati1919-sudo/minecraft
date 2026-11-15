@@ -119,3 +119,17 @@ Pour accéder au dashboard depuis Internet, configure `web-admin.bind: 0.0.0.0` 
 ## Anti-triche sans bannissement automatique
 
 Les détections Speed, Fly, Reach et X-Ray suspect ajoutent des alertes et des éléments de preuve consultables par le staff avec `/ac log`, `/ac top` et dans le dashboard. Aucun seuil ne déclenche de kick ou de ban automatique. Les statistiques X-Ray sont heuristiques et doivent être vérifiées manuellement avant toute sanction.
+
+
+## Compatibilité Java et anti-triche (1.0.8)
+
+Les ZIP générés installent automatiquement:
+- **ViaVersion 5.12.2** et **ViaBackwards 5.12.2** sur Lobby et SMP (et sur le serveur autonome), pour permettre aux clients Java de différentes versions prises en charge de rejoindre le serveur Paper 26.3.
+- **GrimAC** sur le SMP (et sur le serveur autonome). GrimAC est compatible Paper et fournit les contrôles de mouvement, combat et paquets. Grim exempte les joueurs Geyser/Floodgate de ses contrôles; les joueurs Bedrock ne doivent donc pas être jugés sur les mêmes détections Java.
+- Le fichier `plugins/GrimAC/punishments.yml` est préinstallé avec uniquement `[alert]` et `[log]`: **aucun kick ou ban automatique** n'est configuré. Les alertes doivent être vérifiées par un membre du staff avant toute sanction.
+
+## Console web en direct
+
+Le dashboard du SMP (ou du serveur autonome) affiche les dernières lignes du journal et actualise les données toutes les 2 secondes. Il permet aussi d'envoyer une commande comme si elle était saisie dans la console serveur. Toutes les commandes sont exécutées avec les droits console: garde donc le jeton privé.
+
+Par défaut, le site écoute uniquement sur `http://127.0.0.1:8765`. Pour y accéder depuis l'extérieur, utilise un reverse proxy HTTPS authentifié et configure `web-admin.bind: 0.0.0.0` dans `plugins/LarpersCoin/config.yml`; ne publie jamais directement le port 8765 en HTTP. Le jeton est dans `plugins/LarpersCoin/web-admin.yml`.
