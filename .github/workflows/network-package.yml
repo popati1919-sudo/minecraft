@@ -254,7 +254,8 @@ jobs:
             $psi = [System.Diagnostics.ProcessStartInfo]::new()
             $psi.FileName = $Java
             $psi.WorkingDirectory = $folder
-            $psi.Arguments = $Server.Memory + ' -jar "' + $Server.Jar + '" --nogui'
+            $psi.Arguments = $Server.Memory + ' -jar "' + $Server.Jar + '"' 
+            if ($Server.Name -ne 'Velocity') { $psi.Arguments += ' --nogui' }
             $psi.UseShellExecute = $false
             $psi.CreateNoWindow = $true
             $psi.RedirectStandardInput = $true
