@@ -208,7 +208,7 @@ final class LarpersWebDashboard {
             out.append("{\"name\":\"").append(json(name == null ? entry.getKey().toString() : name))
                     .append("\",\"count\":").append(entry.getValue()).append('}');
         }
-        out.append("],\\"console\\":[");
+        out.append("],\"console\":[");
         first = true;
         for (String line : new ArrayList<>(consoleLines)) {
             if (!first) out.append(',');
