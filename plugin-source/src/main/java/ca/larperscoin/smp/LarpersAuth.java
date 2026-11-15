@@ -57,13 +57,13 @@ final class LarpersAuth implements Listener {
 
     LarpersAuth(JavaPlugin plugin) {
         this.plugin = plugin;
+        File siblingLobbyData = new File(plugin.getServer().getWorldContainer(),
+                "../Lobby/plugins/LarpersCoin");
+        boolean networkBackend = !plugin.getConfig().getBoolean("network.auth-only", false)
+                && siblingLobbyData.isDirectory();
         String storage = plugin.getConfig().getString("auth.storage-file");
         if (storage == null || storage.isBlank()) {
-            File siblingLobbyData = new File(plugin.getServer().getWorldContainer(),
-                    "../Lobby/plugins/LarpersCoin");
-            storage = !plugin.getConfig().getBoolean("network.auth-only", false)
-                    && siblingLobbyData.isDirectory()
-                    ? "../Lobby/plugins/LarpersCoin/auth.yml" : "auth.yml";
+            storage = networkBackend ? "../Lobby/plugins/LarpersCoin/auth.yml" : "auth.yml";
         }
         Path storagePath = Path.of(storage);
         if (!storagePath.isAbsolute()) {
@@ -76,6 +76,10 @@ final class LarpersAuth implements Listener {
         if (parent != null && !parent.exists()) parent.mkdirs();
         reloadAccounts();
         plugin.getConfig().addDefault("auth.proxy-authenticated", false);
+        // Un serveur autonome ne doit jamais considérer tous les joueurs comme déjà authentifiés.
+        if (!plugin.getConfig().getBoolean("network.auth-only", false) && !siblingLobbyData.isDirectory()) {
+            plugin.getConfig().set("auth.proxy-authenticated", false);
+        }
         plugin.getConfig().addDefault("auth.remember-ip", false);
         plugin.getConfig().addDefault("auth.connect-to-smp", false);
         Bukkit.getMessenger().registerOutgoingPluginChannel(plugin, "BungeeCord");
