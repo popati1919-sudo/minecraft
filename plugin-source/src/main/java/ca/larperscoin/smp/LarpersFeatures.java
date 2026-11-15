@@ -63,6 +63,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Set<UUID> awaitingSelectorSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<UUID, String> bountySearch = new HashMap<>();
     private final Set<UUID> awaitingBountySearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<UUID> awaitingLotteryAmount = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<UUID> awaitingAdminIp = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
     private static final Map<String, Material> SHOP = new LinkedHashMap<>();
     private static final Map<String, Double> SHOP_PRICES = new LinkedHashMap<>();
@@ -160,8 +162,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     public void openLotteryMenu(Player p) {
         Inventory inv=Bukkit.createInventory(null,27,"LPC | Loterie");
         boolean active=core.lotteryActive();
-        inv.setItem(10,item(Material.PAPER,"Acheter 1 ticket","Prix: 50 LPC","Clique pour acheter"));
-        inv.setItem(12,item(Material.GOLD_INGOT,"Acheter 5 tickets","Prix: 250 LPC","Clique pour acheter"));
+        inv.setItem(10,item(Material.PAPER,"Acheter 1 ticket","Prix: 50 LPC","Achat rapide"));
+        inv.setItem(12,item(Material.WRITABLE_BOOK,"Personnaliser","Choisis le nombre de tickets","De 1 à 1 000 tickets"));
         inv.setItem(14,item(Material.EMERALD,"Jackpot: "+core.lotteryPot()+" LPC",
             "Tickets vendus: "+core.lotteryTicketCount(),
             active?"Loterie en cours":"Aucune loterie en cours"));
@@ -215,27 +217,20 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         LpcMenuTheme.frame(inv);
         p.openInventory(inv);
     }
-    private void openAdmin(Player p) { openAdmin(p,0); }
-    private void openAdmin(Player p,int page) {
-        page=Math.max(0,Math.min(2,page));adminPage.put(p.getUniqueId(),page);
+    private void openAdmin(Player p) {
         Inventory inv=Bukkit.createInventory(null,54,"LPC | Administration");
-        if(page==0) {
-            inv.setItem(10,item(Material.BOOK,"Voir inventaire","Sélectionner un joueur"));
-            inv.setItem(12,item(Material.ICE,"Freeze","Sélectionner un joueur"));
-            inv.setItem(14,item(Material.ENDER_EYE,"Vanish","Activer/désactiver"));
-            inv.setItem(16,item(Material.REDSTONE_TORCH,"Staffchat","/staffchat <message>"));
-            inv.setItem(53,item(Material.ARROW,"Page suivante"));
-        } else if(page==1) {
-            inv.setItem(10,item(Material.GOLD_INGOT,"Économie LPC","/eco give|take|set <joueur> <montant>"));
-            inv.setItem(12,item(Material.CHEST,"Jackpot","Afficher /lottery pot"));
-            inv.setItem(14,item(Material.DIAMOND,"Tirage loterie","/lottery draw"));
-            inv.setItem(16,item(Material.EMERALD,"Classement LPC","/baltop"));
-            inv.setItem(45,item(Material.ARROW,"Page précédente"));
-            inv.setItem(53,item(Material.ARROW,"Page suivante"));
-        } else {
-            inv.setItem(10,item(Material.COMMAND_BLOCK,"Gestion OP","Donner ou retirer OP à un joueur en ligne","Confirmation obligatoire"));
-            inv.setItem(45,item(Material.ARROW,"Page précédente"));
-        }
+        inv.setItem(10,item(Material.BOOK,"Voir inventaire","Choisir un joueur"));
+        inv.setItem(12,item(Material.ICE,"Freeze / dégeler","Choisir un joueur"));
+        inv.setItem(14,item(Material.ENDER_EYE,"Vanish","Activer ou désactiver"));
+        inv.setItem(16,item(Material.REDSTONE_TORCH,"Staffchat","/staffchat <message>"));
+        inv.setItem(19,item(Material.TRIPWIRE_HOOK,"Réinitialiser mot de passe","Choisir un joueur","Le joueur sera expulsé et devra refaire /register"));
+        inv.setItem(21,item(Material.GOLD_INGOT,"Économie LPC","/eco give|take|set <joueur> <montant>"));
+        inv.setItem(23,item(Material.FIREWORK_ROCKET,"Loterie","Ouvrir le menu et gérer le tirage"));
+        inv.setItem(25,item(Material.EMERALD,"Classements","Ouvrir /top"));
+        inv.setItem(28,item(Material.COMMAND_BLOCK,"Gestion OP","Choisir un joueur","Confirmation obligatoire"));
+        inv.setItem(30,item(Material.COMPASS,"Adresse du serveur","IP actuelle: "+plugin.getConfig().getString("server-display.ip","Non configurée"),"Clique puis saisis: IP nom"));
+        inv.setItem(32,item(Material.SHIELD,"Anti-triche","/ac status"));
+        inv.setItem(34,item(Material.SUNFLOWER,"Actualiser le menu"));
         inv.setItem(49,item(Material.BARRIER,"Fermer"));
         LpcMenuTheme.frame(inv);
         p.openInventory(inv);
@@ -379,7 +374,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 case "clan" -> { return clan(sender,a); }
                 case "quest", "quests" -> { return quests(sender,a); }
                 case "top" -> { Player p=player(sender); if(p!=null)openTopMenu(p); return true; }
-                case "admin" -> { Player p=player(sender); if(p!=null){if(!staff(p))msg(p,"Permission insuffisante.");else openAdmin(p);} return true; }
+                case "admin" -> { return adminCommand(sender,a); }
                 case "vanish" -> {
                     Player p=player(sender); if(p==null)return true; if(!staff(p)){msg(p,"Permission insuffisante.");return true;}
                     if(vanished.remove(p.getUniqueId())) { for(Player x:Bukkit.getOnlinePlayers())x.showPlayer(plugin,p); msg(p,"Vanish désactivé."); }
@@ -413,6 +408,38 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         } catch (RuntimeException ex) {
             plugin.getLogger().warning("Erreur /"+c+": "+ex.getMessage()); msg(sender,"Erreur de commande. Consulte la console."); return true;
         }
+    }
+
+    private boolean adminCommand(CommandSender sender,String[] args) {
+        if(args.length==0) {
+            Player p=player(sender);
+            if(p!=null){if(!staff(p))msg(p,"Permission insuffisante.");else openAdmin(p);}
+            return true;
+        }
+        if(args[0].equalsIgnoreCase("reset")) {
+            if(!sender.isOp()&&!sender.hasPermission("larpers.admin")){msg(sender,"Cette action est réservée aux administrateurs.");return true;}
+            if(args.length!=2){msg(sender,"Usage: /admin reset <joueur>");return true;}
+            if(!core.resetAuthAccount(args[1]))msg(sender,"Aucun compte enregistré pour "+args[1]+".");
+            else msg(sender,"Mot de passe réinitialisé pour "+args[1]+". S'il était connecté, il a été expulsé et devra refaire /register.");
+            return true;
+        }
+        if(args[0].equalsIgnoreCase("ip")) {
+            if(!sender.isOp()&&!sender.hasPermission("larpers.admin")){msg(sender,"Seul un administrateur peut modifier l'adresse affichée.");return true;}
+            if(args.length<3){msg(sender,"Usage: /admin ip <adresse:port> <nom du serveur>");return true;}
+            String address=args[1];
+            if(!address.matches("(?i)^(?:[a-z0-9.-]+|\\[[0-9a-f:]+\\])(?::[0-9]{1,5})?$")){msg(sender,"Adresse invalide. Exemple: play.exemple.ca:25565");return true;}
+            int colon=address.lastIndexOf(':');
+            if(colon>0&&address.charAt(0)!='['){try{int port=Integer.parseInt(address.substring(colon+1));if(port<1||port>65535)throw new NumberFormatException();}catch(NumberFormatException ex){msg(sender,"Port invalide (1 à 65535).");return true;}}
+            String serverName=String.join(" ",Arrays.copyOfRange(args,2,args.length)).trim();
+            if(serverName.isEmpty()||serverName.length()>32){msg(sender,"Le nom doit contenir entre 1 et 32 caractères.");return true;}
+            plugin.getConfig().set("server-display.ip",address);
+            plugin.getConfig().set("server-display.name",serverName);
+            plugin.saveConfig();
+            msg(sender,"Adresse affichée mise à jour: "+serverName+" — "+address+".");
+            return true;
+        }
+        msg(sender,"Sous-commandes: /admin | /admin reset <joueur> | /admin ip <adresse:port> <nom>");
+        return true;
     }
 
     private boolean clan(CommandSender s,String[] a) {
@@ -862,7 +889,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(!(e.getWhoClicked() instanceof Player p)||e.getRawSlot()<0||e.getRawSlot()>=e.getView().getTopInventory().getSize())return;
             switch(e.getRawSlot()) {
                 case 10 -> {p.closeInventory();p.performCommand("lottery buy 1");Bukkit.getScheduler().runTaskLater(plugin,()->openLotteryMenu(p),2L);}
-                case 12 -> {p.closeInventory();p.performCommand("lottery buy 5");Bukkit.getScheduler().runTaskLater(plugin,()->openLotteryMenu(p),2L);}
+                case 12 -> {awaitingLotteryAmount.add(p.getUniqueId());p.closeInventory();msg(p,"Combien de tickets veux-tu acheter? Écris un nombre de 1 à 1 000 dans le chat (ou 'annuler').");}
                 case 22 -> {
                     if(!core.isLpcAdmin(p)){msg(p,"Seuls les administrateurs peuvent démarrer ou terminer une loterie.");return;}
                     p.closeInventory();
@@ -877,23 +904,27 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(title.equals("LPC | Administration")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player p)) return;
-            int page=adminPage.getOrDefault(p.getUniqueId(),0),slot=e.getRawSlot();
+            int slot=e.getRawSlot();
             if(slot==49){p.closeInventory();return;}
-            if(slot==53&&page<2){openAdmin(p,page+1);return;}
-            if(slot==45&&page>0){openAdmin(p,page-1);return;}
-            if(page==0)switch(slot) {
+            switch(slot) {
                 case 10 -> openPlayerSelector(p,"invsee");
                 case 12 -> openPlayerSelector(p,"freeze");
                 case 14 -> {p.closeInventory();p.performCommand("vanish");}
                 case 16 -> msg(p,"Utilise /staffchat <message> pour parler au staff.");
+                case 19 -> {if(!core.isLpcAdmin(p)){msg(p,"Réinitialisation réservée aux administrateurs.");return;}openPlayerSelector(p,"reset");}
+                case 21 -> {p.closeInventory();msg(p,"Économie: /eco give|take|set <joueur> <montant>.");}
+                case 23 -> {p.closeInventory();p.performCommand("lottery");}
+                case 25 -> {p.closeInventory();p.performCommand("top");}
+                case 28 -> openPlayerSelector(p,"op/deop");
+                case 30 -> {
+                    if(!core.isLpcAdmin(p)){msg(p,"Seul un administrateur peut modifier l'adresse.");return;}
+                    awaitingAdminIp.add(p.getUniqueId());p.closeInventory();
+                    msg(p,"Écris: <adresse:port> <nom du serveur> (ex.: play.exemple.ca:25565 Larpers Coin).");
+                }
+                case 32 -> {p.closeInventory();p.performCommand("ac status");}
+                case 34 -> openAdmin(p);
                 default -> { }
-            } else if(page==1) switch(slot) {
-                case 10 -> msg(p,"Économie: /eco give|take|set <joueur> <montant>.");
-                case 12 -> {p.closeInventory();p.performCommand("lottery pot");}
-                case 14 -> {p.closeInventory();p.performCommand("lottery draw");}
-                case 16 -> {p.closeInventory();p.performCommand("baltop");}
-                default -> { }
-            } else if(page==2&&slot==10) openPlayerSelector(p,"op/deop");
+            }
             return;
         }
         if(title.startsWith("LPC | Sélection ")) {
@@ -911,7 +942,12 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(target==null) { msg(viewer,"Ce joueur n'est plus en ligne.");viewer.closeInventory();return; }
             if(title.endsWith("invsee")) viewer.openInventory(target.getInventory());
             else if(title.endsWith("op/deop")) openOpConfirm(viewer,target);
-            else { viewer.closeInventory();viewer.performCommand("freeze "+target.getName()); }
+            else if(title.endsWith("reset")) {
+                if(!core.isLpcAdmin(viewer)){msg(viewer,"Réinitialisation réservée aux administrateurs.");return;}
+                viewer.closeInventory();
+                if(core.resetAuthAccount(target.getName()))msg(viewer,"Mot de passe réinitialisé pour "+target.getName()+". Le joueur a été expulsé et devra refaire /register.");
+                else msg(viewer,"Aucun compte enregistré pour "+target.getName()+".");
+            } else { viewer.closeInventory();viewer.performCommand("freeze "+target.getName()); }
         }
         if(title.equals("LPC | Confirmer OP")) {
             e.setCancelled(true);
@@ -1072,11 +1108,37 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         UUID id=e.getPlayer().getUniqueId();
         frozen.remove(id);awaitingAhSearch.remove(id);pendingBountyTarget.remove(id);
         awaitingSelectorSearch.remove(id);awaitingBountySearch.remove(id);
+        awaitingLotteryAmount.remove(id);awaitingAdminIp.remove(id);
         selectorAction.remove(id);selectorSearch.remove(id);bountySearch.remove(id);
     }
     @EventHandler public void onChatSearch(org.bukkit.event.player.AsyncPlayerChatEvent e) {
         Player sender=e.getPlayer();
         UUID senderId=sender.getUniqueId();
+        if(awaitingLotteryAmount.remove(senderId)) {
+            e.setCancelled(true);
+            String raw=e.getMessage().trim();
+            Bukkit.getScheduler().runTask(plugin,()->{
+                if(raw.equalsIgnoreCase("annuler")){msg(sender,"Achat personnalisé annulé.");openLotteryMenu(sender);return;}
+                try {
+                    int count=Integer.parseInt(raw);
+                    if(count<1||count>1000){msg(sender,"Choisis un nombre de 1 à 1 000.");openLotteryMenu(sender);return;}
+                    sender.performCommand("lottery buy "+count);
+                    openLotteryMenu(sender);
+                } catch(NumberFormatException ex){msg(sender,"Écris uniquement un nombre entier.");openLotteryMenu(sender);}
+            });
+            return;
+        }
+        if(awaitingAdminIp.remove(senderId)) {
+            e.setCancelled(true);
+            String raw=e.getMessage().trim();
+            Bukkit.getScheduler().runTask(plugin,()->{
+                if(!core.isLpcAdmin(sender)){msg(sender,"Seul un administrateur peut modifier l'adresse.");return;}
+                String[] parts=raw.split("\\s+",2);
+                if(parts.length<2){msg(sender,"Format: <adresse:port> <nom du serveur>.");return;}
+                adminCommand(sender,new String[]{"ip",parts[0],parts[1]});
+            });
+            return;
+        }
         if(awaitingSelectorSearch.remove(senderId)) {
             e.setCancelled(true);
             String query=e.getMessage().trim();
@@ -1122,11 +1184,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
     }
     @Override public List<String> onTabComplete(CommandSender s,Command c,String alias,String[] a) {
+        if(c.getName().equalsIgnoreCase("admin")&&a.length==1)return List.of("reset","ip");
         if(c.getName().equalsIgnoreCase("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","audit","stats","leaderboard");
         if(c.getName().equalsIgnoreCase("ah")&&a.length==1)return List.of("list","search","sell","buy");
         if(c.getName().equalsIgnoreCase("ah")&&a.length==2&&a[0].equalsIgnoreCase("search"))return List.of("clear");
-        if(c.getName().equalsIgnoreCase("shop")&&a.length==1)return List.of("search","buy");
-        if(c.getName().equalsIgnoreCase("quiz")&&a.length==1)return List.of("top");
+        if(c.getName().equalsIgnoreCase("lottery")&&a.length==2&&a[0].equalsIgnoreCase("buy"))return List.of("1","10","50","100","500","1000");
         return List.of();
     }
 }
