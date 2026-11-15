@@ -239,20 +239,20 @@ final class LarpersWebPanel {
                     String line = "[" + name + "] " + lines.get(i);
                     if (!first) out.append(',');
                     first = false;
-                    out.append("\\\"").append(escape(line)).append("\\\"");
+                    out.append("\"").append(escape(line)).append("\"");
                 }
             } catch (IOException ex) {
                 String line = "[" + name + "] Impossible de lire le journal: " + ex.getMessage();
                 if (!first) out.append(',');
                 first = false;
-                out.append("\\\"").append(escape(line)).append("\\\"");
+                out.append("\"").append(escape(line)).append("\"");
             }
         }
         synchronized (this) {
             for (String event : liveEvents) {
                 if (!first) out.append(',');
                 first = false;
-                out.append("\\\"").append(escape(event)).append("\\\"");
+                out.append("\"").append(escape(event)).append("\"");
             }
         }
         return out.append("]").toString();
