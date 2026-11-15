@@ -365,12 +365,14 @@ jobs:
           echo lp group admin permission set larpers.staff true
           echo lp group admin permission set larpers.anticheat.use true
           echo lp group admin permission set larpers.anticheat.alerts true
+          echo lp group admin permission set grim.alerts true
           echo.
           echo lp creategroup moderator
           echo lp group moderator permission set larpers.staff true
           echo lp group moderator permission set larpers.anticheat.mod true
           echo lp group moderator permission set larpers.anticheat.use true
           echo lp group moderator permission set larpers.anticheat.alerts true
+          echo lp group moderator permission set grim.alerts true
           echo.
           echo lp user PSEUDO parent set admin
           echo lp user PSEUDO parent set moderator
@@ -421,7 +423,10 @@ jobs:
           - Bedrock doit passer par Geyser auth-type floodgate + NetherNet; la meme cle Floodgate doit etre partagee avec les deux backends.
           - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
           - Ne change pas online-mode du proxy et ne rends jamais les ports backend publics.
-          - Le plugin anticheat utilise des seuils de sanctions progressives configurables; ajuste-les apres tests.
+          - GrimAC est configure pour alerter et journaliser uniquement: aucun kick/ban automatique.
+          - Les permissions grim.alerts sont proposees aux groupes admin et moderator.
+          - Dashboard web: http://127.0.0.1:8765 sur la machine SMP; jeton dans SMP/plugins/LarpersCoin/web-admin.yml.
+          - La console web execute des commandes avec les droits console: protege le jeton et passe par HTTPS si tu l'exposes via un reverse proxy.
           - Les mondes et donnees existants ne sont pas inclus: ce ZIP est un paquet serveur propre.
           - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
           EOF
