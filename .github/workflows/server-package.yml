@@ -60,6 +60,16 @@ jobs:
           test -s package/LarpersCoin-Server-Ready/plugins/Geyser-Spigot.jar
           test -s package/LarpersCoin-Server-Ready/plugins/floodgate-spigot.jar
 
+          curl -fL "https://github.com/ViaVersion/ViaVersion/releases/download/5.12.2/ViaVersion-5.12.2.jar" -o package/LarpersCoin-Server-Ready/plugins/ViaVersion.jar
+          curl -fL "https://github.com/ViaVersion/ViaBackwards/releases/download/5.12.2/ViaBackwards-5.12.2.jar" -o package/LarpersCoin-Server-Ready/plugins/ViaBackwards.jar
+          GRIM_META="$(curl -fsSL 'https://api.modrinth.com/v2/project/grimac/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
+          GRIM_URL="$(echo "$GRIM_META" | jq -r '[.[] | select(.version_type == "release") | .files[] | select(.primary == true) | .url][0] // empty')"
+          test -n "$GRIM_URL"
+          curl -fL "$GRIM_URL" -o package/LarpersCoin-Server-Ready/plugins/GrimAC.jar
+          test -s package/LarpersCoin-Server-Ready/plugins/ViaVersion.jar
+          test -s package/LarpersCoin-Server-Ready/plugins/ViaBackwards.jar
+          test -s package/LarpersCoin-Server-Ready/plugins/GrimAC.jar
+
           PLUGIN_JAR="$(find plugin-source/build/libs -maxdepth 1 -type f -name 'LarpersCoin-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
           test -n "$PLUGIN_JAR"
           cp "$PLUGIN_JAR" package/LarpersCoin-Server-Ready/plugins/LarpersCoin.jar
@@ -198,6 +208,8 @@ jobs:
           - Plugin LarpersCoin compile depuis le depot
           - LuckPerms (gestion Admin/Moderateur)
           - Geyser + Floodgate (accès Bedrock)
+          - ViaVersion + ViaBackwards (compatibilité Java multi-version)
+          - GrimAC (anticheat; vérifications manuelles, aucune sanction automatique)
           - Authentification Java par /register et /login LarpersCoin
           - Authentification Bedrock via Floodgate
           - Comptes Java crack via /register et /login (mots de passe PBKDF2)
