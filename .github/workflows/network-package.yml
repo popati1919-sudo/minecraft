@@ -228,12 +228,12 @@ jobs:
           anticheat:
             enabled: true
             auto-punish:
-              enabled: true
+              enabled: false
               thresholds:
-                kick: 12
-                ban-1d: 24
-                ban-7d: 36
-                ban-30d: 48
+                kick: 100
+                ban-1d: 180
+                ban-7d: 260
+                ban-30d: 400
           EOF
 
           cat > "$ROOT/START-NETWORK.bat" <<'EOF'
