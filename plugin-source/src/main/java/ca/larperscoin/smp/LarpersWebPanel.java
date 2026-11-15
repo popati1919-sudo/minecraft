@@ -129,8 +129,8 @@ final class LarpersWebPanel {
                 json(exchange, 200, "{\"ok\":true,\"server\":\"LarpersCoin SMP\"}");
             } else if (path.equals("/api/live") && exchange.getRequestMethod().equals("GET")) {
                 String result = onMain(() -> {
-                    StringBuilder out = new StringBuilder("{\\"playersOnline\\":").append(Bukkit.getOnlinePlayers().size())
-                            .append(",\\"maxPlayers\\":").append(Bukkit.getMaxPlayers()).append(",\\"events\\":");
+                    StringBuilder out = new StringBuilder("{\"playersOnline\":").append(Bukkit.getOnlinePlayers().size())
+                            .append(",\"maxPlayers\":").append(Bukkit.getMaxPlayers()).append(",\"events\":");
                     String events = liveEventsJson();
                     out.append(events.substring(events.indexOf(':') + 1));
                     return out.toString();
@@ -141,30 +141,30 @@ final class LarpersWebPanel {
                 YamlConfiguration reports = YamlConfiguration.loadConfiguration(reportFile);
                 List<String> ids = new ArrayList<>(reports.getConfigurationSection("reports") == null ? List.of() : reports.getConfigurationSection("reports").getKeys(false));
                 ids.sort((a,b) -> Long.compare(reports.getLong("reports." + b + ".timestamp"), reports.getLong("reports." + a + ".timestamp")));
-                StringBuilder out = new StringBuilder("{\\"reports\\":[");
+                StringBuilder out = new StringBuilder("{\"reports\":[");
                 boolean first = true;
                 for (String id : ids) {
                     String base = "reports." + id + ".";
                     if (!first) out.append(',');
                     first = false;
-                    out.append("{\\"id\\":\\"").append(escape(id)).append("\\",\\"timestamp\\":").append(reports.getLong(base + "timestamp"))
-                       .append(",\\"player\\":\\"").append(escape(reports.getString(base + "player", "Inconnu")))
-                       .append("\\",\\"check\\":\\"").append(escape(reports.getString(base + "check", "UNKNOWN")))
-                       .append("\\",\\"detail\\":\\"").append(escape(reports.getString(base + "detail", "")))
-                       .append("\\",\\"violations\\":").append(reports.getInt(base + "violations")).append('}');
+                    out.append("{\"id\":\"").append(escape(id)).append("\",\"timestamp\":").append(reports.getLong(base + "timestamp"))
+                       .append(",\"player\":\"").append(escape(reports.getString(base + "player", "Inconnu")))
+                       .append("\",\"check\":\"").append(escape(reports.getString(base + "check", "UNKNOWN")))
+                       .append("\",\"detail\":\"").append(escape(reports.getString(base + "detail", "")))
+                       .append("\",\"violations\":").append(reports.getInt(base + "violations")).append('}');
                 }
                 json(exchange, 200, out.append("]}").toString());
             } else if (path.equals("/api/ac/reports") && exchange.getRequestMethod().equals("DELETE")) {
                 String id = queryValue(exchange.getRequestURI().getRawQuery(), "id");
                 try { UUID.fromString(id == null ? "" : id); }
-                catch (IllegalArgumentException ex) { json(exchange, 400, "{\\"error\\":\\"Identifiant invalide\\"}"); return; }
+                catch (IllegalArgumentException ex) { json(exchange, 400, "{\"error\":\"Identifiant invalide\"}"); return; }
                 File reportFile = plugin.getDataFolder().toPath().resolve("anticheat-reports.yml").toFile();
                 YamlConfiguration reports = YamlConfiguration.loadConfiguration(reportFile);
-                if (!reports.contains("reports." + id)) { json(exchange, 404, "{\\"error\\":\\"Signalement introuvable\\"}"); return; }
+                if (!reports.contains("reports." + id)) { json(exchange, 404, "{\"error\":\"Signalement introuvable\"}"); return; }
                 reports.set("reports." + id, null);
                 reports.save(reportFile);
                 audit("AC_REPORT_DELETE " + id, exchange);
-                json(exchange, 200, "{\\"deleted\\":true}");
+                json(exchange, 200, "{\"deleted\":true}");
             } else if (path.equals("/api/players") && exchange.getRequestMethod().equals("GET")) {
                 String result = onMain(() -> {
                     StringBuilder out = new StringBuilder("{\"players\":[");
