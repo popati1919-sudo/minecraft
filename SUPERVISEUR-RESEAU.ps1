@@ -6,6 +6,7 @@ $servers = @(
     @{ Name = "Velocity"; Dir = "Velocity"; Jar = "velocity.jar"; Heap = "-Xms512M -Xmx1G"; Nogui = $false }
 )
 $processes = @{}
+$restartHistory = New-Object 'System.Collections.Generic.List[datetime]'
 
 function Start-One($server) {
     $folder = Join-Path $root $server.Dir
@@ -14,6 +15,7 @@ function Start-One($server) {
     $logDir = Join-Path $folder "logs"
     New-Item -ItemType Directory -Force -Path $logDir | Out-Null
     $log = Join-Path $logDir "superviseur-console.log"
+    Set-Content -Path $log -Value ("===== " + (Get-Date -Format "yyyy-MM-dd HH:mm:ss") + " | Demarrage " + $server.Name + " =====") -Encoding UTF8
     $nogui = if ($server.Nogui) { " --nogui" } else { "" }
 
     # Lancer Java directement (pas cmd.exe) afin que le PID, stdin et l'arret
@@ -165,6 +167,8 @@ try {
 
         Write-Host "Reseau actif. Ctrl+C arrete le superviseur."
         $restart = $false
+        $crashedServer = $null
+        $crashExitCode = $null
         while (!$restart) {
             $request = Join-Path $root "restart.request"
             if (Test-Path $request) {
@@ -176,7 +180,9 @@ try {
             foreach ($server in $servers) {
                 $proc = $processes[$server.Name]
                 if ($null -eq $proc -or $proc.HasExited) {
-                    Write-Warning ($server.Name + " s'est arrete; redemarrage complet.")
+                    $crashedServer = $server.Name
+                    if ($null -ne $proc) { $crashExitCode = $proc.ExitCode }
+                    Write-Warning ($server.Name + " s'est arrete (code " + $crashExitCode + "); collecte des dernieres lignes avant arret du reseau.")
                     $restart = $true
                     break
                 }
@@ -184,8 +190,21 @@ try {
             Start-Sleep -Seconds 1
         }
         Stop-All
-        Write-Host "Tous les serveurs sont arretes. Redemarrage dans 5 secondes..."
-        Start-Sleep -Seconds 5
+        if ($null -ne $crashedServer) {
+            $restartHistory.Add((Get-Date))
+            $restartHistory.RemoveAll([Predicate[datetime]]{ param($t) $t -lt (Get-Date).AddMinutes(-10) })
+            $crashLog = Join-Path (Join-Path $root $crashedServer) "logs\superviseur-console.log"
+            Write-Host ("===== DIAGNOSTIC " + $crashedServer + " | code sortie " + $crashExitCode + " =====")
+            if (Test-Path $crashLog) { Get-Content $crashLog -Tail 50 | ForEach-Object { Write-Host $_ } }
+            if ($restartHistory.Count -ge 3) {
+                throw ("Arret de securite: " + $crashedServer + " a plante 3 fois en 10 minutes. Corrige le journal ci-dessus avant de relancer.")
+            }
+            Write-Warning ("Redemarrage complet dans 30 secondes (tentative " + $restartHistory.Count + "/3 sur 10 minutes).")
+            Start-Sleep -Seconds 30
+        } else {
+            Write-Host "Tous les serveurs sont arretes. Redemarrage demande dans 5 secondes..."
+            Start-Sleep -Seconds 5
+        }
     }
 }
 finally {
