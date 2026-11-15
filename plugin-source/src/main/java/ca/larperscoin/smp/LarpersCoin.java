@@ -14,6 +14,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.configuration.file.FileConfiguration;
 
 import java.io.File;
 import java.io.IOException;
@@ -476,7 +477,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private void updatePlayerTags() {
         File lobbyData = new File(getServer().getWorldContainer(), "../Lobby/plugins/LarpersCoin");
         File sharedDisplayFile = new File(lobbyData, "server-display.yml");
-        YamlConfiguration display = sharedDisplayFile.isFile()
+        FileConfiguration display = sharedDisplayFile.isFile()
                 ? YamlConfiguration.loadConfiguration(sharedDisplayFile) : getConfig();
         for(Player p:Bukkit.getOnlinePlayers()) {
             p.setPlayerListName(rankPrefix(p)+ChatColor.WHITE+p.getName());
