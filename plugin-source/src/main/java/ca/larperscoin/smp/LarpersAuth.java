@@ -74,6 +74,7 @@ final class LarpersAuth implements Listener {
         plugin.getConfig().options().copyDefaults(true);
         plugin.saveConfig();
         Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getScheduler().runTaskTimer(plugin, this::enforceRevokedAccounts, 20L, 20L);
     }
 
     private void reloadAccounts() {
@@ -85,6 +86,7 @@ final class LarpersAuth implements Listener {
         String path = accountPath(playerName);
         if (!accounts.contains(path + ".hash")) return false;
         accounts.set(path, null);
+        accounts.set("revoked." + playerName.toLowerCase(Locale.ROOT), true);
         save();
         Player online = null;
         for (Player candidate : Bukkit.getOnlinePlayers()) {
@@ -103,6 +105,7 @@ final class LarpersAuth implements Listener {
     void handleJoin(Player player) {
         reloadAccounts();
         authenticated.remove(player.getUniqueId());
+        boolean mustReRegister = accounts.getBoolean("revoked." + player.getName().toLowerCase(Locale.ROOT), false);
         joinLocations.put(player.getUniqueId(), player.getLocation().clone());
         player.sendMessage(ChatColor.GOLD + "Bienvenue sur Larpers Coin SMP.");
         player.sendMessage(ChatColor.YELLOW + "Vérification de ton compte...");
@@ -110,14 +113,14 @@ final class LarpersAuth implements Listener {
             if (!player.isOnline() || authenticated.containsKey(player.getUniqueId())) return;
             // Le backend est privé derrière Velocity: le proxy valide les comptes Java
             // en mode online et Floodgate valide les comptes Bedrock.
-            if (plugin.getConfig().getBoolean("auth.proxy-authenticated", false)
-                    || isFloodgate(player)) {
+            if (!mustReRegister && (plugin.getConfig().getBoolean("auth.proxy-authenticated", false)
+                    || isFloodgate(player))) {
                 markAuthenticated(player);
                 player.sendMessage(ChatColor.GREEN + "Connexion automatique réussie.");
                 return;
             }
             String path = accountPath(player.getName());
-            if (plugin.getConfig().getBoolean("auth.remember-ip", false)
+            if (!mustReRegister && plugin.getConfig().getBoolean("auth.remember-ip", false)
                     && accounts.contains(path + ".ip-hash")
                     && MessageDigest.isEqual(accounts.getString(path + ".ip-hash", "").getBytes(java.nio.charset.StandardCharsets.US_ASCII),
                     ipHash(player).getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {
@@ -132,6 +135,16 @@ final class LarpersAuth implements Listener {
             }
             player.sendMessage(ChatColor.GRAY + "Tu restes dans le lobby jusqu'à ton authentification.");
         }, 40L);
+    }
+
+    private void enforceRevokedAccounts() {
+        reloadAccounts();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            String revokedPath = "revoked." + player.getName().toLowerCase(Locale.ROOT);
+            if (accounts.getBoolean(revokedPath, false) && authenticated.remove(player.getUniqueId()) != null) {
+                player.kickPlayer(ChatColor.RED + "Ton mot de passe a été réinitialisé. Rejoins et crée un nouveau mot de passe avec /register <motdepasse>.");
+            }
+        }
     }
 
     boolean isAuthenticated(Player player) {
@@ -165,6 +178,7 @@ final class LarpersAuth implements Listener {
                 accounts.set(path + ".hash", hash(args[0].toCharArray(), salt));
                 accounts.set(path + ".iterations", ITERATIONS);
                 accounts.set(path + ".name", player.getName());
+                accounts.set("revoked." + player.getName().toLowerCase(Locale.ROOT), null);
                 rememberIp(player, path);
                 save();
                 markAuthenticated(player);
