@@ -546,7 +546,14 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     inv=Bukkit.createInventory(null,54,"Coffre clan: "+own);
                     List<ItemStack> contents=(List<ItemStack>)db.getList(clanPath(own)+".chest");
                     if(contents!=null)for(int i=0;i<Math.min(54,contents.size());i++)inv.setItem(i,contents.get(i));
-                    int loadedLevel=Math.max(1,db.getInt(clanPath(own)+".chest-level",1));
+                    int storedLevel=db.getInt(clanPath(own)+".chest-level",0);
+                    if(storedLevel<=0) {
+                        boolean legacyItems=contents!=null && contents.size()>1
+                                && contents.subList(1,Math.min(54,contents.size())).stream().anyMatch(Objects::nonNull);
+                        storedLevel=legacyItems?7:1;
+                        db.set(clanPath(own)+".chest-level",storedLevel);
+                    }
+                    int loadedLevel=Math.max(1,Math.min(7,storedLevel));
                     int loadedUnlocked=loadedLevel==1?1:(loadedLevel-1)*9;
                     for(int slot=0;slot<loadedUnlocked;slot++) {
                         ItemStack existing=inv.getItem(slot);
