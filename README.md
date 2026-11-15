@@ -38,7 +38,6 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/pay <joueur> <montant>` — paiement entre joueurs connectés.
 - `/baltop` — classement des fortunes.
 - `/history` — tes 10 dernières transactions; `/history <joueur>` est réservé au staff.
-- `/daily` — récompense quotidienne avec série.
 - `/bounty` ou `/bounty list` — menu graphique de toutes les primes actives; bouton pour choisir un joueur en ligne et saisir le montant dans le chat.
 - `/bounty <joueur> <montant>` — prime payée au joueur qui élimine la cible.
 - `/eco give|take|set <joueur> <montant>` — administration.
@@ -71,9 +70,9 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/ac alerts` — activer/désactiver ses alertes staff.
 - `/ac info <joueur>`, `/ac top`, `/ac log`, `/ac reset <joueur>`, `/ac reload` — diagnostic, classement, journal récent, remise à zéro et rechargement.
 - Détections configurables de vitesse anormale, montée verticale répétée et portée de frappe suspecte. Les violations sont sauvegardées dans `anticheat-violations.yml`; réglages dans `config.yml`. Les alertes ne constituent pas une preuve et aucune expulsion/bannissement automatique n'est appliqué.
-- `/admin` — menu du staff.
+- `/admin` — menu administrateur sur une seule page; `/admin reset <joueur>` réinitialise son mot de passe et l'expulse pour qu'il refasse `/register`; `/admin ip <adresse:port> <nom>` modifie les informations affichées dans TAB (administrateurs seulement).
 - `/vanish`, `/invsee <joueur>`, `/freeze <joueur>`, `/staffchat <message>`.
-- Accès contrôlé par `larpers.staff` et `larpers.admin` (OP par défaut).
+- `/admin`, `/admin reset` et `/admin ip` sont réservés à `larpers.admin` (OP par défaut); les autres outils staff utilisent `larpers.staff`.
 
 ## Rangs visibles
 - Les préfixes sont affichés dans le chat et la liste des joueurs: `[ADMIN]`, `[MOD]`, `[VIP]`, `[JOUEUR]`.
@@ -84,8 +83,8 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - Geyser-Spigot et Floodgate sont inclus dans le ZIP généré par GitHub Actions; AuthMe n'est pas installé.
 - Après le premier démarrage du serveur, arrête-le avec `stop`, puis lance `CONFIGURER-BEDROCK.bat` et redémarre. Geyser utilisera Floodgate (`auth-type: floodgate`).
 - Lance `OUVRIR-PORTS-WINDOWS.bat` en administrateur pour autoriser les ports dans le pare-feu; redirige aussi **TCP 25565** et **TCP + UDP 19132** sur le routeur.
-- `online-mode=true` vérifie automatiquement les comptes Java premium auprès de Mojang/Microsoft: aucun mot de passe propre au serveur. Floodgate authentifie les joueurs Bedrock: aucun mot de passe AuthMe. Les comptes Java crackés/non premium ne sont pas acceptés.
-- **Sécurité:** garde `online-mode=true`. Ne passe pas en mode hors-ligne pour accepter des comptes crackés: les pseudos pourraient être usurpés, y compris celui d'un administrateur.
+- Sur le réseau Velocity fourni, les joueurs Java créent leur mot de passe avec `/register <motdepasse>`, puis utilisent `/login <motdepasse>`; Floodgate reconnaît automatiquement les joueurs Bedrock.
+- Le mode hors-ligne est utilisé uniquement derrière Velocity avec le forwarding moderne et les backends liés à `127.0.0.1`. N'expose jamais directement les ports Paper 25566/25567 sur Internet. Pour un serveur autonome, l'authentification par mot de passe LarpersCoin est activée par défaut.
 - Floodgate authentifie les joueurs Bedrock via son mécanisme de clé. Ne partage jamais les fichiers de clés Floodgate.
 
 ## Données
