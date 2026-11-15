@@ -86,6 +86,21 @@ jobs:
           test -s "$ROOT/Lobby/plugins/PlaceholderAPI.jar"
           test -s "$ROOT/SMP/plugins/PlaceholderAPI.jar"
 
+          # Compatibilite Java multi-version sur les deux backends Paper.
+          for SERVER in Lobby SMP; do
+            curl -fL "https://github.com/ViaVersion/ViaVersion/releases/download/5.12.2/ViaVersion-5.12.2.jar" -o "$ROOT/$SERVER/plugins/ViaVersion.jar"
+            curl -fL "https://github.com/ViaVersion/ViaBackwards/releases/download/5.12.2/ViaBackwards-5.12.2.jar" -o "$ROOT/$SERVER/plugins/ViaBackwards.jar"
+            test -s "$ROOT/$SERVER/plugins/ViaVersion.jar"
+            test -s "$ROOT/$SERVER/plugins/ViaBackwards.jar"
+          done
+
+          # GrimAC sur le SMP uniquement; build Paper stable correspondant a Paper 26.3.
+          grim_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/grimac/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
+          grim_url="$(echo "$grim_meta" | jq -r '[.[] | select(.version_type == "release") | .files[] | select(.primary == true) | .url][0] // empty')"
+          test -n "$grim_url"
+          curl -fL "$grim_url" -o "$ROOT/SMP/plugins/GrimAC.jar"
+          test -s "$ROOT/SMP/plugins/GrimAC.jar"
+
       - name: Configurer Velocity, lobby et SMP
         shell: bash
         run: |
@@ -211,12 +226,7 @@ jobs:
           anticheat:
             enabled: true
             auto-punish:
-              enabled: true
-              thresholds:
-                kick: 12
-                ban-1d: 24
-                ban-7d: 36
-                ban-30d: 48
+              enabled: false
           EOF
 
           cat > "$ROOT/START-NETWORK.bat" <<'EOF'
