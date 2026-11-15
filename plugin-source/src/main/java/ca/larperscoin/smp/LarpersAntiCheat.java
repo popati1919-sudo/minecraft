@@ -1,7 +1,6 @@
 package ca.larperscoin.smp;
 
 import org.bukkit.Bukkit;
-import org.bukkit.BanList;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -14,6 +13,8 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.Material;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -32,7 +33,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Deque;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -60,6 +60,9 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     private final Map<UUID, Integer> lastSanctionTier = new ConcurrentHashMap<>();
     private final Map<String, Long> lastAlert = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> alertsEnabled = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> minedStone = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> minedOres = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> xrayWindowStart = new ConcurrentHashMap<>();
     private final Deque<String> evidence = new ArrayDeque<>();
     private YamlConfiguration storedViolations;
 
@@ -91,7 +94,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
             config.set("anticheat.checks.reach.max-distance", 3.75D);
         config.addDefault("anticheat.alert-cooldown-seconds", 4);
         config.addDefault("anticheat.evidence-limit", MAX_EVIDENCE);
-        config.addDefault("anticheat.auto-punish.enabled", true);
+        config.addDefault("anticheat.auto-punish.enabled", false);
         config.addDefault("anticheat.auto-punish.thresholds.kick", 12);
         config.addDefault("anticheat.auto-punish.thresholds.ban-1d", 24);
         config.addDefault("anticheat.auto-punish.thresholds.ban-7d", 36);
@@ -194,6 +197,9 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         graceUntil.remove(id);
         alertsEnabled.remove(id);
         lastSanctionTier.remove(id);
+        minedStone.remove(id);
+        minedOres.remove(id);
+        xrayWindowStart.remove(id);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -259,6 +265,46 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         }
     }
 
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBlockBreak(BlockBreakEvent event) {
+        if (!globallyEnabled() || !plugin.getConfig().getBoolean("anticheat.checks.xray.enabled", true)) return;
+        Player player = event.getPlayer();
+        if (bypass(player) || inGrace(player) || player.getGameMode() == org.bukkit.GameMode.CREATIVE
+                || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
+        Material type = event.getBlock().getType();
+        UUID id = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        long started = xrayWindowStart.getOrDefault(id, now);
+        if (now - started > 5L * 60_000L) {
+            xrayWindowStart.put(id, now);
+            minedStone.put(id, 0);
+            minedOres.put(id, 0);
+        }
+        if (type == Material.STONE || type == Material.DEEPSLATE || type == Material.NETHERRACK
+                || type == Material.TUFF || type == Material.GRANITE || type == Material.DIORITE
+                || type == Material.ANDESITE) {
+            minedStone.merge(id, 1, Integer::sum);
+        } else if (type.name().endsWith("_ORE") || type == Material.ANCIENT_DEBRIS) {
+            int ores = minedOres.merge(id, 1, Integer::sum);
+            int stone = minedStone.getOrDefault(id, 0);
+            if (ores >= 8 && stone < 18) {
+                flag(player, "XRAY_SUSPECT", ores + " minerais / " + stone + " blocs de roche sur 5 min");
+                minedOres.put(id, 0);
+                minedStone.put(id, 0);
+                xrayWindowStart.put(id, now);
+            }
+        }
+    }
+
+    public List<String> dashboardEvidence() {
+        synchronized (evidence) { return new ArrayList<>(evidence); }
+    }
+
+    public Map<UUID, Integer> dashboardViolations() {
+        return new java.util.HashMap<>(violations);
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent event) {
         if (!globallyEnabled() || !plugin.getConfig().getBoolean("anticheat.checks.reach.enabled", true)) return;
@@ -273,7 +319,6 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
 
     private void flag(Player player, String check, String detail) {
         int total = violations.merge(player.getUniqueId(), 1, Integer::sum);
-        applyAutomaticSanction(player, total);
         long now = System.currentTimeMillis();
         long cooldown = Math.max(1L, plugin.getConfig().getLong("anticheat.alert-cooldown-seconds", 4L)) * 1000L;
         String key = player.getUniqueId() + ":" + check;
@@ -295,54 +340,6 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
                 staff.sendMessage(message);
             }
         }
-    }
-
-    private int tierFor(int count) {
-        var config = plugin.getConfig();
-        if (count >= config.getInt("anticheat.auto-punish.thresholds.ban-30d", 48)) return 4;
-        if (count >= config.getInt("anticheat.auto-punish.thresholds.ban-7d", 36)) return 3;
-        if (count >= config.getInt("anticheat.auto-punish.thresholds.ban-1d", 24)) return 2;
-        if (count >= config.getInt("anticheat.auto-punish.thresholds.kick", 12)) return 1;
-        return 0;
-    }
-
-    private void applyAutomaticSanction(Player player, int totalViolations) {
-        if (!plugin.getConfig().getBoolean("anticheat.auto-punish.enabled", true)
-                || player.hasPermission("larpers.anticheat.bypass")) return;
-        UUID id = player.getUniqueId();
-        int tier = tierFor(totalViolations);
-        int previousTier = lastSanctionTier.getOrDefault(id, tierFor(totalViolations - 1));
-        if (tier <= previousTier) return;
-        lastSanctionTier.put(id, tier);
-
-        String reason;
-        Date expires;
-        switch (tier) {
-            case 1 -> {
-                reason = "Anti-cheat LPC: seuil de violations atteint (kick).";
-                player.kickPlayer(ChatColor.RED + reason);
-                plugin.getLogger().warning("[AntiCheat] Kick automatique: " + player.getName()
-                        + " (" + totalViolations + " VL)");
-                return;
-            }
-            case 2 -> {
-                reason = "Anti-cheat LPC: violations répétées (ban 1 jour).";
-                expires = new Date(System.currentTimeMillis() + 24L * 60L * 60L * 1000L);
-            }
-            case 3 -> {
-                reason = "Anti-cheat LPC: violations répétées (ban 7 jours).";
-                expires = new Date(System.currentTimeMillis() + 7L * 24L * 60L * 60L * 1000L);
-            }
-            case 4 -> {
-                reason = "Anti-cheat LPC: violations répétées (ban 30 jours).";
-                expires = new Date(System.currentTimeMillis() + 30L * 24L * 60L * 60L * 1000L);
-            }
-            default -> { return; }
-        }
-        Bukkit.getBanList(BanList.Type.NAME).addBan(player.getName(), reason, expires, "LarpersAntiCheat");
-        player.kickPlayer(ChatColor.RED + reason);
-        plugin.getLogger().warning("[AntiCheat] " + reason + " Joueur: " + player.getName()
-                + " (" + totalViolations + " VL)");
     }
 
     private boolean isAdmin(CommandSender sender) {
@@ -376,7 +373,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         switch (args[0].toLowerCase(Locale.ROOT)) {
             case "status" -> {
                 send(sender, "État: " + (globallyEnabled() ? ChatColor.GREEN + "ACTIF" : ChatColor.RED + "DÉSACTIVÉ")
-                        + ChatColor.GRAY + " | Speed/Fly/Reach configurables | sanctions automatiques progressives: actives.");
+                        + ChatColor.GRAY + " | Speed/Fly/Reach/Xray configurables | aucune sanction automatique.");
                 return true;
             }
             case "alerts" -> {
