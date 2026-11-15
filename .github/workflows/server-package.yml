@@ -244,12 +244,14 @@ jobs:
           echo lp group admin permission set larpers.staff true
           echo lp group admin permission set larpers.anticheat.use true
           echo lp group admin permission set larpers.anticheat.alerts true
+          echo lp group admin permission set grim.alerts true
           echo.
           echo lp creategroup moderator
           echo lp group moderator permission set larpers.staff true
           echo lp group moderator permission set larpers.anticheat.mod true
           echo lp group moderator permission set larpers.anticheat.use true
           echo lp group moderator permission set larpers.anticheat.alerts true
+          echo lp group moderator permission set grim.alerts true
           echo.
           echo lp user PSEUDO parent set moderator
           echo lp user PSEUDO parent set admin
@@ -271,6 +273,9 @@ jobs:
           - Authentification Bedrock via Floodgate
           - Comptes Java crack via /register et /login (mots de passe PBKDF2)
           - Configuration de base et scripts Windows
+          - Dashboard web avec console temps reel et execution de commandes admin
+          - GrimAC configure en alertes/logs seulement, sans kick/ban automatique
+          - ViaVersion + ViaBackwards pour les versions Java compatibles
 
           PREMIER DEMARRAGE:
           1. Installe Java 25 (JDK/JRE).
@@ -281,7 +286,9 @@ jobs:
           6. Lance CONFIGURER-BEDROCK.bat pour régler Geyser sur Floodgate, puis redemarre.
           7. Lance OUVRIR-PORTS-WINDOWS.bat en administrateur; redirige aussi les ports sur le routeur.
           8. Configure les groupes avec CONFIGURER-LES-GROUPES.bat.
-          9. Tous les joueurs Java utilisent /register puis /login avec leur mot de passe LarpersCoin.
+          9. Dashboard: http://127.0.0.1:8765; jeton dans plugins/LarpersCoin/web-admin.yml.
+          10. La console du site execute les commandes avec les droits console: garde le jeton secret.
+          11. Tous les joueurs Java utilisent /register puis /login avec leur mot de passe LarpersCoin.
           10. Les comptes Java crack utilisent /register <motdepasse> <confirmation>, puis /login <motdepasse>.
           11. Bedrock passe par Floodgate et est exempté du mot de passe LPC.
 
