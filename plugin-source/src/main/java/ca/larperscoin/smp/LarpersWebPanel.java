@@ -7,6 +7,7 @@ import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -18,6 +19,10 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -29,6 +34,22 @@ final class LarpersWebPanel {
     private final Map<String, Long> sessions = new ConcurrentHashMap<>();
     private HttpServer server;
     private final SecureRandom random = new SecureRandom();
+    private final java.util.Deque<String> liveEvents = new java.util.ArrayDeque<>();
+    private Handler liveHandler;
+    private synchronized void addLiveEvent(String message) {
+        liveEvents.addLast(Instant.now() + " " + message);
+        while (liveEvents.size() > 300) liveEvents.removeFirst();
+    }
+    private synchronized String liveEventsJson() {
+        StringBuilder out = new StringBuilder("{\\"events\\":[");
+        boolean first = true;
+        for (String event : liveEvents) {
+            if (!first) out.append(',');
+            first = false;
+            out.append("\\"").append(escape(event)).append("\\"");
+        }
+        return out.append("]}").toString();
+    }
 
     LarpersWebPanel(JavaPlugin plugin) { this.plugin = plugin; }
 
@@ -41,8 +62,17 @@ final class LarpersWebPanel {
         try {
             int port = Integer.parseInt(System.getenv().getOrDefault("LARPERS_PANEL_PORT", "8765"));
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", port), 32);
-            server.setExecutor(Executors.newFixedThreadPool(4));
+            server.setExecutor(Executors.newFixedThreadPool(6));
             server.createContext("/", this::handle);
+            liveHandler = new Handler() {
+                @Override public void publish(LogRecord record) {
+                    if (record != null && isLoggable(record)) addLiveEvent(record.getLevel() + " " + record.getLoggerName() + ": " + record.getMessage());
+                }
+                @Override public void flush() { }
+                @Override public void close() { }
+            };
+            Bukkit.getLogger().addHandler(liveHandler);
+            addLiveEvent("Panneau de contrôle connecté au journal du serveur.");
             server.start();
             plugin.getLogger().info("Panel web actif sur 127.0.0.1:" + port + " (tunnel HTTPS requis).");
         } catch (Exception ex) {
@@ -52,6 +82,7 @@ final class LarpersWebPanel {
 
     void stop() {
         if (server != null) server.stop(1);
+        if (liveHandler != null) Bukkit.getLogger().removeHandler(liveHandler);
         sessions.clear();
     }
 
@@ -96,7 +127,45 @@ final class LarpersWebPanel {
 
             if (path.equals("/api/me") && exchange.getRequestMethod().equals("GET")) {
                 json(exchange, 200, "{\"ok\":true,\"server\":\"LarpersCoin SMP\"}");
-            } else if (path.equals("/api/players") && exchange.getRequestMethod().equals("GET")) {
+            } if (path.equals("/api/live") && exchange.getRequestMethod().equals("GET")) {
+                String result = onMain(() -> {
+                    StringBuilder out = new StringBuilder("{\\"playersOnline\\":").append(Bukkit.getOnlinePlayers().size())
+                            .append(",\\"maxPlayers\\":").append(Bukkit.getMaxPlayers()).append(",\\"events\\":");
+                    String events = liveEventsJson();
+                    out.append(events.substring(events.indexOf(':') + 1));
+                    return out.toString();
+                });
+                json(exchange, 200, result);
+            } else if (path.equals("/api/ac/reports") && exchange.getRequestMethod().equals("GET")) {
+                File reportFile = plugin.getDataFolder().toPath().resolve("anticheat-reports.yml").toFile();
+                YamlConfiguration reports = YamlConfiguration.loadConfiguration(reportFile);
+                List<String> ids = new ArrayList<>(reports.getConfigurationSection("reports") == null ? List.of() : reports.getConfigurationSection("reports").getKeys(false));
+                ids.sort((a,b) -> Long.compare(reports.getLong("reports." + b + ".timestamp"), reports.getLong("reports." + a + ".timestamp")));
+                StringBuilder out = new StringBuilder("{\\"reports\\":[");
+                boolean first = true;
+                for (String id : ids) {
+                    String base = "reports." + id + ".";
+                    if (!first) out.append(',');
+                    first = false;
+                    out.append("{\\"id\\":\\"").append(escape(id)).append("\\",\\"timestamp\\":").append(reports.getLong(base + "timestamp"))
+                       .append(",\\"player\\":\\"").append(escape(reports.getString(base + "player", "Inconnu")))
+                       .append("\\",\\"check\\":\\"").append(escape(reports.getString(base + "check", "UNKNOWN")))
+                       .append("\\",\\"detail\\":\\"").append(escape(reports.getString(base + "detail", "")))
+                       .append("\\",\\"violations\\":").append(reports.getInt(base + "violations")).append('}');
+                }
+                json(exchange, 200, out.append("]}").toString());
+            } else if (path.equals("/api/ac/reports") && exchange.getRequestMethod().equals("DELETE")) {
+                String id = queryValue(exchange.getRequestURI().getRawQuery(), "id");
+                try { UUID.fromString(id == null ? "" : id); }
+                catch (IllegalArgumentException ex) { json(exchange, 400, "{\\"error\\":\\"Identifiant invalide\\"}"); return; }
+                File reportFile = plugin.getDataFolder().toPath().resolve("anticheat-reports.yml").toFile();
+                YamlConfiguration reports = YamlConfiguration.loadConfiguration(reportFile);
+                if (!reports.contains("reports." + id)) { json(exchange, 404, "{\\"error\\":\\"Signalement introuvable\\"}"); return; }
+                reports.set("reports." + id, null);
+                reports.save(reportFile);
+                audit("AC_REPORT_DELETE " + id, exchange);
+                json(exchange, 200, "{\\"deleted\\":true}");
+            } else 
                 String result = onMain(() -> {
                     StringBuilder out = new StringBuilder("{\"players\":[");
                     boolean first = true;
