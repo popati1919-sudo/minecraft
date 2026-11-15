@@ -127,7 +127,7 @@ final class LarpersWebPanel {
 
             if (path.equals("/api/me") && exchange.getRequestMethod().equals("GET")) {
                 json(exchange, 200, "{\"ok\":true,\"server\":\"LarpersCoin SMP\"}");
-            } if (path.equals("/api/live") && exchange.getRequestMethod().equals("GET")) {
+            } else if (path.equals("/api/live") && exchange.getRequestMethod().equals("GET")) {
                 String result = onMain(() -> {
                     StringBuilder out = new StringBuilder("{\\"playersOnline\\":").append(Bukkit.getOnlinePlayers().size())
                             .append(",\\"maxPlayers\\":").append(Bukkit.getMaxPlayers()).append(",\\"events\\":");
@@ -165,7 +165,7 @@ final class LarpersWebPanel {
                 reports.save(reportFile);
                 audit("AC_REPORT_DELETE " + id, exchange);
                 json(exchange, 200, "{\\"deleted\\":true}");
-            } else 
+            } else if (path.equals("/api/players") && exchange.getRequestMethod().equals("GET")) {
                 String result = onMain(() -> {
                     StringBuilder out = new StringBuilder("{\"players\":[");
                     boolean first = true;
