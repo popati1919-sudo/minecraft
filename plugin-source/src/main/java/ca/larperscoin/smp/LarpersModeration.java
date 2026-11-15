@@ -33,6 +33,7 @@ public final class LarpersModeration implements Listener, CommandExecutor, TabCo
     private final Map<UUID, Long> lastChat = new ConcurrentHashMap<>();
     private final Map<UUID, String> lastMessage = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastDuplicate = new ConcurrentHashMap<>();
+    private final Set<UUID> awaitingSanctionsSearch = ConcurrentHashMap.newKeySet();
 
     public LarpersModeration(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -89,11 +90,12 @@ public final class LarpersModeration implements Listener, CommandExecutor, TabCo
 
     private void openMenu(Player viewer) {
         Inventory inv = Bukkit.createInventory(null, 27, MENU_TITLE);
-        inv.setItem(10, item(Material.BOOK, "Historique des sanctions", "Utilise /sanctions <joueur>"));
+        inv.setItem(10, item(Material.BOOK, "Rechercher les sanctions", "Clique puis écris un pseudo dans le chat", "Compatible Java et Bedrock"));
         inv.setItem(12, item(Material.ANVIL, "Bannir un joueur", "Utilise /ban <joueur> <durée> <raison>"));
         inv.setItem(14, item(Material.IRON_DOOR, "Débannir un joueur", "Utilise /unban <joueur>"));
         inv.setItem(16, item(Material.PAPER, "Aide du staff", "Commandes selon tes permissions: /help"));
         inv.setItem(22, item(Material.BARRIER, "Fermer"));
+        LpcMenuTheme.frame(inv);
         viewer.openInventory(inv);
     }
 
@@ -186,6 +188,29 @@ public final class LarpersModeration implements Listener, CommandExecutor, TabCo
         }
     }
 
+    @EventHandler
+    public void onSanctionsSearch(AsyncPlayerChatEvent event) {
+        UUID id = event.getPlayer().getUniqueId();
+        if (!awaitingSanctionsSearch.remove(id)) return;
+        event.setCancelled(true);
+        String target = event.getMessage().trim();
+        Player player = event.getPlayer();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (target.equalsIgnoreCase("annuler")) {
+                player.sendMessage(PREFIX + "Recherche annulée.");
+                openMenu(player);
+                return;
+            }
+            if (!target.matches("[A-Za-z0-9_]{3,16}")) {
+                player.sendMessage(PREFIX + "Pseudo invalide.");
+                openMenu(player);
+                return;
+            }
+            player.performCommand("sanctions " + target);
+            openMenu(player);
+        });
+    }
+
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onChat(AsyncPlayerChatEvent event) {
         Player player = event.getPlayer();
@@ -211,7 +236,11 @@ public final class LarpersModeration implements Listener, CommandExecutor, TabCo
         event.setCancelled(true);
         if (!(event.getWhoClicked() instanceof Player player)) return;
         if (event.getRawSlot() == 22) player.closeInventory();
-        else if (event.getRawSlot() == 10) { player.closeInventory(); player.performCommand("sanctions"); }
+        else if (event.getRawSlot() == 10) {
+            awaitingSanctionsSearch.add(player.getUniqueId());
+            player.closeInventory();
+            player.sendMessage(PREFIX + "Écris le pseudo à rechercher dans le chat (ou 'annuler').");
+        }
         else if (event.getRawSlot() == 12) { player.closeInventory(); player.sendMessage(PREFIX + "Usage: /ban <joueur> <durée> <raison>"); }
         else if (event.getRawSlot() == 14) { player.closeInventory(); player.sendMessage(PREFIX + "Usage: /unban <joueur>"); }
         else if (event.getRawSlot() == 16) { player.closeInventory(); player.performCommand("help"); }

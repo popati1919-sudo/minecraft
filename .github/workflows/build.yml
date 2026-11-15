@@ -2,9 +2,9 @@ name: Build LarpersCoin
 
 on:
   push:
-    branches: [main, auth/velocity-replacement]
+    branches: [main, auth/velocity-replacement, ui/bedrock-friendly-menus]
   pull_request:
-    branches: [main]
+    branches: [main, feature/lpc-admin-lottery-ui]
   workflow_dispatch:
 
 permissions:

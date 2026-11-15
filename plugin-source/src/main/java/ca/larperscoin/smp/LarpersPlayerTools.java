@@ -17,6 +17,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -43,6 +44,8 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
     private final File file;
     private final YamlConfiguration data;
     private final Map<UUID, SavedState> spectating = new HashMap<>();
+    private final Map<UUID, String> reportSearch = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Set<UUID> awaitingReportSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private record SavedState(Location location, GameMode gameMode) {}
 
@@ -148,6 +151,7 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
         inv.setItem(16, item(Material.MAP, "Dernière connexion",
                 lastSeen <= 0L ? "Inconnue" : new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(new java.util.Date(lastSeen))));
         inv.setItem(22, item(Material.BARRIER, "Fermer"));
+        LpcMenuTheme.frame(inv);
         viewer.openInventory(inv);
     }
 
@@ -159,22 +163,30 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
 
     private void openReports(Player viewer) {
         Inventory inv = Bukkit.createInventory(null, 54, REPORTS_TITLE);
+        String query = reportSearch.getOrDefault(viewer.getUniqueId(), "").toLowerCase(Locale.ROOT).trim();
         List<Map<?, ?>> rows = new ArrayList<>(reports());
         rows.sort(Comparator.comparingLong((Map<?, ?> row) -> ((Number) value(row, "timestamp", 0L)).longValue()).reversed());
         int slot = 0;
         for (Map<?, ?> row : rows) {
-            if (slot >= 45) break;
-            int id = ((Number) value(row, "id", 0)).intValue();
             String target = String.valueOf(value(row, "target-name", "inconnu"));
             String reporter = String.valueOf(value(row, "reporter-name", "inconnu"));
             String reason = String.valueOf(value(row, "reason", "Aucun motif"));
             String status = String.valueOf(value(row, "status", "OUVERT"));
+            String idText = String.valueOf(value(row, "id", 0));
+            String searchable = (idText + " " + target + " " + reporter + " " + reason + " " + status).toLowerCase(Locale.ROOT);
+            if (!query.isEmpty() && !searchable.contains(query)) continue;
+            if (slot >= 45) break;
+            int id = ((Number) value(row, "id", 0)).intValue();
             inv.setItem(slot++, item(Material.PAPER, "#" + id + " • " + target,
                     "Signalé par: " + reporter, "Motif: " + reason, "Statut: " + status,
                     "Clique pour afficher les détails"));
         }
-        if (slot == 0) inv.setItem(22, item(Material.BOOK, "Aucun signalement", "Aucun rapport enregistré."));
+        if (slot == 0) inv.setItem(22, item(Material.BOOK, "Aucun résultat", query.isEmpty() ? "Aucun signalement enregistré." : "Recherche: " + query));
+        inv.setItem(45, item(Material.COMPASS, "Rechercher", "Par pseudo, motif, statut ou ID", "Filtre: " + (query.isEmpty() ? "aucun" : query)));
+        inv.setItem(47, item(Material.MILK_BUCKET, "Effacer la recherche"));
         inv.setItem(49, item(Material.BARRIER, "Fermer"));
+        inv.setItem(53, item(Material.SUNFLOWER, "Actualiser"));
+        LpcMenuTheme.frame(inv);
         viewer.openInventory(inv);
     }
 
@@ -234,6 +246,25 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
     }
 
     @EventHandler
+    public void onReportSearchChat(AsyncPlayerChatEvent event) {
+        UUID id = event.getPlayer().getUniqueId();
+        if (!awaitingReportSearch.remove(id)) return;
+        event.setCancelled(true);
+        String query = event.getMessage().trim();
+        Player player = event.getPlayer();
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (query.equalsIgnoreCase("annuler")) {
+                player.sendMessage(PREFIX + "Recherche annulée.");
+            } else if (query.length() > 40) {
+                player.sendMessage(PREFIX + "Recherche trop longue (40 caractères maximum).");
+            } else {
+                reportSearch.put(id, query);
+            }
+            if (player.isOnline()) openReports(player);
+        });
+    }
+
+    @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         UUID id = event.getPlayer().getUniqueId();
         data.set(path(id, "name"), event.getPlayer().getName());
@@ -268,8 +299,20 @@ public final class LarpersPlayerTools implements Listener, CommandExecutor, TabC
         if (!REPORTS_TITLE.equals(title) && !PROFILE_TITLE.equals(title)) return;
         event.setCancelled(true);
         if (!(event.getWhoClicked() instanceof Player viewer)) return;
-        if (event.getRawSlot() == 49 || event.getRawSlot() == 22) { viewer.closeInventory(); return; }
-        if (!REPORTS_TITLE.equals(title) || event.getRawSlot() < 0 || event.getRawSlot() >= 45) return;
+        if (PROFILE_TITLE.equals(title)) {
+            if (event.getRawSlot() == 22) viewer.closeInventory();
+            return;
+        }
+        if (event.getRawSlot() == 49) { viewer.closeInventory(); return; }
+        if (event.getRawSlot() == 45) {
+            awaitingReportSearch.add(viewer.getUniqueId());
+            viewer.closeInventory();
+            viewer.sendMessage(PREFIX + "Écris un pseudo, un motif, un statut ou un ID dans le chat (ou 'annuler').");
+            return;
+        }
+        if (event.getRawSlot() == 47) { reportSearch.remove(viewer.getUniqueId()); openReports(viewer); return; }
+        if (event.getRawSlot() == 53) { openReports(viewer); return; }
+        if (event.getRawSlot() < 0 || event.getRawSlot() >= 45) return;
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta() || !clicked.getItemMeta().hasDisplayName()) return;
         String display = ChatColor.stripColor(clicked.getItemMeta().getDisplayName());

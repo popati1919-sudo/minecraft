@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
@@ -46,14 +47,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             public org.bukkit.generator.ChunkGenerator.ChunkData generateChunkData(
                     org.bukkit.World world, java.util.Random random, int chunkX, int chunkZ, BiomeGrid biome) {
                 ChunkData data = createChunkData(world);
-                // Petite plateforme de départ au centre; tous les autres blocs restent dans le vide.
-                if (chunkX == 0 && chunkZ == 0) {
-                    for (int x = 3; x <= 12; x++) {
-                        for (int z = 3; z <= 12; z++) {
-                            data.setBlock(x, 80, z, org.bukkit.Material.SMOOTH_STONE);
-                        }
-                    }
-                }
+                // Lobby volontairement vide: aucun bloc, plateforme ou décor.
                 return data;
             }
         };
@@ -64,14 +58,90 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private LarpersAuth auth;
     private LarpersModeration moderation;
     private LarpersPlayerTools playerTools;
+    private LarpersServerTools serverTools;
+    private LarpersWebPanel webPanel;
     private File dataFile;
     private String globalAnnouncement = "";
     private final DecimalFormat money = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(Locale.CANADA_FRENCH));
+
+    /**
+     * Crée une copie de sécurité des fichiers YAML avant chaque chargement du plugin.
+     * Les sauvegardes restent indépendantes du JAR et les 10 plus récentes sont conservées.
+     */
+    private boolean backupPluginData() {
+        File[] yamlFiles = getDataFolder().listFiles((dir, name) -> name.toLowerCase(Locale.ROOT).endsWith(".yml"));
+        if (yamlFiles == null || yamlFiles.length == 0) return true;
+        Path backupRoot = getDataFolder().toPath().resolve("backups");
+        Path backupDir = backupRoot.resolve("backup-" + System.currentTimeMillis());
+        try {
+            Files.createDirectories(backupDir);
+            for (File yaml : yamlFiles) {
+                Files.copy(yaml.toPath(), backupDir.resolve(yaml.getName()), StandardCopyOption.COPY_ATTRIBUTES);
+            }
+            try (var backups = Files.list(backupRoot)) {
+                for (Path oldBackup : backups.filter(Files::isDirectory)
+                        .sorted(Comparator.comparing((Path path) -> path.getFileName().toString()).reversed())
+                        .skip(10).toList()) {
+                    try (var oldFiles = Files.list(oldBackup)) {
+                        for (Path oldFile : oldFiles.toList()) Files.deleteIfExists(oldFile);
+                    }
+                    Files.deleteIfExists(oldBackup);
+                }
+            }
+            getLogger().info("Sauvegarde de sécurité créée : " + backupDir.getFileName());
+            return true;
+        } catch (IOException ex) {
+            getLogger().severe("Impossible de créer la sauvegarde de sécurité : " + ex.getMessage());
+            return false;
+        }
+    }
+
+    private boolean isVoidLobby() {
+        return getConfig().getBoolean("lobby-void.enabled", false);
+    }
+
+    private void prepareVoidLobby(Player player) {
+        if (!isVoidLobby()) return;
+        org.bukkit.World world = Bukkit.getWorld("world");
+        if (world == null) return;
+        org.bukkit.Location spawn = new org.bukkit.Location(world, 0.5, 100.0, 0.5, 0.0f, 0.0f);
+        player.setInvulnerable(true);
+        player.setCollidable(false);
+        player.setAllowFlight(true);
+        player.setFlying(true);
+        player.setFallDistance(0.0f);
+        player.teleport(spawn);
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (online.equals(player)) continue;
+            player.hidePlayer(this, online);
+            online.hidePlayer(this, player);
+        }
+    }
+
+    @EventHandler
+    public void onVoidLobbyJoin(PlayerJoinEvent event) {
+        if (!isVoidLobby()) return;
+        Player player = event.getPlayer();
+        Bukkit.getScheduler().runTask(this, () -> prepareVoidLobby(player));
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (player.isOnline()) prepareVoidLobby(player);
+        }, 10L);
+    }
+
+    @EventHandler
+    public void onVoidLobbyDamage(EntityDamageEvent event) {
+        if (isVoidLobby() && event.getEntity() instanceof Player) event.setCancelled(true);
+    }
 
     @Override
     public void onEnable() {
         if (!getDataFolder().exists() && !getDataFolder().mkdirs()) {
             getLogger().severe("Impossible de créer le dossier de données.");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        if (!backupPluginData()) {
+            getLogger().severe("Sauvegarde de sécurité impossible : démarrage annulé pour protéger les données.");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
@@ -98,6 +168,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         antiCheat = new LarpersAntiCheat(this);
         moderation = new LarpersModeration(this);
         playerTools = new LarpersPlayerTools(this);
+        serverTools = new LarpersServerTools(this, this);
         long lotteryEnd=data.getLong("lottery.ends-at",0L);
         if(data.getBoolean("lottery.active",false)) {
             long remaining=Math.max(1L,lotteryEnd-System.currentTimeMillis());
@@ -107,14 +178,23 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         getServer().getScheduler().runTaskLater(this, () -> {
             org.bukkit.World lobby = Bukkit.getWorld("world");
             if (lobby != null && getConfig().getBoolean("network.auth-only", false)) {
-                lobby.setSpawnLocation(8, 81, 8);
+                lobby.setSpawnLocation(0, 100, 0);
             }
         }, 1L);
-        getLogger().info("LarpersCoin 1.0.3 actif. Aucun claim ni protection de parcelle n'est enregistré.");
+        boolean panelEnabled = getConfig().getBoolean("panel.enabled",
+                !getConfig().getBoolean("network.auth-only", false));
+        if (panelEnabled) {
+            webPanel = new LarpersWebPanel(this);
+            webPanel.start();
+        } else {
+            getLogger().info("Panel web non demarre sur ce serveur (panel.enabled=false).");
+        }
+        getLogger().info("LarpersCoin 1.0.8 actif. Aucun claim ni protection de parcelle n'est enregistré.");
     }
 
     @Override
     public void onDisable() {
+        if (webPanel != null) webPanel.stop();
         if (features != null) features.shutdown();
         if (antiCheat != null) antiCheat.shutdown();
         if (playerTools != null) playerTools.shutdown();
@@ -314,6 +394,25 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                 case "register", "login" -> {
                     Player player = requirePlayer(sender);
                     if (player != null) auth.command(player, name, args);
+                    return true;
+                }
+                case "redemarrer" -> {
+                    if (!isStaff(sender)) {
+                        reply(sender, "Permission insuffisante. Seuls les administrateurs peuvent redémarrer le réseau.");
+                        return true;
+                    }
+                    saveData();
+                    try {
+                        Path networkRoot = getDataFolder().toPath().toAbsolutePath().getParent().getParent().getParent();
+                        Path request = networkRoot.resolve("restart.request");
+                        Files.writeString(request, "requested-by=" + sender.getName() + System.lineSeparator(),
+                                StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+                        Bukkit.broadcastMessage(ChatColor.GOLD + "[LPC] Redémarrage du réseau demandé. Lobby, SMP et Velocity vont redémarrer.");
+                        getLogger().warning("Redémarrage global demandé par " + sender.getName());
+                    } catch (IOException | RuntimeException ex) {
+                        reply(sender, "Impossible de demander le redémarrage global. Vérifie que le réseau est lancé avec START-NETWORK.bat.");
+                        getLogger().severe("Échec de la demande de redémarrage: " + ex.getMessage());
+                    }
                     return true;
                 }
                 case "balance" -> {
