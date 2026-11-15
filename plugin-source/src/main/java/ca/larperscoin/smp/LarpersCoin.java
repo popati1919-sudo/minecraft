@@ -95,7 +95,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     lobby.getBlockAt(x,80,z).setType(org.bukkit.Material.AIR,false);
             }
         }, 1L);
-        getLogger().info("LarpersCoin 1.0.6 actif. Aucun claim ni protection de parcelle n'est enregistré.");
+        getLogger().info("LarpersCoin 1.0.8 actif. Aucun claim ni protection de parcelle n'est enregistré.");
     }
 
     @Override
