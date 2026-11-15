@@ -67,7 +67,7 @@ final class LarpersAuth implements Listener {
         File parent = this.file.getParentFile();
         if (parent != null && !parent.exists()) parent.mkdirs();
         reloadAccounts();
-        plugin.getConfig().addDefault("auth.proxy-authenticated", true);
+        plugin.getConfig().addDefault("auth.proxy-authenticated", false);
         plugin.getConfig().addDefault("auth.remember-ip", false);
         plugin.getConfig().addDefault("auth.connect-to-smp", false);
         Bukkit.getMessenger().registerOutgoingPluginChannel(plugin, "BungeeCord");
@@ -86,7 +86,10 @@ final class LarpersAuth implements Listener {
         if (!accounts.contains(path + ".hash")) return false;
         accounts.set(path, null);
         save();
-        Player online = Bukkit.getPlayerExact(playerName);
+        Player online = null;
+        for (Player candidate : Bukkit.getOnlinePlayers()) {
+            if (candidate.getName().equalsIgnoreCase(playerName)) { online = candidate; break; }
+        }
         if (online != null) {
             UUID id = online.getUniqueId();
             authenticated.remove(id);
