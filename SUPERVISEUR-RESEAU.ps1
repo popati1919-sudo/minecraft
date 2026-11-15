@@ -150,6 +150,14 @@ function Stop-All {
 }
 
 try {
+    # Verifier les trois JAR avant de lancer le premier processus.
+    foreach ($server in $servers) {
+        $requiredJar = Join-Path (Join-Path $root $server.Dir) $server.Jar
+        if (!(Test-Path $requiredJar)) {
+            throw ("JAR manquant pour " + $server.Name + ": " + $requiredJar)
+        }
+    }
+
     while ($true) {
         foreach ($server in $servers) {
             $processes[$server.Name] = Start-One $server
@@ -206,6 +214,18 @@ try {
             Start-Sleep -Seconds 5
         }
     }
+}
+catch {
+    $message = $_.Exception.Message
+    Write-Host ""
+    Write-Host ("ERREUR DU SUPERVISEUR: " + $message) -ForegroundColor Red
+    Write-Host ("Fichier: " + $_.InvocationInfo.PositionMessage) -ForegroundColor Yellow
+    $errorLog = Join-Path $root "SUPERVISEUR-ERREUR.txt"
+    try {
+        ("[" + (Get-Date -Format "yyyy-MM-dd HH:mm:ss") + "] " + $message + [Environment]::NewLine + $_.ScriptStackTrace) | Set-Content -Path $errorLog -Encoding UTF8
+        Write-Host ("Diagnostic enregistre dans: " + $errorLog)
+    } catch {}
+    throw
 }
 finally {
     Stop-All
