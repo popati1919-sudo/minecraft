@@ -1028,6 +1028,20 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             }
         }
     }
+    @EventHandler public void onClanChestDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
+        String title=e.getView().getTitle();
+        if(!title.startsWith("Coffre clan:"))return;
+        String clan=title.substring("Coffre clan:".length());
+        int level=Math.max(1,db.getInt(clanPath(clan)+".chest-level",1));
+        int unlocked=Math.max(1,Math.min(54,level==1?1:(level-1)*9));
+        for(int rawSlot:e.getRawSlots()) {
+            if(rawSlot>=0 && rawSlot<e.getView().getTopInventory().getSize() && rawSlot>=unlocked) {
+                e.setCancelled(true);
+                if(e.getWhoClicked() instanceof Player p)msg(p,"Emplacement verrouillé. Utilise /clan chest upgrade.");
+                return;
+            }
+        }
+    }
     @EventHandler public void onChestClose(org.bukkit.event.inventory.InventoryCloseEvent e) {
         String title=e.getView().getTitle();
         if(!title.startsWith("Coffre clan:"))return;
