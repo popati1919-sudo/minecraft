@@ -100,6 +100,63 @@ jobs:
           test -n "$grim_url"
           curl -fL "$grim_url" -o "$ROOT/SMP/plugins/GrimAC.jar"
           test -s "$ROOT/SMP/plugins/GrimAC.jar"
+          mkdir -p "$ROOT/SMP/plugins/GrimAC"
+          cat > "$ROOT/SMP/plugins/GrimAC/punishments.yml" <<'EOF'
+          Punishments:
+            Movement:
+              remove-violations-after: 300
+              checks:
+                - "Simulation"
+                - "GroundSpoof"
+                - "Timer"
+                - "TimerLimit"
+                - "NoFall"
+                - "Knockback"
+                - "Explosion"
+                - "Post"
+                - "Vehicle"
+                - "NoSlow"
+                - "Sprint"
+                - "Elytra"
+              commands:
+                - "1:1 [alert]"
+                - "1:1 [log]"
+            Combat:
+              remove-violations-after: 300
+              checks:
+                - "Reach"
+                - "Hitboxes"
+                - "Interact"
+                - "Aim"
+                - "Killaura"
+              commands:
+                - "1:1 [alert]"
+                - "1:1 [log]"
+            Packets:
+              remove-violations-after: 300
+              checks:
+                - "BadPackets"
+                - "PacketOrder"
+                - "Crash"
+                - "Exploit"
+                - "TransactionOrder"
+              commands:
+                - "1:1 [alert]"
+                - "1:1 [log]"
+            Other:
+              remove-violations-after: 300
+              checks:
+                - "MultiActions"
+                - "Place"
+                - "Baritone"
+                - "Break"
+                - "Chat"
+                - "Autoclicker"
+              commands:
+                - "1:1 [alert]"
+                - "1:1 [log]"
+          
+          EOF
 
       - name: Configurer Velocity, lobby et SMP
         shell: bash
