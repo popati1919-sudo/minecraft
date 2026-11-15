@@ -106,3 +106,16 @@ Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions, [docs/CO
 - Le paquet configuré pour les comptes crack utilise `online-mode=false`; ne l'expose jamais directement derrière un proxy non sécurisé et ne partage pas les ports avec un serveur non fiable.
 
 Cette fonctionnalité doit encore réussir la compilation CI et être testée en jeu avant d'être considérée prête pour la production.
+
+
+## Dashboard web administrateur (1.0.7)
+
+Le SMP démarre un petit dashboard intégré sur le port **8765** (par défaut lié à `127.0.0.1`). Ouvre `http://127.0.0.1:8765` depuis la machine serveur. Le jeton administrateur est généré au premier démarrage dans `plugins/LarpersCoin/web-admin.yml`; ne le publie jamais et ne l'envoie pas dans un salon public.
+
+Le dashboard affiche les joueurs connectés, leur ping, les alertes anti-triche et permet à un administrateur de réinitialiser un compte. La réinitialisation révoque le compte, expulse le joueur connecté et l'oblige à refaire `/register`. La commande en jeu `/admin reset <pseudo>` reste réservée à `larpers.admin` ou OP.
+
+Pour accéder au dashboard depuis Internet, configure `web-admin.bind: 0.0.0.0` dans `plugins/LarpersCoin/config.yml`, puis place-le derrière un reverse proxy HTTPS avec authentification réseau et limite l'accès au port du dashboard. **N'expose pas directement le port HTTP 8765 sur Internet** : l'application intégrée ne fournit pas elle-même TLS. Garde le jeton secret.
+
+## Anti-triche sans bannissement automatique
+
+Les détections Speed, Fly, Reach et X-Ray suspect ajoutent des alertes et des éléments de preuve consultables par le staff avec `/ac log`, `/ac top` et dans le dashboard. Aucun seuil ne déclenche de kick ou de ban automatique. Les statistiques X-Ray sont heuristiques et doivent être vérifiées manuellement avant toute sanction.
