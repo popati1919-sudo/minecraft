@@ -20,6 +20,7 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerVelocityEvent;
+import org.bukkit.event.player.PlayerVelocityEvent;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -84,6 +85,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         config.addDefault("anticheat.checks.speed.enabled", true);
         config.addDefault("anticheat.checks.speed.max-ground-blocks-per-tick", 0.65D);
         config.addDefault("anticheat.checks.fly.enabled", true);
+        config.addDefault("anticheat.checks.xray.enabled", true);
         config.addDefault("anticheat.checks.fly.upward-limit-per-tick", 0.72D);
         config.addDefault("anticheat.checks.fly.repeated-upward-ticks", 4);
         config.addDefault("anticheat.checks.reach.enabled", true);
