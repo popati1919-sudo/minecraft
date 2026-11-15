@@ -139,7 +139,8 @@ final class LarpersWebPanel {
             } else if (path.equals("/api/ac/reports") && exchange.getRequestMethod().equals("GET")) {
                 File reportFile = plugin.getDataFolder().toPath().resolve("anticheat-reports.yml").toFile();
                 YamlConfiguration reports = YamlConfiguration.loadConfiguration(reportFile);
-                List<String> ids = new ArrayList<>(reports.getConfigurationSection("reports") == null ? List.of() : reports.getConfigurationSection("reports").getKeys(false));
+                List<String> ids = new ArrayList<>();
+                if (reports.getConfigurationSection("reports") != null) ids.addAll(reports.getConfigurationSection("reports").getKeys(false));
                 ids.sort((a,b) -> Long.compare(reports.getLong("reports." + b + ".timestamp"), reports.getLong("reports." + a + ".timestamp")));
                 StringBuilder out = new StringBuilder("{\"reports\":[");
                 boolean first = true;
