@@ -1,5 +1,5 @@
 name: LarpersCoin
-version: 1.0.4
+version: 1.0.5
 main: ca.larperscoin.smp.LarpersCoin
 load: STARTUP
 api-version: '26.3'
@@ -15,7 +15,7 @@ commands:
     usage: /login <motdepasse>
   balance:
     description: Affiche ton solde LPC
-    aliases: [bal]
+    aliases: [bal, money]
     usage: /balance [joueur]
   pay:
     description: Envoie des LPC à un joueur
