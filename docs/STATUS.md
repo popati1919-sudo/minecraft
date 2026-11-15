@@ -52,10 +52,16 @@ Dernière mise à jour: 2026-11-13 — version 1.0.4.
 
 ## Mise à jour 1.0.5 — Authentification, économie et menus Bedrock
 - Inscription simplifiée: une seule saisie avec /register <motdepasse>.
-- Récompense quotidienne ajustée à 60 + 10 LPC par jour de série (maximum 130 LPC).
+- Récompense quotidienne de connexion retirée; les quêtes quotidiennes restent disponibles.
 - Quêtes quotidiennes: 100 LPC; hebdomadaires: 400 LPC, avec objectifs hebdomadaires réduits.
 - Ticket de loterie: 50 LPC.
 - Menus LPC avec bordure grise discrète, recherche de joueurs par chat et menu /top.
 - Coffre de clan limité à 1 emplacement au départ, puis améliorations payantes jusqu'à 54 emplacements.
 - Commandes Quiz et Boutique retirées.
 - Compilation et essais en jeu Bedrock à confirmer après les workflows.
+
+- Menu /admin regroupé sur une seule page; ajout de /admin reset <joueur> et /admin ip <adresse:port> <nom>, réservés aux administrateurs.
+- Base auth.yml partagée entre Lobby et SMP pour que les réinitialisations de mot de passe fonctionnent sur le réseau.
+- /top, ping individuel et adresse/nom du serveur dans l'en-tête TAB.
+- Lobby 100 % vide, ancienne plateforme supprimée au démarrage et vol autorisé dans le lobby d'authentification.
+- Distances de rendu/simulation et options JVM ajustées pour réduire la charge.
