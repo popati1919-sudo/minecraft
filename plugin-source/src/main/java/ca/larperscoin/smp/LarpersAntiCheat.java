@@ -57,7 +57,6 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     private final Map<UUID, Integer> lastMovementTick = new ConcurrentHashMap<>();
     private final Map<UUID, Double> horizontalDistanceThisTick = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> violations = new ConcurrentHashMap<>();
-    private final Map<UUID, Integer> lastSanctionTier = new ConcurrentHashMap<>();
     private final Map<String, Long> lastAlert = new ConcurrentHashMap<>();
     private final Map<UUID, Boolean> alertsEnabled = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> minedStone = new ConcurrentHashMap<>();
@@ -175,7 +174,6 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     public void onJoin(PlayerJoinEvent event) {
         grantGrace(event.getPlayer());
         UUID id = event.getPlayer().getUniqueId();
-        lastSanctionTier.put(id, tierFor(violations.getOrDefault(id, 0)));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -197,7 +195,6 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         horizontalDistanceThisTick.remove(id);
         graceUntil.remove(id);
         alertsEnabled.remove(id);
-        lastSanctionTier.remove(id);
         minedStone.remove(id);
         minedOres.remove(id);
         xrayWindowStart.remove(id);
