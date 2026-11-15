@@ -56,7 +56,14 @@ final class LarpersAuth implements Listener {
 
     LarpersAuth(JavaPlugin plugin) {
         this.plugin = plugin;
-        String storage = plugin.getConfig().getString("auth.storage-file", "auth.yml");
+        String storage = plugin.getConfig().getString("auth.storage-file");
+        if (storage == null || storage.isBlank()) {
+            File siblingLobbyData = new File(plugin.getServer().getWorldContainer(),
+                    "../Lobby/plugins/LarpersCoin");
+            storage = !plugin.getConfig().getBoolean("network.auth-only", false)
+                    && siblingLobbyData.isDirectory()
+                    ? "../Lobby/plugins/LarpersCoin/auth.yml" : "auth.yml";
+        }
         Path storagePath = Path.of(storage);
         if (!storagePath.isAbsolute()) {
             storagePath = storage.equals("auth.yml")
