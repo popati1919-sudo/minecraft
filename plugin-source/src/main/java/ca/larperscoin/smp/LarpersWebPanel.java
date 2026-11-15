@@ -41,12 +41,12 @@ final class LarpersWebPanel {
         while (liveEvents.size() > 300) liveEvents.removeFirst();
     }
     private synchronized String liveEventsJson() {
-        StringBuilder out = new StringBuilder("{\\"events\\":[");
+        StringBuilder out = new StringBuilder("{\"events\":[");
         boolean first = true;
         for (String event : liveEvents) {
             if (!first) out.append(',');
             first = false;
-            out.append("\\"").append(escape(event)).append("\\"");
+            out.append("\"").append(escape(event)).append("\"");
         }
         return out.append("]}").toString();
     }
