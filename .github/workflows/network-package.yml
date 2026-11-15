@@ -196,6 +196,9 @@ jobs:
             remember-ip: true
             connect-to-smp: true
             storage-file: plugins/LarpersCoin/auth.yml
+          server-display:
+            name: Larpers Coin SMP
+            ip: Non configurée
           EOF
           cat > "$ROOT/SMP/plugins/LarpersCoin/config.yml" <<'EOF'
           auth:
