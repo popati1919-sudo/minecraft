@@ -275,7 +275,7 @@ jobs:
           )
           echo.
           echo Cle Floodgate partagee avec Lobby et SMP.
-          echo FastLoginPlus n'est pas utilise. L'authentification des comptes non premium reste geree par LarpersCoin.
+          echo L'authentification des joueurs est geree par LarpersCoin.
           echo Redemarre Lobby, SMP puis Velocity.
           pause
           EOF
