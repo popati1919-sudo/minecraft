@@ -43,7 +43,7 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/bounty <joueur> <montant>` — prime payée au joueur qui élimine la cible.
 - `/eco give|take|set <joueur> <montant>` — administration.
 - `/lottery` — menu graphique pour tous: jackpot, nombre de tickets et achat de tickets.
-- `/lottery buy [1-10]` — acheter de 1 à 10 tickets à 25 LPC chacun; disponible seulement pendant une loterie active.
+- `/lottery buy [1-10]` — acheter de 1 à 10 tickets à 50 LPC chacun; disponible seulement pendant une loterie active.
 - `/lottery start [minutes]` — démarrer une loterie (1 à 1440 minutes), réservé aux administrateurs; annonce globale dans le chat et bannière dans la liste des joueurs.
 - `/lottery draw` — terminer et tirer immédiatement, réservé aux administrateurs.
 
@@ -55,13 +55,12 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/clan bank [deposit|withdraw <montant>]`.
 - `/clan allies request|accept|remove <clan>` — alliances bilatérales.
 - `/clan role <joueur> <officer|member>` — rôle d'officier ou membre.
-- `/clan chest` — coffre partagé.
+- `/clan chest` — coffre partagé du clan (1 emplacement au départ); `/clan chest upgrade` augmente sa capacité contre des LPC.
 - `/clan top`, `/clan leaderboard`.
 
 ### Activités et commerce
 - `/quests` ouvre le menu des objectifs; `/quests claim`, `/quests weekly`, `/quests weekly claim` — objectifs automatiques quotidiens et hebdomadaires.
-- `/quiz` — quiz Minecraft à choix multiples configurable dans `features.yml`; `/quiz top` — classement des scores.
-- `/shop` ouvre la boutique graphique avec catégories, pages et quantités par clic (gauche=1, droit=16, Maj-clic=64); `/shop search <objet>` et `/shop buy <clé> [quantité]` — recherche et achats LPC; prix modifiables dans features.yml.
+- `/top` — ouvre un menu de classements LPC (fortunes, clans et primes).
 - `/ah` ou `/ah list` — hôtel des ventes graphique persistant avec barre de recherche (clic sur la boussole, puis saisie dans le chat), filtre vendeur/objet et bouton pour effacer la recherche.
 - `/ah search <objet|vendeur>` et `/ah search clear` — recherche directe; `/ah sell <prix>`, `/ah buy <id>` — gestion des annonces.
 - `/trade <joueur>`, `/trade accept`, `/trade item`, `/trade money <montant>`, `/trade confirm`, `/trade cancel` — échange avec double confirmation.
@@ -90,17 +89,17 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - Floodgate authentifie les joueurs Bedrock via son mécanisme de clé. Ne partage jamais les fichiers de clés Floodgate.
 
 ## Données
-Les soldes sont dans `plugins/LarpersCoin/data.yml`; clans, quêtes, quiz et hôtel des ventes sont dans `plugins/LarpersCoin/features.yml`.
+Les soldes sont dans `plugins/LarpersCoin/data.yml`; clans, quêtes, coffre partagé et hôtel des ventes sont dans `plugins/LarpersCoin/features.yml`.
 
 ## État et limites à connaître
-Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et achats boutique ont maintenant une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Le menu staff possède deux pages d'actions rapides; le quiz dispose d'une banque configurable et d'un classement. Le menu primes et la recherche AH sont ajoutés dans la version 1.0.2. La version 1.0.3 ajoute le menu de loterie administrable et les préfixes de rang dans le chat et le tab. Geyser/Floodgate sont empaquetés automatiquement; les connexions Bedrock et hors-ligne doivent encore être testées sur le serveur réel.
+Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et hôtel des ventes ont une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Les menus LPC utilisent une bordure commune et des recherches par chat compatibles avec Bedrock. Le menu primes et la recherche AH sont ajoutés dans la version 1.0.2. La version 1.0.3 ajoute le menu de loterie administrable et les préfixes de rang dans le chat et le tab. Geyser/Floodgate sont empaquetés automatiquement; les connexions Bedrock et hors-ligne doivent encore être testées sur le serveur réel.
 
-Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions, [docs/CONFIGURATION.md](docs/CONFIGURATION.md) pour les prix/quiz/permissions et [CHANGELOG.txt](CHANGELOG.txt) pour les changements de la version 1.0.0.
+Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions, [docs/CONFIGURATION.md](docs/CONFIGURATION.md) pour les permissions et [CHANGELOG.txt](CHANGELOG.txt) pour les changements de la version 1.0.0.
 
 
 ## Authentification intégrée (version de développement)
 
-- Comptes Java crack : `/register <motdepasse> <confirmation>` à la première visite, puis `/login <motdepasse>`.
+- Comptes Java crack : `/register <motdepasse>` à la première visite, puis `/login <motdepasse>`.
 - Mots de passe stockés sous forme PBKDF2-HMAC-SHA256 avec sel individuel dans `plugins/LarpersCoin/auth.yml`.
 - Cinq tentatives incorrectes déclenchent un blocage temporaire de 15 minutes.
 - Les commandes et actions de jeu sont bloquées tant que le joueur n'est pas authentifié.
