@@ -17,6 +17,12 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.Deque;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
@@ -27,6 +33,8 @@ final class LarpersWebDashboard {
     private final LarpersCoin core;
     private HttpServer server;
     private String token;
+    private final Deque<String> consoleLines = new ConcurrentLinkedDeque<>();
+    private Handler consoleHandler;
 
     LarpersWebDashboard(JavaPlugin plugin, LarpersCoin core) {
         this.plugin = plugin;
@@ -53,6 +61,25 @@ final class LarpersWebDashboard {
             server.setExecutor(Executors.newFixedThreadPool(3, r -> {
                 Thread t = new Thread(r, "LPC-WebAdmin"); t.setDaemon(true); return t;
             }));
+            consoleHandler = new Handler() {
+                @Override public void publish(LogRecord record) {
+                    if (record == null || !isLoggable(record)) return;
+                    String message = record.getMessage();
+                    if (message == null || message.isBlank()) return;
+                    String line = java.time.LocalTime.now().withNano(0) + " [" + record.getLevel().getName()
+                            + "] " + message;
+                    consoleLines.addLast(line);
+                    while (consoleLines.size() > 400) consoleLines.pollFirst();
+                    if (record.getThrown() != null) {
+                        String detail = record.getThrown().toString();
+                        consoleLines.addLast(java.time.LocalTime.now().withNano(0) + " [ERROR] " + detail);
+                    }
+                }
+                @Override public void flush() { }
+                @Override public void close() { }
+            };
+            Logger.getLogger("").addHandler(consoleHandler);
+            Logger.getLogger("Minecraft").addHandler(consoleHandler);
             server.start();
             plugin.getLogger().info("Dashboard LPC actif sur http://" + bind + ":" + port
                     + " (jeton dans plugins/LarpersCoin/web-admin.yml).");
@@ -63,6 +90,11 @@ final class LarpersWebDashboard {
 
     void shutdown() {
         if (server != null) server.stop(1);
+        if (consoleHandler != null) {
+            Logger.getLogger("").removeHandler(consoleHandler);
+            Logger.getLogger("Minecraft").removeHandler(consoleHandler);
+            consoleHandler.close();
+        }
     }
 
     private void handle(HttpExchange exchange) throws IOException {
@@ -79,6 +111,37 @@ final class LarpersWebDashboard {
             }
             if (path.equals("/api/status") && exchange.getRequestMethod().equals("GET")) {
                 send(exchange, 200, "application/json; charset=utf-8", statusJsonOnMainThread());
+                return;
+            }
+            if (path.equals("/api/command") && exchange.getRequestMethod().equals("POST")) {
+                String body = new String(exchange.getRequestBody().readNBytes(2048), StandardCharsets.UTF_8);
+                Matcher matcher = Pattern.compile("\\"command\\"\\s*:\\s*\\"([^\\r\\n]{1,512})\\"").matcher(body);
+                if (!matcher.find()) {
+                    send(exchange, 400, "application/json; charset=utf-8", "{\\"error\\":\\"Commande invalide (512 caractères maximum)\\"}");
+                    return;
+                }
+                String commandText = matcher.group(1).trim();
+                if (commandText.startsWith("/")) commandText = commandText.substring(1).trim();
+                if (commandText.isEmpty() || commandText.indexOf('\\n') >= 0 || commandText.indexOf('\\r') >= 0) {
+                    send(exchange, 400, "application/json; charset=utf-8", "{\\"error\\":\\"Commande invalide\\"}");
+                    return;
+                }
+                final String safeCommand = commandText;
+                java.util.concurrent.CompletableFuture<Boolean> result = new java.util.concurrent.CompletableFuture<>();
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    consoleLines.addLast(java.time.LocalTime.now().withNano(0) + " [WEB] > " + safeCommand);
+                    while (consoleLines.size() > 400) consoleLines.pollFirst();
+                    try { result.complete(Bukkit.dispatchCommand(Bukkit.getConsoleSender(), safeCommand)); }
+                    catch (Throwable error) { result.completeExceptionally(error); }
+                });
+                try {
+                    boolean accepted = result.get(10, TimeUnit.SECONDS);
+                    send(exchange, accepted ? 200 : 400, "application/json; charset=utf-8",
+                            accepted ? "{\\"ok\\":true,\\"message\\":\\"Commande envoyée à la console.\\"}"
+                                     : "{\\"ok\\":false,\\"message\\":\\"Commande inconnue ou refusée; consulte la console.\\"}");
+                } catch (Exception ex) {
+                    send(exchange, 503, "application/json; charset=utf-8", "{\\"error\\":\\"Console indisponible\\"}");
+                }
                 return;
             }
             if (path.equals("/api/reset-password") && exchange.getRequestMethod().equals("POST")) {
@@ -147,6 +210,13 @@ final class LarpersWebDashboard {
             out.append("{\"name\":\"").append(json(name == null ? entry.getKey().toString() : name))
                     .append("\",\"count\":").append(entry.getValue()).append('}');
         }
+        out.append("],\\"console\\":[");
+        first = true;
+        for (String line : new ArrayList<>(consoleLines)) {
+            if (!first) out.append(',');
+            first = false;
+            out.append("\\\"").append(json(line)).append("\\\"");
+        }
         return out.append("]}").toString();
     }
 
@@ -169,12 +239,13 @@ final class LarpersWebDashboard {
     private static final String PAGE = """
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Larpers Coin — Admin</title><style>
-*{box-sizing:border-box}body{margin:0;background:#0b1020;color:#e8edf8;font:15px system-ui}header{padding:24px 5%;background:#111a30;border-bottom:1px solid #263451}h1{margin:0;font-size:24px}main{max-width:1100px;margin:28px auto;padding:0 18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}.card{background:#141e33;border:1px solid #293955;border-radius:14px;padding:18px;margin-bottom:16px}.muted{color:#9eacc5}input,button{font:inherit;border-radius:9px;padding:11px;border:1px solid #394c6c;background:#0d1628;color:#fff}button{background:#7658e8;border:0;cursor:pointer;font-weight:700}button:hover{filter:brightness(1.15)}.row{display:flex;gap:9px;flex-wrap:wrap}ul{padding-left:20px}li{padding:5px 0;border-bottom:1px solid #263451}.value{font-size:30px;font-weight:800}.hidden{display:none}.danger{background:#a83c52}#login{max-width:520px;margin:40px auto}small{color:#aab6ca}</style></head>
+*{box-sizing:border-box}body{margin:0;background:#0b1020;color:#e8edf8;font:15px system-ui}header{padding:24px 5%;background:#111a30;border-bottom:1px solid #263451}h1{margin:0;font-size:24px}main{max-width:1100px;margin:28px auto;padding:0 18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}.card{background:#141e33;border:1px solid #293955;border-radius:14px;padding:18px;margin-bottom:16px}.muted{color:#9eacc5}input,button{font:inherit;border-radius:9px;padding:11px;border:1px solid #394c6c;background:#0d1628;color:#fff}button{background:#7658e8;border:0;cursor:pointer;font-weight:700}button:hover{filter:brightness(1.15)}.row{display:flex;gap:9px;flex-wrap:wrap}ul{padding-left:20px}li{padding:5px 0;border-bottom:1px solid #263451}.value{font-size:30px;font-weight:800}.hidden{display:none}.danger{background:#a83c52}#login{max-width:520px;margin:40px auto}small{color:#aab6ca}#consoleOutput{height:320px;overflow:auto;white-space:pre-wrap;background:#070b14;border:1px solid #293955;border-radius:10px;padding:12px;color:#c8f7d2;font:12px ui-monospace,monospace;margin:12px 0}#consoleCommand{flex:1;min-width:220px;font-family:ui-monospace,monospace}</style></head>
 <body><header><h1>◈ Larpers Coin — Dashboard</h1><div class="muted">Administration sécurisée · actualisation automatique</div></header>
 <main><section id="login" class="card"><h2>Connexion administrateur</h2><p class="muted">Colle le jeton contenu dans plugins/LarpersCoin/web-admin.yml.</p><div class="row"><input id="token" type="password" placeholder="Jeton administrateur" style="flex:1;min-width:220px"><button onclick="connect()">Connexion</button></div><p id="loginError"></p></section>
 <section id="app" class="hidden"><div class="grid"><div class="card"><div class="muted">Joueurs connectés</div><div class="value" id="count">0</div></div><div class="card"><div class="muted">Alertes anti-triche en mémoire</div><div class="value" id="alertsCount">0</div></div></div>
 <div class="card"><h2>Joueurs en ligne</h2><ul id="players"></ul></div>
 <div class="card"><h2>Réinitialiser un mot de passe</h2><p class="muted">Le compte est révoqué, le joueur est expulsé s'il est connecté et devra créer un nouveau mot de passe avec /register.</p><div class="row"><input id="playerName" placeholder="Pseudo exact"><button class="danger" onclick="resetPass()">Réinitialiser</button></div><p id="resetResult"></p></div>
+<div class="card"><h2>Console du serveur — temps réel</h2><p class="muted">Les dernières lignes du journal. Les commandes sont exécutées comme console serveur.</p><pre id="consoleOutput">Connexion à la console…</pre><div class="row"><input id="consoleCommand" autocomplete="off" placeholder="Commande Minecraft (ex. list, say Bonjour, lp...)"><button onclick="sendCommand()">Exécuter</button></div><p id="commandResult"></p></div>
 <div class="card"><h2>Alertes anti-triche</h2><small>Les alertes ne déclenchent jamais de kick ni de ban automatique. Vérifie les preuves avant toute sanction manuelle.</small><ul id="alerts"></ul></div>
 <div class="card"><h2>Joueurs signalés</h2><ul id="violations"></ul></div></section></main>
 <script>
@@ -182,10 +253,12 @@ let key=localStorage.getItem('lpc-admin-token')||'';
 const $=id=>document.getElementById(id);
 async function api(path,opts={}){return fetch(path,{...opts,headers:{'X-LPC-Token':key,'Content-Type':'application/json',...(opts.headers||{})}})}
 async function connect(){key=$('token').value.trim();try{let r=await api('/api/status');if(!r.ok)throw Error('Jeton invalide ou accès refusé');localStorage.setItem('lpc-admin-token',key);$('login').classList.add('hidden');$('app').classList.remove('hidden');refresh()}catch(e){$('loginError').textContent=e.message}}
-async function refresh(){try{let r=await api('/api/status');if(!r.ok)throw Error();let d=await r.json();$('count').textContent=d.onlineCount;$('alertsCount').textContent=d.alerts.length;$('players').innerHTML=d.online.map(p=>'<li>'+esc(p.name)+' — ping '+p.ping+' ms</li>').join('')||'<li>Aucun joueur connecté</li>';$('alerts').innerHTML=d.alerts.map(x=>'<li>'+esc(x)+'</li>').join('')||'<li>Aucune alerte récente</li>';$('violations').innerHTML=d.violations.sort((a,b)=>b.count-a.count).map(x=>'<li>'+esc(x.name)+' — '+x.count+' signalement(s)</li>').join('')||'<li>Aucun joueur signalé</li>'}catch(e){$('app').classList.add('hidden');$('login').classList.remove('hidden');$('loginError').textContent='Session expirée. Reconnecte-toi.'}}
+async function refresh(){try{let r=await api('/api/status');if(!r.ok)throw Error();let d=await r.json();$('count').textContent=d.onlineCount;$('alertsCount').textContent=d.alerts.length;$('players').innerHTML=d.online.map(p=>'<li>'+esc(p.name)+' — ping '+p.ping+' ms</li>').join('')||'<li>Aucun joueur connecté</li>';$('alerts').innerHTML=d.alerts.map(x=>'<li>'+esc(x)+'</li>').join('')||'<li>Aucune alerte récente</li>';$('violations').innerHTML=d.violations.sort((a,b)=>b.count-a.count).map(x=>'<li>'+esc(x.name)+' — '+x.count+' signalement(s)</li>').join('')||'<li>Aucun joueur signalé</li>';$('consoleOutput').textContent=(d.console||[]).join('\\n')||'Aucune ligne reçue';$('consoleOutput').scrollTop=$('consoleOutput').scrollHeight}catch(e){$('app').classList.add('hidden');$('login').classList.remove('hidden');$('loginError').textContent='Session expirée. Reconnecte-toi.'}}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+async function sendCommand(){let command=$('consoleCommand').value.trim();if(!command)return;let r=await api('/api/command',{method:'POST',body:JSON.stringify({command})});let d=await r.json();$('commandResult').textContent=d.message||d.error||'Commande envoyée';$('consoleCommand').value='';refresh()}
+$('consoleCommand')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendCommand()}});
 async function resetPass(){let name=$('playerName').value.trim();if(!/^[A-Za-z0-9_]{3,16}$/.test(name)){$('resetResult').textContent='Pseudo invalide.';return}if(!confirm('Réinitialiser le compte de '+name+' ?'))return;let r=await api('/api/reset-password',{method:'POST',body:JSON.stringify({player:name})});let d=await r.json();$('resetResult').textContent=d.message||d.error;refresh()}
-if(key){$('token').value=key;connect()}setInterval(()=>{if(!$('app').classList.contains('hidden'))refresh()},10000);
+if(key){$('token').value=key;connect()}setInterval(()=>{if(!$('app').classList.contains('hidden'))refresh()},2000);
 </script></body></html>
 """;
 }
