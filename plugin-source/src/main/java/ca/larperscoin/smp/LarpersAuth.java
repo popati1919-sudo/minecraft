@@ -76,7 +76,7 @@ final class LarpersAuth implements Listener {
             // Le backend est privé derrière Velocity: le proxy valide les comptes Java
             // en mode online et Floodgate valide les comptes Bedrock.
             if (plugin.getConfig().getBoolean("auth.proxy-authenticated", false)
-                    || isFloodgate(player) || isPremium(player)) {
+                    || isFloodgate(player)) {
                 markAuthenticated(player);
                 player.sendMessage(ChatColor.GREEN + "Connexion automatique réussie.");
                 return;
@@ -263,28 +263,6 @@ final class LarpersAuth implements Listener {
             Object instance = api.getMethod("getInstance").invoke(null);
             return (boolean) api.getMethod("isFloodgatePlayer", UUID.class).invoke(instance, player.getUniqueId());
         } catch (ReflectiveOperationException | LinkageError ex) {
-            return false;
-        }
-    }
-
-    private boolean isPremium(Player player) {
-        Plugin fastLogin = Bukkit.getPluginManager().getPlugin("FastLoginPlus");
-        if (fastLogin == null || !fastLogin.isEnabled()) return false;
-        // Seul le statut verifie par FastLoginPlus peut dispenser du mot de passe.
-        Plugin papi = Bukkit.getPluginManager().getPlugin("PlaceholderAPI");
-        if (papi == null || !papi.isEnabled()) return false;
-        try {
-            Class<?> api = Class.forName("me.clip.placeholderapi.PlaceholderAPI");
-            Object premium = api.getMethod("setPlaceholders",
-                    org.bukkit.OfflinePlayer.class, String.class)
-                    .invoke(null, player, "%fastloginplus_is_premium%");
-            if (premium != null && premium.toString().equalsIgnoreCase("true")) return true;
-            Object status = api.getMethod("setPlaceholders",
-                    org.bukkit.OfflinePlayer.class, String.class)
-                    .invoke(null, player, "%fastloginplus_status%");
-            return status != null && status.toString().equalsIgnoreCase("premium");
-        } catch (ReflectiveOperationException | LinkageError ex) {
-            plugin.getLogger().fine("Statut FastLoginPlus indisponible pour " + player.getName());
             return false;
         }
     }
