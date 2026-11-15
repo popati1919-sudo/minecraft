@@ -192,7 +192,7 @@ try {
         Stop-All
         if ($null -ne $crashedServer) {
             $restartHistory.Add((Get-Date))
-            $restartHistory.RemoveAll([Predicate[datetime]]{ param($t) $t -lt (Get-Date).AddMinutes(-10) })
+            while ($restartHistory.Count -gt 0 -and $restartHistory[0] -lt (Get-Date).AddMinutes(-10)) { $restartHistory.RemoveAt(0) }
             $crashLog = Join-Path (Join-Path $root $crashedServer) "logs\superviseur-console.log"
             Write-Host ("===== DIAGNOSTIC " + $crashedServer + " | code sortie " + $crashExitCode + " =====")
             if (Test-Path $crashLog) { Get-Content $crashLog -Tail 50 | ForEach-Object { Write-Host $_ } }
