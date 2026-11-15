@@ -1209,6 +1209,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @Override public List<String> onTabComplete(CommandSender s,Command c,String alias,String[] a) {
         if(c.getName().equalsIgnoreCase("admin")&&a.length==1)return List.of("reset","ip");
+        if(c.getName().equalsIgnoreCase("admin")&&a.length==2&&a[0].equalsIgnoreCase("reset"))
+            return Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
         if(c.getName().equalsIgnoreCase("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","audit","stats","leaderboard");
         if(c.getName().equalsIgnoreCase("ah")&&a.length==1)return List.of("list","search","sell","buy");
         if(c.getName().equalsIgnoreCase("ah")&&a.length==2&&a[0].equalsIgnoreCase("search"))return List.of("clear");
