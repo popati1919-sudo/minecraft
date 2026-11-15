@@ -31,18 +31,20 @@ function Start-One($server) {
     $proc = New-Object System.Diagnostics.Process
     $proc.StartInfo = $psi
     $logPath = $log
-    $outHandler = [System.Diagnostics.DataReceivedEventHandler]{
+    $outBlock = {
         param($sender, $eventArgs)
         if ($null -ne $eventArgs.Data) {
             [System.IO.File]::AppendAllText($logPath, $eventArgs.Data + [Environment]::NewLine)
         }
     }.GetNewClosure()
-    $errHandler = [System.Diagnostics.DataReceivedEventHandler]{
+    $errBlock = {
         param($sender, $eventArgs)
         if ($null -ne $eventArgs.Data) {
             [System.IO.File]::AppendAllText($logPath, "[ERREUR] " + $eventArgs.Data + [Environment]::NewLine)
         }
     }.GetNewClosure()
+    $outHandler = [System.Diagnostics.DataReceivedEventHandler]$outBlock
+    $errHandler = [System.Diagnostics.DataReceivedEventHandler]$errBlock
     $proc.add_OutputDataReceived($outHandler)
     $proc.add_ErrorDataReceived($errHandler)
 
