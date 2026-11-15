@@ -4,7 +4,7 @@ main: ca.larperscoin.smp.LarpersCoin
 load: STARTUP
 api-version: '26.3'
 author: Larpers Coin SMP
-description: "Plugin SMP LPC: économie, clans, quêtes, commerce, modération et anti-triche."
+description: "Plugin SMP LPC: économie, clans, quêtes, hôtel des ventes, modération et anti-triche."
 softdepend: [floodgate]
 commands:
   register:
@@ -23,6 +23,9 @@ commands:
   baltop:
     description: Classement des fortunes LPC
     usage: /baltop
+  top:
+    description: Ouvre le menu des classements LPC
+    usage: /top
   history:
     description: Historique des transactions LPC
     usage: /history [joueur]
@@ -46,12 +49,6 @@ commands:
     description: Quêtes quotidiennes
     aliases: [quests]
     usage: /quests [claim|weekly [claim]]
-  quiz:
-    description: Quiz de connaissances Minecraft
-    usage: /quiz [top]
-  shop:
-    description: Recherche et achat LPC dans la boutique
-    usage: /shop [search <objet>|buy <clé> [quantité]]
   admin:
     description: Menu graphique du staff
     permission: larpers.staff
