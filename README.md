@@ -43,7 +43,7 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/bounty <joueur> <montant>` — prime payée au joueur qui élimine la cible.
 - `/eco give|take|set <joueur> <montant>` — administration.
 - `/lottery` — menu graphique pour tous: jackpot, nombre de tickets et achat de tickets.
-- `/lottery buy [1-10]` — acheter de 1 à 10 tickets à 50 LPC chacun; disponible seulement pendant une loterie active.
+- `/lottery buy <nombre>` — choisir le nombre de tickets (1 à 1 000) à 50 LPC chacun; le menu propose un achat personnalisé.
 - `/lottery start [minutes]` — démarrer une loterie (1 à 1440 minutes), réservé aux administrateurs; annonce globale dans le chat et bannière dans la liste des joueurs.
 - `/lottery draw` — terminer et tirer immédiatement, réservé aux administrateurs.
 
