@@ -69,6 +69,63 @@ jobs:
           test -s package/LarpersCoin-Server-Ready/plugins/ViaVersion.jar
           test -s package/LarpersCoin-Server-Ready/plugins/ViaBackwards.jar
           test -s package/LarpersCoin-Server-Ready/plugins/GrimAC.jar
+          mkdir -p package/LarpersCoin-Server-Ready/plugins/GrimAC
+          cat > package/LarpersCoin-Server-Ready/plugins/GrimAC/punishments.yml <<'EOF'
+          Punishments:
+            Movement:
+              remove-violations-after: 300
+              checks:
+                - "Simulation"
+                - "GroundSpoof"
+                - "Timer"
+                - "TimerLimit"
+                - "NoFall"
+                - "Knockback"
+                - "Explosion"
+                - "Post"
+                - "Vehicle"
+                - "NoSlow"
+                - "Sprint"
+                - "Elytra"
+              commands:
+                - "1:1 [alert]"
+                - "1:1 [log]"
+            Combat:
+              remove-violations-after: 300
+              checks:
+                - "Reach"
+                - "Hitboxes"
+                - "Interact"
+                - "Aim"
+                - "Killaura"
+              commands:
+                - "1:1 [alert]"
+                - "1:1 [log]"
+            Packets:
+              remove-violations-after: 300
+              checks:
+                - "BadPackets"
+                - "PacketOrder"
+                - "Crash"
+                - "Exploit"
+                - "TransactionOrder"
+              commands:
+                - "1:1 [alert]"
+                - "1:1 [log]"
+            Other:
+              remove-violations-after: 300
+              checks:
+                - "MultiActions"
+                - "Place"
+                - "Baritone"
+                - "Break"
+                - "Chat"
+                - "Autoclicker"
+              commands:
+                - "1:1 [alert]"
+                - "1:1 [log]"
+          
+          EOF
 
           PLUGIN_JAR="$(find plugin-source/build/libs -maxdepth 1 -type f -name 'LarpersCoin-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
           test -n "$PLUGIN_JAR"
