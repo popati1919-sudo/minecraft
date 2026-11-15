@@ -63,6 +63,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Set<UUID> awaitingSelectorSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Map<UUID, String> bountySearch = new HashMap<>();
     private final Set<UUID> awaitingBountySearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<UUID> awaitingBountyListSearch = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Set<UUID> awaitingLotteryAmount = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private final Set<UUID> awaitingAdminIp = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final String PREFIX = ChatColor.GOLD + "[LPC] " + ChatColor.RESET;
@@ -291,7 +292,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         Player viewer=player(sender);
         if(viewer==null)return;
         Inventory inv=Bukkit.createInventory(null,54,"LPC | Primes");
+        String query=bountySearch.getOrDefault(viewer.getUniqueId(),"").toLowerCase(Locale.ROOT).trim();
         List<Map.Entry<UUID,Double>> entries=core.bountyLeaderboard().entrySet().stream()
+            .filter(entry -> {
+                if(query.isEmpty())return true;
+                String name=Bukkit.getOfflinePlayer(entry.getKey()).getName();
+                return name!=null&&name.toLowerCase(Locale.ROOT).contains(query);
+            })
             .sorted(Map.Entry.<UUID,Double>comparingByValue().reversed()).toList();
         int slot=0;
         for(Map.Entry<UUID,Double> entry:entries) {
@@ -302,6 +309,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
         if(entries.isEmpty())inv.setItem(22,item(Material.PAPER,"Aucune prime active","Place une prime sur un joueur en ligne."));
         inv.setItem(45,item(Material.TARGET,"Placer une prime","Choisir un joueur en ligne"));
+        inv.setItem(46,item(Material.COMPASS,"Rechercher une prime","Filtrer par pseudo"));
+        inv.setItem(47,item(Material.MILK_BUCKET,"Effacer la recherche"));
         inv.setItem(49,item(Material.BARRIER,"Fermer"));
         inv.setItem(53,item(Material.SUNFLOWER,"Actualiser",entries.size()+" prime(s) active(s)"));
         LpcMenuTheme.frame(inv);
@@ -974,6 +983,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             int slot=e.getRawSlot();
             if(slot==49){viewer.closeInventory();return;}
             if(slot==45){openBountyTargets(viewer);return;}
+            if(slot==46){awaitingBountyListSearch.add(viewer.getUniqueId());viewer.closeInventory();msg(viewer,"Écris le pseudo à rechercher dans le chat (ou 'annuler').");return;}
+            if(slot==47){bountySearch.remove(viewer.getUniqueId());openBountyMenu(viewer);return;}
             if(slot==53){openBountyMenu(viewer);return;}
             return;
         }
@@ -1112,7 +1123,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         UUID id=e.getPlayer().getUniqueId();
         frozen.remove(id);awaitingAhSearch.remove(id);pendingBountyTarget.remove(id);
         awaitingSelectorSearch.remove(id);awaitingBountySearch.remove(id);
-        awaitingLotteryAmount.remove(id);awaitingAdminIp.remove(id);
+        awaitingLotteryAmount.remove(id);awaitingAdminIp.remove(id);awaitingBountyListSearch.remove(id);
         selectorAction.remove(id);selectorSearch.remove(id);bountySearch.remove(id);
     }
     @EventHandler public void onChatSearch(org.bukkit.event.player.AsyncPlayerChatEvent e) {
@@ -1152,6 +1163,16 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 if(query.length()>16){msg(sender,"Pseudo trop long (16 caractères maximum).");if(action!=null)openPlayerSelector(sender,action);return;}
                 selectorSearch.put(senderId,query);
                 if(action!=null)openPlayerSelector(sender,action);
+            });
+            return;
+        }
+        if(awaitingBountyListSearch.remove(senderId)) {
+            e.setCancelled(true);
+            String query=e.getMessage().trim();
+            Bukkit.getScheduler().runTask(plugin,()->{
+                if(query.equalsIgnoreCase("annuler")){msg(sender,"Recherche de primes annulée.");openBountyMenu(sender);return;}
+                if(query.length()>16){msg(sender,"Pseudo trop long.");openBountyMenu(sender);return;}
+                bountySearch.put(senderId,query);openBountyMenu(sender);
             });
             return;
         }
