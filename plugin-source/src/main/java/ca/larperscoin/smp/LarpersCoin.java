@@ -330,7 +330,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     int previousStreak = data.getInt("streak." + id, 0);
                     int streak = previousDay > 0 && now - previousDay <= 172_800_000L
                             ? previousStreak + 1 : 1;
-                    double reward = 100.0 + Math.min(streak, 7) * 20.0;
+                    double reward = 60.0 + Math.min(streak, 7) * 10.0;
                     if (!Double.isFinite(balance(player.getUniqueId()) + reward)) {
                         reply(sender, "Ton solde ne peut pas recevoir cette récompense.");
                         return true;
@@ -432,7 +432,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         if(!lotteryActive()){reply(sender,"Aucune loterie en cours. Attends l'annonce d'un administrateur.");return true;}
                         int count=args.length>=2?Integer.parseInt(args[1]):1;
                         if(count<1||count>10){reply(sender,"Tu peux acheter de 1 à 10 tickets.");return true;}
-                        double cost=count*25.0,nextPot=lotteryPot()+cost;
+                        double cost=count*50.0,nextPot=lotteryPot()+cost;
                         if(!Double.isFinite(nextPot)){reply(sender,"Le jackpot dépasserait la limite numérique.");return true;}
                         if(!debit(player.getUniqueId(),cost)){reply(sender,"Fonds insuffisants : "+format(cost)+".");return true;}
                         List<String> tickets=data.getStringList("lottery.tickets");for(int i=0;i<count;i++)tickets.add(key(player.getUniqueId()));
@@ -481,7 +481,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         data.set("lottery.active",true);data.set("lottery.ends-at",end);saveData();
         Bukkit.broadcastMessage(ChatColor.LIGHT_PURPLE+"§l✦ LOTERIE LARPERS COIN ✦");
         Bukkit.broadcastMessage(ChatColor.YELLOW+"Une nouvelle loterie vient de commencer!");
-        Bukkit.broadcastMessage(ChatColor.GREEN+"Ticket: 25 LPC | Durée: "+minutes+" minute(s) | Jackpot: "+format(lotteryPot()));
+        Bukkit.broadcastMessage(ChatColor.GREEN+"Ticket: 50 LPC | Durée: "+minutes+" minute(s) | Jackpot: "+format(lotteryPot()));
         Bukkit.broadcastMessage(ChatColor.AQUA+"Ouvre /lottery pour acheter tes tickets!");
         Bukkit.broadcastMessage(ChatColor.GRAY+"Lancée par "+starter+".");
         getServer().getScheduler().runTaskLater(this,()->finishLottery(true),minutes*60L*20L);
