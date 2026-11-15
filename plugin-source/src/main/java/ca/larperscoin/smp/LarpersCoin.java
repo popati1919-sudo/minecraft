@@ -43,14 +43,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             public org.bukkit.generator.ChunkGenerator.ChunkData generateChunkData(
                     org.bukkit.World world, java.util.Random random, int chunkX, int chunkZ, BiomeGrid biome) {
                 ChunkData data = createChunkData(world);
-                // Petite plateforme de départ au centre; tous les autres blocs restent dans le vide.
-                if (chunkX == 0 && chunkZ == 0) {
-                    for (int x = 3; x <= 12; x++) {
-                        for (int z = 3; z <= 12; z++) {
-                            data.setBlock(x, 80, z, org.bukkit.Material.SMOOTH_STONE);
-                        }
-                    }
-                }
+                // Générateur entièrement vide: aucune plateforme ni décoration.
                 return data;
             }
         };
@@ -90,7 +83,10 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         getServer().getScheduler().runTaskLater(this, () -> {
             org.bukkit.World lobby = Bukkit.getWorld("world");
             if (lobby != null && getConfig().getBoolean("network.auth-only", false)) {
-                lobby.setSpawnLocation(8, 81, 8);
+                lobby.setSpawnLocation(0, 80, 0);
+                lobby.setGameRule(org.bukkit.GameRule.DO_MOB_SPAWNING, false);
+                lobby.setGameRule(org.bukkit.GameRule.DO_WEATHER_CYCLE, false);
+                lobby.setGameRule(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE, false);
             }
         }, 1L);
         getLogger().info("LarpersCoin 1.0.5 actif. Aucun claim ni protection de parcelle n'est enregistré.");
@@ -314,35 +310,6 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     }
                     return true;
                 }
-                case "daily" -> {
-                    Player player = requirePlayer(sender);
-                    if (player == null) return true;
-                    String id = key(player.getUniqueId());
-                    long now = System.currentTimeMillis();
-                    long previous = data.getLong("daily." + id, 0L);
-                    long cooldown = 86_400_000L;
-                    if (now - previous < cooldown) {
-                        long hours = (cooldown - (now - previous) + 3_599_999L) / 3_600_000L;
-                        reply(sender, "Tu as déjà réclamé ta récompense. Reviens dans environ " + hours + " h.");
-                        return true;
-                    }
-                    long previousDay = previous;
-                    int previousStreak = data.getInt("streak." + id, 0);
-                    int streak = previousDay > 0 && now - previousDay <= 172_800_000L
-                            ? previousStreak + 1 : 1;
-                    double reward = 60.0 + Math.min(streak, 7) * 10.0;
-                    if (!Double.isFinite(balance(player.getUniqueId()) + reward)) {
-                        reply(sender, "Ton solde ne peut pas recevoir cette récompense.");
-                        return true;
-                    }
-                    data.set("daily." + id, now);
-                    data.set("streak." + id, streak);
-                    credit(player.getUniqueId(), reward);
-                    saveData();
-                    recordTransaction("DAILY", new UUID(0L,0L), player.getUniqueId(), reward);
-                    reply(sender, "Récompense quotidienne : +" + format(reward) + " (série " + streak + ").");
-                    return true;
-                }
                 case "bounty" -> {
                     if (args.length == 0 || args.length == 1 && args[0].equalsIgnoreCase("list")) {
                         features.openBountyMenu(sender);
@@ -431,7 +398,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         Player player=requirePlayer(sender);if(player==null)return true;
                         if(!lotteryActive()){reply(sender,"Aucune loterie en cours. Attends l'annonce d'un administrateur.");return true;}
                         int count=args.length>=2?Integer.parseInt(args[1]):1;
-                        if(count<1||count>10){reply(sender,"Tu peux acheter de 1 à 10 tickets.");return true;}
+                        if(count<1||count>1000){reply(sender,"Choisis entre 1 et 1 000 tickets.");return true;}
                         double cost=count*50.0,nextPot=lotteryPot()+cost;
                         if(!Double.isFinite(nextPot)){reply(sender,"Le jackpot dépasserait la limite numérique.");return true;}
                         if(!debit(player.getUniqueId(),cost)){reply(sender,"Fonds insuffisants : "+format(cost)+".");return true;}
@@ -453,7 +420,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         if(!isLpcAdminSender(sender)){reply(sender,"Seuls les administrateurs peuvent terminer une loterie.");return true;}
                         finishLottery(false);reply(sender,"La loterie a été terminée.");return true;
                     }
-                    reply(sender,"Usage : /lottery [menu] | buy [1-10] | start [minutes] (admin) | draw (admin)");return true;
+                    reply(sender,"Usage : /lottery [menu] | buy <1-1000> | start [minutes] (admin) | draw (admin)");return true;
                 }
                 default -> {
                     return false;
@@ -469,6 +436,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         }
     }
 
+    public boolean resetAuthAccount(String playerName){return auth!=null&&auth.resetAccount(playerName);}
     public double lotteryPot(){return Math.max(0.0,data.getDouble("lottery.pot",0.0));}
     public int lotteryTicketCount(){return data.getStringList("lottery.tickets").size();}
     public boolean lotteryActive(){return data.getBoolean("lottery.active",false);}
@@ -505,13 +473,25 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private void updatePlayerTags() {
         for(Player p:Bukkit.getOnlinePlayers()) {
             p.setPlayerListName(rankPrefix(p)+ChatColor.WHITE+p.getName());
-            if(lotteryActive())p.setPlayerListHeaderFooter(ChatColor.LIGHT_PURPLE+"✦ LOTERIE LPC EN COURS ✦",ChatColor.YELLOW+"/lottery • Jackpot: "+format(lotteryPot()));
-            else p.setPlayerListHeaderFooter(ChatColor.GOLD+"Larpers Coin SMP",ChatColor.GRAY+"Bonne chance et bon jeu!");
+            String serverName=getConfig().getString("server-display.name","Larpers Coin SMP");
+            String serverIp=getConfig().getString("server-display.ip","Non configurée");
+            String status=lotteryActive()?ChatColor.LIGHT_PURPLE+"✦ LOTERIE • "+format(lotteryPot())+" LPC ✦":ChatColor.GRAY+"Bienvenue sur le SMP";
+            p.setPlayerListHeaderFooter(ChatColor.GOLD+serverName,status+ChatColor.DARK_GRAY+" | "+ChatColor.YELLOW+"IP: "+serverIp+ChatColor.DARK_GRAY+" | "+ChatColor.GREEN+"Ping: "+p.getPing()+" ms");
         }
     }
     @EventHandler public void onPlayerJoin(PlayerJoinEvent e) {
+        Player player=e.getPlayer();
+        if(getConfig().getBoolean("network.auth-only",false)) {
+            org.bukkit.World lobby=Bukkit.getWorld("world");
+            if(lobby!=null) {
+                player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+                player.setAllowFlight(true);
+                player.setFlying(true);
+                player.teleport(lobby.getSpawnLocation());
+            }
+        }
         Bukkit.getScheduler().runTask(this,()->updatePlayerTags());
-        e.getPlayer().sendMessage(ChatColor.GOLD+"Bienvenue sur Larpers Coin SMP!");
+        player.sendMessage(ChatColor.GOLD+"Bienvenue sur Larpers Coin SMP!");
     }
     @EventHandler public void onPlayerChat(AsyncPlayerChatEvent e) {
         e.setFormat(rankPrefix(e.getPlayer())+ChatColor.WHITE+"%1$s"+ChatColor.DARK_GRAY+" » "+ChatColor.RESET+"%2$s");
