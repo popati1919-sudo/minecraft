@@ -57,3 +57,14 @@ Not yet complete / not yet verified
 - Coffre de clan: 1 emplacement pour les nouveaux clans, améliorations payantes par paliers jusqu'à 54; conservation des anciens coffres déjà remplis.
 - Ajout de /money comme alias de /balance.
 - Build GitHub Actions et test réel sur Bedrock en attente.
+
+## 1.0.6 — Administration, authentification et lobby
+- /admin tient maintenant sur une seule page; /admin reset <joueur> révoque son ancien mot de passe, expulse le joueur et impose une nouvelle inscription.
+- Base auth.yml partagée entre Lobby et SMP, y compris détection automatique pour les anciennes installations réseau.
+- /admin ip <adresse:port> <nom> permet aux administrateurs de modifier les informations affichées dans TAB; TAB affiche aussi le ping.
+- Récompense quotidienne de connexion supprimée.
+- Loterie: achat personnalisé de 1 à 1 000 tickets.
+- Coffre de clan: un emplacement initial et amélioration payante directement depuis le menu.
+- Recherche par pseudo dans les listes de joueurs, les primes et l'hôtel des ventes.
+- Lobby entièrement vide, sans plateforme; vol autorisé dans le lobby d'authentification.
+- Distances de rendu/simulation réduites et options G1GC pour diminuer la charge.
