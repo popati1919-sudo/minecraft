@@ -36,7 +36,7 @@ Dernière mise à jour: 2026-11-13 — version 1.0.4.
 - Aucun claim / protection de terrain.
 - Aucun rang VIP.
 - Ne pas remplacer les commandes vanilla ni les sélecteurs vanilla.
-- Le workflow réseau génère Velocity + Lobby + SMP, avec FastLoginPlus pour les connexions Java premium, /register et /login LPC pour les comptes non premium, et Geyser/Floodgate pour Bedrock. Les connexions réelles et les transferts restent à valider sur une machine de test.
+- Le workflow réseau génère Velocity + Lobby + SMP, avec l'authentification Java gérée par LarpersCoin (/register et /login) et Geyser/Floodgate pour Bedrock. Les connexions réelles et les transferts restent à valider sur une machine de test.
 
 ## Commandes récemment ajoutées
 - /history [joueur] — historique économique (consultation d'un autre joueur réservée au staff).
