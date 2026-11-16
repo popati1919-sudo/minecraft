@@ -5,7 +5,7 @@ load: STARTUP
 api-version: '26.3'
 author: Larry SMP
 description: "Plugin Larry SMP: économie, clans, quêtes, hôtel des ventes, modération et anti-triche."
-softdepend: [floodgate]
+softdepend: [floodgate, GrimAC]
 commands:
   register:
     description: Crée un compte joueur
