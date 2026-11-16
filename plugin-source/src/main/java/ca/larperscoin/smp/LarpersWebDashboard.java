@@ -68,8 +68,10 @@ final class LarpersWebDashboard {
 
     void recordGrimFlag(String player, String check, String verbose) {
         String name = (player == null || player.isBlank()) ? "Joueur inconnu" : player;
+        String checkName = check == null ? "Check inconnu" : check;
+        String category = classifyGrimCheck(checkName);
         String detail = java.time.LocalTime.now().withNano(0) + " [GRIM] " + name + " | "
-                + (check == null ? "Check inconnu" : check) + " | " + (verbose == null ? "" : verbose);
+                + category + " | " + checkName + " | " + (verbose == null ? "" : verbose);
         grimAlerts.computeIfAbsent(name, ignored -> new GrimAlertSummary()).add(detail);
         consoleLines.addLast(detail);
         while (consoleLines.size() > 400) consoleLines.pollFirst();
@@ -291,6 +293,15 @@ final class LarpersWebDashboard {
             out.append("\"").append(json(line)).append("\"");
         }
         return out.append("]}").toString();
+    }
+
+    private String classifyGrimCheck(String check) {
+        String value = check.toLowerCase(java.util.Locale.ROOT).replace("_", "").replace("-", "").replace(" ", "");
+        if (value.contains("fly") || value.contains("flight") || value.contains("prediction") || value.contains("elytra")) return "Vol / Fly suspect";
+        if (value.contains("speed") || value.contains("timer") || value.contains("velocity") || value.contains("strafe")) return "Speed / Timer suspect";
+        if (value.contains("aura") || value.contains("reach") || value.contains("hitbox") || value.contains("aim") || value.contains("rotation") || value.contains("autoclick") || value.contains("attack")) return "Combat suspect";
+        if (value.contains("scaffold") || value.contains("tower") || value.contains("jesus") || value.contains("nofall") || value.contains("step") || value.contains("vehicle")) return "Déplacement / Scaffold suspect";
+        return "Autre vérification Grim";
     }
 
     private String json(String value) {
