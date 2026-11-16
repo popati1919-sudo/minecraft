@@ -12,6 +12,11 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.Material;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -36,6 +41,12 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 public final class LarpersCoin extends JavaPlugin implements Listener, org.bukkit.command.CommandExecutor, TabCompleter {
+    private static final class InvseeHolder implements InventoryHolder {
+        private final UUID targetId;
+        InvseeHolder(UUID targetId) { this.targetId = targetId; }
+        UUID targetId() { return targetId; }
+        @Override public Inventory getInventory() { return null; }
+    }
     @Override
     public org.bukkit.generator.ChunkGenerator getDefaultWorldGenerator(String worldName, String id) {
         if (!"empty".equalsIgnoreCase(id)) return null;
@@ -236,6 +247,25 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                 case "register", "login" -> {
                     Player player = requirePlayer(sender);
                     if (player != null) auth.command(player, name, args);
+                    return true;
+                }
+                case "invsee" -> {
+                    if (!isStaff(sender)) {
+                        reply(sender, "Permission insuffisante.");
+                        return true;
+                    }
+                    Player viewer = requirePlayer(sender);
+                    if (viewer == null) return true;
+                    if (args.length != 1) {
+                        reply(sender, "Usage : /invsee <joueur>");
+                        return true;
+                    }
+                    Player target = Bukkit.getPlayerExact(args[0]);
+                    if (target == null) {
+                        reply(sender, "Ce joueur doit être connecté.");
+                        return true;
+                    }
+                    openInvsee(viewer, target);
                     return true;
                 }
                 case "balance" -> {
@@ -458,6 +488,46 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         }
     }
 
+    private void openInvsee(Player viewer, Player target) {
+        Inventory menu = Bukkit.createInventory(new InvseeHolder(target.getUniqueId()), 54,
+                ChatColor.DARK_AQUA + "Inventaire: " + ChatColor.WHITE + target.getName());
+        ItemStack[] contents = target.getInventory().getStorageContents();
+        for (int slot = 0; slot < Math.min(contents.length, 36); slot++) {
+            ItemStack item = contents[slot];
+            if (item != null && item.getType() != Material.AIR) menu.setItem(slot, item.clone());
+        }
+        ItemStack[] armor = target.getInventory().getArmorContents();
+        // Ordre Bukkit: bottes, jambières, plastron, casque.
+        int[] armorSlots = {45, 46, 47, 48};
+        for (int i = 0; i < armor.length; i++) {
+            ItemStack item = armor[i];
+            if (item != null && item.getType() != Material.AIR) menu.setItem(armorSlots[i], item.clone());
+        }
+        ItemStack offhand = target.getInventory().getItemInOffHand();
+        if (offhand != null && offhand.getType() != Material.AIR) menu.setItem(50, offhand.clone());
+        menu.setItem(49, namedItem(Material.SHIELD, ChatColor.YELLOW + "Main gauche"));
+        menu.setItem(51, namedItem(Material.IRON_CHESTPLATE, ChatColor.YELLOW + "Armure"));
+        menu.setItem(52, namedItem(Material.BARRIER, ChatColor.RED + "Consultation seulement"));
+        menu.setItem(53, namedItem(Material.PLAYER_HEAD, ChatColor.AQUA + target.getName()));
+        viewer.openInventory(menu);
+    }
+
+    private ItemStack namedItem(Material material, String name) {
+        ItemStack item = new ItemStack(material);
+        org.bukkit.inventory.meta.ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(name);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    @EventHandler
+    public void onInvseeClick(InventoryClickEvent event) {
+        Inventory top = event.getView().getTopInventory();
+        if (top.getHolder() instanceof InvseeHolder) event.setCancelled(true);
+    }
+
     public boolean resetAuthAccount(String playerName){return auth!=null&&auth.resetAccount(playerName);}
     LarpersAntiCheat getAntiCheat(){return antiCheat;}
     public double lotteryPot(){return Math.max(0.0,data.getDouble("lottery.pot",0.0));}
@@ -562,6 +632,11 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (command.getName().equalsIgnoreCase("invsee") && args.length == 1 && isStaff(sender)) {
+            String prefix = args[0].toLowerCase(Locale.ROOT);
+            return Bukkit.getOnlinePlayers().stream().map(Player::getName)
+                    .filter(n -> n.toLowerCase(Locale.ROOT).startsWith(prefix)).toList();
+        }
         if (command.getName().equalsIgnoreCase("eco") && args.length == 1 && sender.hasPermission("larpers.admin")) {
             return List.of("give", "take", "set").stream().filter(s -> s.startsWith(args[0].toLowerCase(Locale.ROOT))).toList();
         }
