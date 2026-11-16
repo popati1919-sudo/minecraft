@@ -22,6 +22,7 @@ import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Deque;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -34,7 +35,47 @@ final class LarpersWebDashboard {
     private HttpServer server;
     private String token;
     private final Deque<String> consoleLines = new ConcurrentLinkedDeque<>();
+    private final Map<String, GrimAlertSummary> grimAlerts = new ConcurrentHashMap<>();
     private Handler consoleHandler;
+
+    private static final class GrimAlertSummary {
+        private int count;
+        private String latest = "";
+        private final Deque<String> recent = new ConcurrentLinkedDeque<>();
+        synchronized void add(String line) {
+            count++;
+            latest = line;
+            recent.addFirst(line);
+            while (recent.size() > 5) recent.pollLast();
+        }
+        synchronized String toJson(String player, LarpersWebDashboard owner) {
+            StringBuilder out = new StringBuilder("{\\"player\\":\\"")
+                    .append(owner.json(player)).append("\\",\\"count\\":").append(count)
+                    .append(",\\"latest\\":\\"").append(owner.json(latest)).append("\\",\\"details\\":[");
+            boolean first = true;
+            for (String item : recent) {
+                if (!first) out.append(',');
+                first = false;
+                out.append("\\"").append(owner.json(item)).append("\\"");
+            }
+            return out.append("]}").toString();
+        }
+    }
+
+    private void recordGrimAlert(String message, String formattedLine) {
+        String lower = message.toLowerCase(java.util.Locale.ROOT);
+        if (!lower.contains("grim") || !(lower.contains("alert") || lower.contains("flag")
+                || lower.contains("violat") || lower.contains("failed") || lower.contains("punish"))) return;
+        String player = null;
+        Matcher named = Pattern.compile("(?i)\\\\[?grim(?:ac)?\\\\]?\\\\s*(?:»|:|-)\\\\s*([A-Za-z0-9_]{3,16})\\\\s+(?:failed|flagged|violated|triggered)").matcher(message);
+        if (named.find()) player = named.group(1);
+        if (player == null) {
+            Matcher labelled = Pattern.compile("(?i)(?:player|joueur)\\\\s*[:=]\\\\s*([A-Za-z0-9_]{3,16})").matcher(message);
+            if (labelled.find()) player = labelled.group(1);
+        }
+        if (player == null) player = "GrimAC — joueur non identifié";
+        grimAlerts.computeIfAbsent(player, ignored -> new GrimAlertSummary()).add(formattedLine);
+    }
 
     LarpersWebDashboard(JavaPlugin plugin, LarpersCoin core) {
         this.plugin = plugin;
@@ -77,6 +118,7 @@ final class LarpersWebDashboard {
                             + "] " + message;
                     consoleLines.addLast(line);
                     while (consoleLines.size() > 400) consoleLines.pollFirst();
+                    recordGrimAlert(message, line);
                     if (record.getThrown() != null) {
                         String detail = record.getThrown().toString();
                         consoleLines.addLast(java.time.LocalTime.now().withNano(0) + " [ERROR] " + detail);
@@ -253,14 +295,16 @@ final class LarpersWebDashboard {
 <div class="card"><h2>Joueurs en ligne</h2><ul id="players"></ul></div>
 <div class="card"><h2>Réinitialiser un mot de passe</h2><p class="muted">Le compte est révoqué, le joueur est expulsé s'il est connecté et devra créer un nouveau mot de passe avec /register.</p><div class="row"><input id="playerName" placeholder="Pseudo exact"><button class="danger" onclick="resetPass()">Réinitialiser</button></div><p id="resetResult"></p></div>
 <div class="card"><h2>Console du serveur — temps réel</h2><p class="muted">Les dernières lignes du journal. Les commandes sont exécutées comme console serveur.</p><pre id="consoleOutput">Connexion à la console…</pre><div class="row"><input id="consoleCommand" autocomplete="off" placeholder="Commande Minecraft (ex. list, say Bonjour, lp...)"><button onclick="sendCommand()">Exécuter</button></div><p id="commandResult"></p></div>
-<div class="card"><h2>Alertes anti-triche</h2><small>Les alertes ne déclenchent jamais de kick ni de ban automatique. Vérifie les preuves avant toute sanction manuelle.</small><ul id="alerts"></ul></div>
+<div class="card"><h2>Alertes GrimAC — regroupées par joueur</h2><small>Chaque joueur apparaît une seule fois; x21 signifie 21 alertes Grim détectées dans le journal.</small><ul id="grimAlerts"></ul></div>
+<div class="card"><h2>Alertes anti-triche Larry</h2><small>Les alertes ne déclenchent jamais de kick ni de ban automatique. Vérifie les preuves avant toute sanction manuelle.</small><ul id="alerts"></ul></div>
 <div class="card"><h2>Joueurs signalés</h2><ul id="violations"></ul></div></section></main>
 <script>
 let key=localStorage.getItem('larry-admin-token')||localStorage.getItem('lpc-admin-token')||'';
 const $=id=>document.getElementById(id);
 async function api(path,opts={}){return fetch(path,{...opts,headers:{'X-Larry-Token':key,'Content-Type':'application/json',...(opts.headers||{})}})}
 async function connect(){key=$('token').value.trim();try{let r=await api('/api/status');if(!r.ok)throw Error('Jeton invalide ou accès refusé');localStorage.setItem('larry-admin-token',key);$('login').classList.add('hidden');$('app').classList.remove('hidden');refresh()}catch(e){$('loginError').textContent=e.message}}
-async function refresh(){try{let r=await api('/api/status');if(!r.ok)throw Error();let d=await r.json();$('count').textContent=d.onlineCount;$('alertsCount').textContent=d.alerts.length;$('players').innerHTML=d.online.map(p=>'<li>'+esc(p.name)+' — ping '+p.ping+' ms</li>').join('')||'<li>Aucun joueur connecté</li>';$('alerts').innerHTML=d.alerts.map(x=>'<li>'+esc(x)+'</li>').join('')||'<li>Aucune alerte récente</li>';$('violations').innerHTML=d.violations.sort((a,b)=>b.count-a.count).map(x=>'<li>'+esc(x.name)+' — '+x.count+' signalement(s)</li>').join('')||'<li>Aucun joueur signalé</li>';$('consoleOutput').textContent=(d.console||[]).join('\\n')||'Aucune ligne reçue';$('consoleOutput').scrollTop=$('consoleOutput').scrollHeight}catch(e){$('app').classList.add('hidden');$('login').classList.remove('hidden');$('loginError').textContent='Session expirée. Reconnecte-toi.'}}
+async function refresh(){try{let r=await api('/api/status');if(!r.ok)throw Error();let d=await r.json();$('count').textContent=d.onlineCount;$('alertsCount').textContent=d.alerts.length+(d.grimAlerts||[]).reduce((n,a)=>n+a.count,0);
+$('grimAlerts').innerHTML=(d.grimAlerts||[]).sort((a,b)=>b.count-a.count).map(a=>'<li><b>'+esc(a.player)+'</b> — <b>x'+a.count+'</b><br><small>Dernière alerte : '+esc(a.latest)+'</small><details><summary>Voir les 5 dernières</summary>'+a.details.map(x=>'<div>'+esc(x)+'</div>').join('')+'</details></li>').join('')||'<li>Aucune alerte Grim reçue dans le journal pour le moment</li>';$('players').innerHTML=d.online.map(p=>'<li>'+esc(p.name)+' — ping '+p.ping+' ms</li>').join('')||'<li>Aucun joueur connecté</li>';$('alerts').innerHTML=d.alerts.map(x=>'<li>'+esc(x)+'</li>').join('')||'<li>Aucune alerte récente</li>';$('violations').innerHTML=d.violations.sort((a,b)=>b.count-a.count).map(x=>'<li>'+esc(x.name)+' — '+x.count+' signalement(s)</li>').join('')||'<li>Aucun joueur signalé</li>';$('consoleOutput').textContent=(d.console||[]).join('\\n')||'Aucune ligne reçue';$('consoleOutput').scrollTop=$('consoleOutput').scrollHeight}catch(e){$('app').classList.add('hidden');$('login').classList.remove('hidden');$('loginError').textContent='Session expirée. Reconnecte-toi.'}}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function sendCommand(){let command=$('consoleCommand').value.trim();if(!command)return;let r=await api('/api/command',{method:'POST',body:JSON.stringify({command})});let d=await r.json();$('commandResult').textContent=d.message||d.error||'Commande envoyée';$('consoleCommand').value='';refresh()}
 $('consoleCommand')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendCommand()}});
