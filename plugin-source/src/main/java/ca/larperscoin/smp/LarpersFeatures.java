@@ -46,6 +46,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<String, ItemStack[]> clanChestSnapshots = new HashMap<>();
     private final Set<UUID> vanished = new HashSet<>();
     private final SecureTradeManager tradeManager;
+    private final ChatEvents chatEvents;
     private final Map<UUID, Long> lastQuiz = new HashMap<>();
     private final Map<UUID, Long> questClaims = new HashMap<>();
     private final Map<UUID, UUID> pendingBids = new HashMap<>();
@@ -92,6 +93,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         this.plugin = plugin;
         this.core = (LarpersCoin) plugin;
         this.tradeManager = new SecureTradeManager(plugin, core);
+        this.chatEvents = new ChatEvents(plugin, core);
         if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
         file = new File(plugin.getDataFolder(), "features.yml");
         db = YamlConfiguration.loadConfiguration(file);
@@ -137,7 +139,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             db.set(path+".choices",choices);
         }
     }
-    public void shutdown() { save(); }
+    public void shutdown() { chatEvents.shutdown(); save(); }
     private void msg(CommandSender s, String m) { s.sendMessage(PREFIX + m); }
     private boolean staff(CommandSender s) { return s.isOp() || s.hasPermission("larpers.staff") || s.hasPermission("larpers.admin"); }
     private Player player(CommandSender s) { if (s instanceof Player p) return p; msg(s,"Commande réservée aux joueurs."); return null; }
@@ -443,6 +445,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             else msg(sender,"Mot de passe réinitialisé pour "+args[1]+". S'il était connecté, il a été expulsé et devra refaire /register.");
             return true;
         }
+        if(args[0].equalsIgnoreCase("event")) return adminEventCommand(sender,args);
         if(args[0].equalsIgnoreCase("ip")) {
             if(!sender.isOp()&&!sender.hasPermission("larpers.admin")){msg(sender,"Seul un administrateur peut modifier l'adresse affichée.");return true;}
             if(args.length<3){msg(sender,"Usage: /admin ip <adresse:port> <nom du serveur>");return true;}
@@ -467,6 +470,31 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             return true;
         }
         msg(sender,"Sous-commandes: /admin | /admin reset <joueur> | /admin ip <adresse:port> <nom>");
+        return true;
+    }
+
+    private boolean adminEventCommand(CommandSender sender,String[] args) {
+        boolean admin=sender.isOp() || sender.hasPermission("larpers.admin") || (sender instanceof Player p && core.isLpcAdmin(p));
+        if(!admin){msg(sender,"Les événements sont réservés aux administrateurs.");return true;}
+        if(args.length==1 || args[1].equalsIgnoreCase("list")) {
+            msg(sender,"Événements chat: melange, quiz, calcul, reaction.");
+            msg(sender,"Usage: /admin event start <type> [récompense]");
+            return true;
+        }
+        if(args[1].equalsIgnoreCase("status")){msg(sender,chatEvents.status());return true;}
+        if(args[1].equalsIgnoreCase("stop")){msg(sender,chatEvents.stop()?"Événement arrêté.":"Aucun événement en cours.");return true;}
+        if(args[1].equalsIgnoreCase("start")) {
+            if(args.length<3){msg(sender,"Usage: /admin event start <melange|quiz|calcul|reaction> [récompense]");return true;}
+            double reward=plugin.getConfig().getDouble("events.chat-reward",100.0);
+            if(args.length>=4) {
+                try{reward=Double.parseDouble(args[3].replace(',','.'));}
+                catch(NumberFormatException ex){msg(sender,"Récompense invalide.");return true;}
+            }
+            if(!Double.isFinite(reward)||reward<1||reward>1000000){msg(sender,"Récompense entre 1 et 1 000 000 LPC.");return true;}
+            if(!chatEvents.start(args[2],reward)){msg(sender,"Type invalide ou événement déjà actif. Types: melange, quiz, calcul, reaction.");return true;}
+            msg(sender,"Événement chat lancé: "+args[2]+".");return true;
+        }
+        msg(sender,"Usage: /admin event <list|status|stop|start>");
         return true;
     }
 
@@ -1246,7 +1274,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             Bukkit.getOnlinePlayers().stream().filter(p->!p.equals(s)).map(Player::getName).forEach(options::add);
             return options.stream().filter(v->v.toLowerCase(Locale.ROOT).startsWith(a[0].toLowerCase(Locale.ROOT))).toList();
         }
-        if(c.getName().equalsIgnoreCase("admin")&&a.length==1)return List.of("reset","ip");
+        if(c.getName().equalsIgnoreCase("admin")&&a.length==1)return List.of("reset","ip","event");
+        if(c.getName().equalsIgnoreCase("admin")&&a.length==2&&a[0].equalsIgnoreCase("event"))return List.of("list","start","stop","status");
+        if(c.getName().equalsIgnoreCase("admin")&&a.length==3&&a[0].equalsIgnoreCase("event")&&a[1].equalsIgnoreCase("start"))return List.of("melange","quiz","calcul","reaction");
         if(c.getName().equalsIgnoreCase("admin")&&a.length==2&&a[0].equalsIgnoreCase("reset"))
             return Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
         if(c.getName().equalsIgnoreCase("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","audit","stats","leaderboard");
