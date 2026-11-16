@@ -55,8 +55,15 @@ final class LarpersWebDashboard {
                         + file.getAbsolutePath() + " — ne le partage jamais.");
             }
             String bind = plugin.getConfig().getString("web-admin.bind", "127.0.0.1");
-            int port = Math.max(1024, Math.min(65535, plugin.getConfig().getInt("web-admin.port", 8765)));
-            server = HttpServer.create(new InetSocketAddress(bind, port), 32);
+            int port = Math.max(1, Math.min(65535, plugin.getConfig().getInt("web-admin.port", 80)));
+            try {
+                server = HttpServer.create(new InetSocketAddress(bind, port), 32);
+            } catch (IOException bindError) {
+                if (port != 80) throw bindError;
+                port = 8765;
+                server = HttpServer.create(new InetSocketAddress(bind, port), 32);
+                plugin.getLogger().warning("Le port 80 est occupé; dashboard déplacé sur le port 8765.");
+            }
             server.createContext("/", this::handle);
             server.setExecutor(Executors.newFixedThreadPool(3, r -> {
                 Thread t = new Thread(r, "Larry-WebAdmin"); t.setDaemon(true); return t;
@@ -80,7 +87,8 @@ final class LarpersWebDashboard {
             };
             Logger.getLogger("").addHandler(consoleHandler);
             server.start();
-            plugin.getLogger().info("Dashboard Larry actif sur http://" + bind + ":" + port
+            String dashboardUrl = port == 80 ? "http://" + bind : "http://" + bind + ":" + port;
+            plugin.getLogger().info("Dashboard Larry actif sur " + dashboardUrl
                     + " (jeton dans plugins/LarpersCoin/web-admin.yml).");
         } catch (Exception ex) {
             plugin.getLogger().severe("Impossible de démarrer le dashboard web: " + ex.getMessage());
@@ -168,6 +176,7 @@ final class LarpersWebDashboard {
 
     private boolean authorized(HttpExchange exchange) {
         String supplied = exchange.getRequestHeaders().getFirst("X-Larry-Token");
+        if (supplied == null) supplied = exchange.getRequestHeaders().getFirst("X-LPC-Token");
         if (supplied == null) {
             String header = exchange.getRequestHeaders().getFirst("Authorization");
             if (header != null && header.startsWith("Bearer ")) supplied = header.substring(7);
@@ -236,9 +245,9 @@ final class LarpersWebDashboard {
 
     private static final String PAGE = """
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Larpers Coin — Admin</title><style>
+<title>Larry SMP — Administration</title><style>
 *{box-sizing:border-box}body{margin:0;background:#0b1020;color:#e8edf8;font:15px system-ui}header{padding:24px 5%;background:#111a30;border-bottom:1px solid #263451}h1{margin:0;font-size:24px}main{max-width:1100px;margin:28px auto;padding:0 18px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}.card{background:#141e33;border:1px solid #293955;border-radius:14px;padding:18px;margin-bottom:16px}.muted{color:#9eacc5}input,button{font:inherit;border-radius:9px;padding:11px;border:1px solid #394c6c;background:#0d1628;color:#fff}button{background:#7658e8;border:0;cursor:pointer;font-weight:700}button:hover{filter:brightness(1.15)}.row{display:flex;gap:9px;flex-wrap:wrap}ul{padding-left:20px}li{padding:5px 0;border-bottom:1px solid #263451}.value{font-size:30px;font-weight:800}.hidden{display:none}.danger{background:#a83c52}#login{max-width:520px;margin:40px auto}small{color:#aab6ca}#consoleOutput{height:320px;overflow:auto;white-space:pre-wrap;background:#070b14;border:1px solid #293955;border-radius:10px;padding:12px;color:#c8f7d2;font:12px ui-monospace,monospace;margin:12px 0}#consoleCommand{flex:1;min-width:220px;font-family:ui-monospace,monospace}</style></head>
-<body><header><h1>◈ Larpers Coin — Dashboard</h1><div class="muted">Administration sécurisée · actualisation automatique</div></header>
+<body><header><h1>◈ Larry SMP — Dashboard</h1><div class="muted">Administration sécurisée · actualisation automatique</div></header>
 <main><section id="login" class="card"><h2>Connexion administrateur</h2><p class="muted">Colle le jeton contenu dans plugins/LarpersCoin/web-admin.yml.</p><div class="row"><input id="token" type="password" placeholder="Jeton administrateur" style="flex:1;min-width:220px"><button onclick="connect()">Connexion</button></div><p id="loginError"></p></section>
 <section id="app" class="hidden"><div class="grid"><div class="card"><div class="muted">Joueurs connectés</div><div class="value" id="count">0</div></div><div class="card"><div class="muted">Alertes anti-triche en mémoire</div><div class="value" id="alertsCount">0</div></div></div>
 <div class="card"><h2>Joueurs en ligne</h2><ul id="players"></ul></div>
@@ -247,10 +256,10 @@ final class LarpersWebDashboard {
 <div class="card"><h2>Alertes anti-triche</h2><small>Les alertes ne déclenchent jamais de kick ni de ban automatique. Vérifie les preuves avant toute sanction manuelle.</small><ul id="alerts"></ul></div>
 <div class="card"><h2>Joueurs signalés</h2><ul id="violations"></ul></div></section></main>
 <script>
-let key=localStorage.getItem('lpc-admin-token')||'';
+let key=localStorage.getItem('larry-admin-token')||localStorage.getItem('lpc-admin-token')||'';
 const $=id=>document.getElementById(id);
-async function api(path,opts={}){return fetch(path,{...opts,headers:{'X-LPC-Token':key,'Content-Type':'application/json',...(opts.headers||{})}})}
-async function connect(){key=$('token').value.trim();try{let r=await api('/api/status');if(!r.ok)throw Error('Jeton invalide ou accès refusé');localStorage.setItem('lpc-admin-token',key);$('login').classList.add('hidden');$('app').classList.remove('hidden');refresh()}catch(e){$('loginError').textContent=e.message}}
+async function api(path,opts={}){return fetch(path,{...opts,headers:{'X-Larry-Token':key,'Content-Type':'application/json',...(opts.headers||{})}})}
+async function connect(){key=$('token').value.trim();try{let r=await api('/api/status');if(!r.ok)throw Error('Jeton invalide ou accès refusé');localStorage.setItem('larry-admin-token',key);$('login').classList.add('hidden');$('app').classList.remove('hidden');refresh()}catch(e){$('loginError').textContent=e.message}}
 async function refresh(){try{let r=await api('/api/status');if(!r.ok)throw Error();let d=await r.json();$('count').textContent=d.onlineCount;$('alertsCount').textContent=d.alerts.length;$('players').innerHTML=d.online.map(p=>'<li>'+esc(p.name)+' — ping '+p.ping+' ms</li>').join('')||'<li>Aucun joueur connecté</li>';$('alerts').innerHTML=d.alerts.map(x=>'<li>'+esc(x)+'</li>').join('')||'<li>Aucune alerte récente</li>';$('violations').innerHTML=d.violations.sort((a,b)=>b.count-a.count).map(x=>'<li>'+esc(x.name)+' — '+x.count+' signalement(s)</li>').join('')||'<li>Aucun joueur signalé</li>';$('consoleOutput').textContent=(d.console||[]).join('\\n')||'Aucune ligne reçue';$('consoleOutput').scrollTop=$('consoleOutput').scrollHeight}catch(e){$('app').classList.add('hidden');$('login').classList.remove('hidden');$('loginError').textContent='Session expirée. Reconnecte-toi.'}}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 async function sendCommand(){let command=$('consoleCommand').value.trim();if(!command)return;let r=await api('/api/command',{method:'POST',body:JSON.stringify({command})});let d=await r.json();$('commandResult').textContent=d.message||d.error||'Commande envoyée';$('consoleCommand').value='';refresh()}
