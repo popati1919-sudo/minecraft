@@ -297,9 +297,8 @@ jobs:
           8. Configure les groupes avec CONFIGURER-LES-GROUPES.bat.
           9. Dashboard: http://127.0.0.1 (si le port 80 est occupé, http://127.0.0.1:8765); jeton dans plugins/LarpersCoin/web-admin.yml.
           10. La console du site execute les commandes avec les droits console: garde le jeton secret.
-          11. Tous les joueurs Java utilisent /register puis /login avec leur mot de passe Larry.
-          10. Les comptes Java crack utilisent /register <motdepasse> <confirmation>, puis /login <motdepasse>.
-          11. Bedrock passe par Floodgate et est exempté du mot de passe Larry.
+          11. Tous les joueurs Java utilisent /register <motdepasse> puis /login <motdepasse>.
+          12. Bedrock passe par Floodgate et est exempté du mot de passe Larry.
 
           RESEAU:
           - Java: TCP 25565.
