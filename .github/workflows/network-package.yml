@@ -274,7 +274,7 @@ jobs:
             connect-to-smp: true
             storage-file: plugins/LarpersCoin/auth.yml
           server-display:
-            name: Larry SMP SMP
+            name: Larry SMP
             ip: Non configurée
           EOF
           cat > "$ROOT/SMP/plugins/LarpersCoin/config.yml" <<'EOF'
@@ -289,6 +289,10 @@ jobs:
             enabled: true
             auto-punish:
               enabled: false
+          web-admin:
+            enabled: true
+            bind: 127.0.0.1
+            port: 80
           EOF
 
           cat > "$ROOT/START-NETWORK.bat" <<'EOF'
@@ -430,7 +434,7 @@ jobs:
           - Ne change pas online-mode du proxy et ne rends jamais les ports backend publics.
           - GrimAC est configure pour alerter et journaliser uniquement: aucun kick/ban automatique.
           - Les permissions grim.alerts sont proposees aux groupes admin et moderator.
-          - Dashboard web: http://127.0.0.1:8765 sur la machine SMP; jeton dans SMP/plugins/LarpersCoin/web-admin.yml.
+          - Dashboard web: http://127.0.0.1 sur la machine SMP (port 8765 si le port 80 est occupé); jeton dans SMP/plugins/LarpersCoin/web-admin.yml.
           - La console web execute des commandes avec les droits console: protege le jeton et passe par HTTPS si tu l'exposes via un reverse proxy.
           - Les mondes et donnees existants ne sont pas inclus: ce ZIP est un paquet serveur propre.
           - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
