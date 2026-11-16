@@ -58,12 +58,12 @@ final class LarpersAuth implements Listener {
     LarpersAuth(JavaPlugin plugin) {
         this.plugin = plugin;
         File siblingLobbyData = new File(plugin.getServer().getWorldContainer(),
-                "../Lobby/plugins/LarpersCoin");
+                "../Lobby/plugins/Larry SMP");
         boolean networkBackend = !plugin.getConfig().getBoolean("network.auth-only", false)
                 && siblingLobbyData.isDirectory();
         String storage = plugin.getConfig().getString("auth.storage-file");
         if (storage == null || storage.isBlank()) {
-            storage = networkBackend ? "../Lobby/plugins/LarpersCoin/auth.yml" : "auth.yml";
+            storage = networkBackend ? "../Lobby/plugins/Larry SMP/auth.yml" : "auth.yml";
         }
         Path storagePath = Path.of(storage);
         if (!storagePath.isAbsolute()) {
@@ -120,7 +120,7 @@ final class LarpersAuth implements Listener {
         boolean mustReRegister = accounts.getLong("revoked." + player.getName().toLowerCase(Locale.ROOT), 0L) > 0L;
         sessionJoinedAt.put(player.getUniqueId(), System.currentTimeMillis());
         joinLocations.put(player.getUniqueId(), player.getLocation().clone());
-        player.sendMessage(ChatColor.GOLD + "Bienvenue sur Larpers Coin SMP.");
+        player.sendMessage(ChatColor.GOLD + "Bienvenue sur Larry SMP SMP.");
         player.sendMessage(ChatColor.YELLOW + "Vérification de ton compte...");
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!player.isOnline() || authenticated.containsKey(player.getUniqueId())) return;
@@ -198,7 +198,7 @@ final class LarpersAuth implements Listener {
                 rememberIp(player, path);
                 save();
                 markAuthenticated(player);
-                player.sendMessage(ChatColor.GREEN + "Compte créé. Bienvenue sur Larpers Coin !");
+                player.sendMessage(ChatColor.GREEN + "Compte créé. Bienvenue sur Larry SMP !");
             } catch (GeneralSecurityException ex) {
                 plugin.getLogger().severe("Erreur de hachage du mot de passe: " + ex.getMessage());
                 player.sendMessage(ChatColor.RED + "Erreur interne. Réessaie plus tard.");
