@@ -56,7 +56,7 @@ final class LarpersWebDashboard {
             for (String item : recent) {
                 if (!first) out.append(',');
                 first = false;
-                out.append("\\"").append(owner.json(item)).append("\\"");
+                out.append("\"").append(owner.json(item)).append("\"");
             }
             return out.append("]}").toString();
         }
