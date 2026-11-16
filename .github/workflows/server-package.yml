@@ -1,4 +1,4 @@
-name: Package serveur complet Larpers Coin
+name: Package serveur complet Larry SMP
 
 on:
   push:
@@ -39,43 +39,43 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p package/LarpersCoin-Server-Ready/plugins
+          mkdir -p package/LarrySMP-Server-Ready/plugins
           PAPER_VERSION="26.3"
           PAPER_META="$(curl -fsSL -H 'User-Agent: LarpersCoin-Server-Packager/1.0 (github.com/popati1919-sudo/minecraft)' "https://fill.papermc.io/v3/projects/paper/versions/${PAPER_VERSION}/builds?channel=STABLE&limit=1")"
           PAPER_URL="$(echo "$PAPER_META" | jq -r '.[0].downloads["server:default"].url // empty')"
           test -n "$PAPER_URL"
-          curl -fL "$PAPER_URL" -o package/LarpersCoin-Server-Ready/paper.jar
-          test -s package/LarpersCoin-Server-Ready/paper.jar
+          curl -fL "$PAPER_URL" -o package/LarrySMP-Server-Ready/paper.jar
+          test -s package/LarrySMP-Server-Ready/paper.jar
 
           LP_META="$(curl -fsSL https://metadata.luckperms.net/data/downloads)"
           LP_URL="$(echo "$LP_META" | jq -r '.downloads.bukkit // empty')"
           test -n "$LP_URL"
-          curl -fL "$LP_URL" -o package/LarpersCoin-Server-Ready/plugins/LuckPerms.jar
-          test -s package/LarpersCoin-Server-Ready/plugins/LuckPerms.jar
+          curl -fL "$LP_URL" -o package/LarrySMP-Server-Ready/plugins/LuckPerms.jar
+          test -s package/LarrySMP-Server-Ready/plugins/LuckPerms.jar
 
           GEYSER_URL="https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/spigot"
           FLOODGATE_URL="https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/spigot"
-          curl -fL "$GEYSER_URL" -o package/LarpersCoin-Server-Ready/plugins/Geyser-Spigot.jar
-          curl -fL "$FLOODGATE_URL" -o package/LarpersCoin-Server-Ready/plugins/floodgate-spigot.jar
-          test -s package/LarpersCoin-Server-Ready/plugins/Geyser-Spigot.jar
-          test -s package/LarpersCoin-Server-Ready/plugins/floodgate-spigot.jar
+          curl -fL "$GEYSER_URL" -o package/LarrySMP-Server-Ready/plugins/Geyser-Spigot.jar
+          curl -fL "$FLOODGATE_URL" -o package/LarrySMP-Server-Ready/plugins/floodgate-spigot.jar
+          test -s package/LarrySMP-Server-Ready/plugins/Geyser-Spigot.jar
+          test -s package/LarrySMP-Server-Ready/plugins/floodgate-spigot.jar
 
-          curl -fL "https://github.com/ViaVersion/ViaVersion/releases/download/5.12.2/ViaVersion-5.12.2.jar" -o package/LarpersCoin-Server-Ready/plugins/ViaVersion.jar
-          curl -fL "https://github.com/ViaVersion/ViaBackwards/releases/download/5.12.2/ViaBackwards-5.12.2.jar" -o package/LarpersCoin-Server-Ready/plugins/ViaBackwards.jar
+          curl -fL "https://github.com/ViaVersion/ViaVersion/releases/download/5.12.2/ViaVersion-5.12.2.jar" -o package/LarrySMP-Server-Ready/plugins/ViaVersion.jar
+          curl -fL "https://github.com/ViaVersion/ViaBackwards/releases/download/5.12.2/ViaBackwards-5.12.2.jar" -o package/LarrySMP-Server-Ready/plugins/ViaBackwards.jar
           GRIM_META="$(curl -fsSL 'https://api.modrinth.com/v2/project/grimac/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
           GRIM_URL="$(echo "$GRIM_META" | jq -r '[.[] | select(.version_type == "release") | .files[] | select(.primary == true) | .url][0] // empty')"
           test -n "$GRIM_URL"
-          curl -fL "$GRIM_URL" -o package/LarpersCoin-Server-Ready/plugins/GrimAC.jar
-          test -s package/LarpersCoin-Server-Ready/plugins/ViaVersion.jar
-          test -s package/LarpersCoin-Server-Ready/plugins/ViaBackwards.jar
-          test -s package/LarpersCoin-Server-Ready/plugins/GrimAC.jar
-          mkdir -p package/LarpersCoin-Server-Ready/plugins/GrimAC
-          cat > "package/LarpersCoin-Server-Ready/plugins/GrimAC/config.yml" <<'EOF'
+          curl -fL "$GRIM_URL" -o package/LarrySMP-Server-Ready/plugins/GrimAC.jar
+          test -s package/LarrySMP-Server-Ready/plugins/ViaVersion.jar
+          test -s package/LarrySMP-Server-Ready/plugins/ViaBackwards.jar
+          test -s package/LarrySMP-Server-Ready/plugins/GrimAC.jar
+          mkdir -p package/LarrySMP-Server-Ready/plugins/GrimAC
+          cat > "package/LarrySMP-Server-Ready/plugins/GrimAC/config.yml" <<'EOF'
           # -1 désactive TimerLimit, source des alertes répétitives constatées.
           TimerLimit:
             ping-abuse-limit-threshold: -1
           EOF
-          cat > package/LarpersCoin-Server-Ready/plugins/GrimAC/punishments.yml <<'EOF'
+          cat > package/LarrySMP-Server-Ready/plugins/GrimAC/punishments.yml <<'EOF'
           Punishments:
             Movement:
               remove-violations-after: 300
@@ -134,13 +134,13 @@ jobs:
 
           PLUGIN_JAR="$(find plugin-source/build/libs -maxdepth 1 -type f -name 'LarpersCoin-*.jar' ! -name '*-sources.jar' ! -name '*-javadoc.jar' | head -n 1)"
           test -n "$PLUGIN_JAR"
-          cp "$PLUGIN_JAR" package/LarpersCoin-Server-Ready/plugins/LarpersCoin.jar
+          cp "$PLUGIN_JAR" package/LarrySMP-Server-Ready/plugins/LarpersCoin.jar
 
       - name: Ajouter les fichiers de configuration Windows
         shell: bash
         run: |
           set -euo pipefail
-          ROOT="package/LarpersCoin-Server-Ready"
+          ROOT="package/LarrySMP-Server-Ready"
           cat > "$ROOT/eula.txt" <<'EOF'
           # Lis https://aka.ms/MinecraftEULA puis remplace eula=false par eula=true si tu acceptes.
           eula=false
@@ -159,7 +159,7 @@ jobs:
           pvp=true
           server-port=25565
           server-ip=
-          motd=Larpers Coin SMP
+          motd=Larry SMP SMP
           view-distance=6
           simulation-distance=4
           network-compression-threshold=512
@@ -174,7 +174,7 @@ jobs:
             proxy-authenticated: false
             remember-ip: false
           server-display:
-            name: Larpers Coin SMP
+            name: Larry SMP SMP
             ip: Non configurée
           anticheat:
             enabled: true
@@ -182,7 +182,7 @@ jobs:
           cat > "$ROOT/START-SERVER.bat" <<'EOF'
           @echo off
           cd /d "%~dp0"
-          title Larpers Coin SMP - Paper 26.3
+          title Larry SMP SMP - Paper 26.3
           where java >nul 2>nul
           if errorlevel 1 (
             echo Java 25 est requis. Installe un JDK 25 puis relance.
@@ -233,9 +233,9 @@ jobs:
             pause
             exit /b 1
           )
-          netsh advfirewall firewall add rule name="LarpersCoin Java TCP 25565" dir=in action=allow protocol=TCP localport=25565
-          netsh advfirewall firewall add rule name="LarpersCoin Bedrock TCP 19132" dir=in action=allow protocol=TCP localport=19132
-          netsh advfirewall firewall add rule name="LarpersCoin Bedrock UDP 19132" dir=in action=allow protocol=UDP localport=19132
+          netsh advfirewall firewall add rule name="Larry SMP Java TCP 25565" dir=in action=allow protocol=TCP localport=25565
+          netsh advfirewall firewall add rule name="Larry SMP Bedrock TCP 19132" dir=in action=allow protocol=TCP localport=19132
+          netsh advfirewall firewall add rule name="Larry SMP Bedrock UDP 19132" dir=in action=allow protocol=UDP localport=19132
           echo Regles du pare-feu Windows ajoutees.
           echo Il faut aussi rediriger TCP 25565 et TCP+UDP 19132 sur le routeur.
           pause
@@ -264,7 +264,7 @@ jobs:
           pause
           EOF
           cat > "$ROOT/LISEZ-MOI.txt" <<'EOF'
-          LARPERS COIN SMP - SERVEUR PAPER 26.3
+          LARRY SMP SMP - SERVEUR PAPER 26.3
           =====================================
           Inclus:
           - Paper 26.3
@@ -293,9 +293,9 @@ jobs:
           8. Configure les groupes avec CONFIGURER-LES-GROUPES.bat.
           9. Dashboard: http://127.0.0.1:8765; jeton dans plugins/LarpersCoin/web-admin.yml.
           10. La console du site execute les commandes avec les droits console: garde le jeton secret.
-          11. Tous les joueurs Java utilisent /register puis /login avec leur mot de passe LarpersCoin.
+          11. Tous les joueurs Java utilisent /register puis /login avec leur mot de passe Larry.
           10. Les comptes Java crack utilisent /register <motdepasse> <confirmation>, puis /login <motdepasse>.
-          11. Bedrock passe par Floodgate et est exempté du mot de passe LPC.
+          11. Bedrock passe par Floodgate et est exempté du mot de passe Larry.
 
           RESEAU:
           - Java: TCP 25565.
@@ -314,12 +314,12 @@ jobs:
       - name: Creer le ZIP du serveur
         run: |
           cd package
-          zip -qr ../LarpersCoin-Server-Ready.zip LarpersCoin-Server-Ready
+          zip -qr ../LarrySMP-Server-Ready.zip LarrySMP-Server-Ready
 
       - name: Publier le ZIP comme artefact GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: LarpersCoin-Server-Ready
-          path: LarpersCoin-Server-Ready.zip
+          name: LarrySMP-Server-Ready
+          path: LarrySMP-Server-Ready.zip
           if-no-files-found: error
           retention-days: 90
