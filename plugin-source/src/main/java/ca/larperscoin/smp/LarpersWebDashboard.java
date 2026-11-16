@@ -176,7 +176,7 @@ final class LarpersWebDashboard {
                 }
                 // Compatibilité avec l'ancien nom d'item "log" : depuis Minecraft 1.13,
                 // le bloc de bois s'appelle oak_log. Les autres commandes restent inchangées.
-                Matcher legacyLog = Pattern.compile("(?i)^give\\\\s+(\\\\S+)\\\\s+log\\\\s+(\\\\d+)(.*)$").matcher(commandText);
+                Matcher legacyLog = Pattern.compile("(?i)^give\\s+(\\S+)\\s+log\\s+(\\d+)(.*)$").matcher(commandText);
                 if (legacyLog.matches()) {
                     commandText = "give " + legacyLog.group(1) + " minecraft:oak_log " + legacyLog.group(2) + legacyLog.group(3);
                 }
@@ -264,6 +264,13 @@ final class LarpersWebDashboard {
             String name = Bukkit.getOfflinePlayer(entry.getKey()).getName();
             out.append("{\"name\":\"").append(json(name == null ? entry.getKey().toString() : name))
                     .append("\",\"count\":").append(entry.getValue()).append('}');
+        }
+        out.append("],\"grimAlerts\":[");
+        first = true;
+        for (var entry : new java.util.TreeMap<>(grimAlerts).entrySet()) {
+            if (!first) out.append(',');
+            first = false;
+            out.append(entry.getValue().toJson(entry.getKey(), this));
         }
         out.append("],\"console\":[");
         first = true;
