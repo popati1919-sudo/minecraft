@@ -121,16 +121,20 @@ final class LarpersWebDashboard {
                 @Override public void close() { }
             };
             Logger.getLogger("").addHandler(consoleHandler);
-            if (Bukkit.getPluginManager().isPluginEnabled("GrimAC")) {
-                try {
-                    Class<?> hook = Class.forName("ca.larperscoin.smp.GrimAlertHook");
-                    hook.getMethod("register", JavaPlugin.class, LarpersWebDashboard.class).invoke(null, plugin, this);
-                } catch (Throwable error) {
-                    plugin.getLogger().severe("Impossible de connecter les alertes Grim au dashboard: " + error.getMessage());
+            // LarpersCoin est chargé tôt pour fournir le générateur du lobby.
+            // Attendre le tick suivant garantit que GrimAC (chargé après STARTUP) est activé.
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (Bukkit.getPluginManager().isPluginEnabled("GrimAC")) {
+                    try {
+                        Class<?> hook = Class.forName("ca.larperscoin.smp.GrimAlertHook");
+                        hook.getMethod("register", JavaPlugin.class, LarpersWebDashboard.class).invoke(null, plugin, this);
+                    } catch (Throwable error) {
+                        plugin.getLogger().severe("Impossible de connecter les alertes Grim au dashboard: " + error.getMessage());
+                    }
+                } else {
+                    plugin.getLogger().warning("GrimAC absent: le panneau d'alertes Grim restera vide sur cette instance.");
                 }
-            } else {
-                plugin.getLogger().warning("GrimAC absent: le panneau d'alertes Grim restera vide sur cette instance.");
-            }
+            }, 1L);
             server.start();
             String dashboardUrl = port == 80 ? "http://" + bind : "http://" + bind + ":" + port;
             plugin.getLogger().info("Dashboard Larry actif sur " + dashboardUrl
