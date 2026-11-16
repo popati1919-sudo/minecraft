@@ -51,7 +51,7 @@ final class LarpersWebDashboard {
                 token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
                 cfg.set("token", token);
                 cfg.save(file);
-                plugin.getLogger().warning("Dashboard LPC: nouveau jeton administrateur créé. Il est enregistré dans "
+                plugin.getLogger().warning("Dashboard Larry: nouveau jeton administrateur créé. Il est enregistré dans "
                         + file.getAbsolutePath() + " — ne le partage jamais.");
             }
             String bind = plugin.getConfig().getString("web-admin.bind", "127.0.0.1");
@@ -59,7 +59,7 @@ final class LarpersWebDashboard {
             server = HttpServer.create(new InetSocketAddress(bind, port), 32);
             server.createContext("/", this::handle);
             server.setExecutor(Executors.newFixedThreadPool(3, r -> {
-                Thread t = new Thread(r, "LPC-WebAdmin"); t.setDaemon(true); return t;
+                Thread t = new Thread(r, "Larry-WebAdmin"); t.setDaemon(true); return t;
             }));
             consoleHandler = new Handler() {
                 @Override public void publish(LogRecord record) {
@@ -80,7 +80,7 @@ final class LarpersWebDashboard {
             };
             Logger.getLogger("").addHandler(consoleHandler);
             server.start();
-            plugin.getLogger().info("Dashboard LPC actif sur http://" + bind + ":" + port
+            plugin.getLogger().info("Dashboard Larry actif sur http://" + bind + ":" + port
                     + " (jeton dans plugins/LarpersCoin/web-admin.yml).");
         } catch (Exception ex) {
             plugin.getLogger().severe("Impossible de démarrer le dashboard web: " + ex.getMessage());
@@ -167,7 +167,7 @@ final class LarpersWebDashboard {
     }
 
     private boolean authorized(HttpExchange exchange) {
-        String supplied = exchange.getRequestHeaders().getFirst("X-LPC-Token");
+        String supplied = exchange.getRequestHeaders().getFirst("X-Larry-Token");
         if (supplied == null) {
             String header = exchange.getRequestHeaders().getFirst("Authorization");
             if (header != null && header.startsWith("Bearer ")) supplied = header.substring(7);
