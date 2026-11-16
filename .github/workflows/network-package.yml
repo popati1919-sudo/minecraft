@@ -257,6 +257,53 @@ jobs:
           EOF
           done
 
+          # Anti-Xray Paper natif niveau 3 sur le monde SMP (pas sur le lobby).
+          cat > "$ROOT/SMP/config/paper-world-defaults.yml" <<'EOF'
+          _version: 31
+          anticheat:
+            anti-xray:
+              enabled: true
+              engine-mode: 3
+              hidden-blocks:
+                - copper_ore
+                - deepslate_copper_ore
+                - raw_copper_block
+                - diamond_ore
+                - deepslate_diamond_ore
+                - gold_ore
+                - deepslate_gold_ore
+                - iron_ore
+                - deepslate_iron_ore
+                - raw_iron_block
+                - lapis_ore
+                - deepslate_lapis_ore
+                - redstone_ore
+                - deepslate_redstone_ore
+              lava-obscures: false
+              max-block-height: 64
+              replacement-blocks:
+                - chest
+                - amethyst_block
+                - andesite
+                - budding_amethyst
+                - calcite
+                - coal_ore
+                - deepslate_coal_ore
+                - deepslate
+                - diorite
+                - dirt
+                - emerald_ore
+                - deepslate_emerald_ore
+                - granite
+                - gravel
+                - oak_planks
+                - smooth_basalt
+                - stone
+                - tuff
+              update-radius: 2
+              use-permission: false
+          EOF
+
           # Le monde du lobby est généré dans le vide par LarpersCoin.
           cat > "$ROOT/Lobby/bukkit.yml" <<'EOF'
           worlds:
