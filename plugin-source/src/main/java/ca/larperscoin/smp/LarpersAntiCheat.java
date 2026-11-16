@@ -198,6 +198,8 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         minedStone.remove(id);
         minedOres.remove(id);
         xrayWindowStart.remove(id);
+        String alertPrefix = id + ":";
+        lastAlert.keySet().removeIf(key -> key.startsWith(alertPrefix));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -316,13 +318,14 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     }
 
     private void flag(Player player, String check, String detail) {
-        int total = violations.merge(player.getUniqueId(), 1, Integer::sum);
         long now = System.currentTimeMillis();
         long cooldown = Math.max(1L, plugin.getConfig().getLong("anticheat.alert-cooldown-seconds", 4L)) * 1000L;
         String key = player.getUniqueId() + ":" + check;
         long previous = lastAlert.getOrDefault(key, 0L);
+        // Ne pas gonfler les violations avec chaque paquet/mouvement pendant le délai anti-spam.
         if (now - previous < cooldown) return;
         lastAlert.put(key, now);
+        int total = violations.merge(player.getUniqueId(), 1, Integer::sum);
 
         String plain = player.getName() + " | " + check + " | " + detail + " | VL " + total;
         synchronized (evidence) {
