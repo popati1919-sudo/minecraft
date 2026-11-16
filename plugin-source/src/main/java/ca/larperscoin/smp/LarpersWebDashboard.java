@@ -221,8 +221,16 @@ final class LarpersWebDashboard {
                 final String completionInput = prefix.startsWith("/") ? prefix.substring(1) : prefix;
                 java.util.concurrent.CompletableFuture<List<String>> result = new java.util.concurrent.CompletableFuture<>();
                 Bukkit.getScheduler().runTask(plugin, () -> {
-                    try { result.complete(Bukkit.getServer().tabCompleteCommand(completionInput).stream().limit(30).toList()); }
-                    catch (Throwable error) { result.complete(List.of()); }
+                    try {
+                        Object raw = Bukkit.getServer().getClass().getMethod("tabCompleteCommand", String.class)
+                                .invoke(Bukkit.getServer(), completionInput);
+                        if (raw instanceof List<?> values) {
+                            result.complete(values.stream().filter(String.class::isInstance).map(String.class::cast).limit(30).toList());
+                        } else result.complete(List.of());
+                    } catch (Throwable error) {
+                        result.complete(List.of("list", "tps", "plugins", "version", "whitelist list", "save-all")
+                                .stream().filter(x -> x.startsWith(completionInput)).toList());
+                    }
                 });
                 try {
                     StringBuilder json = new StringBuilder("{\"suggestions\":[");
