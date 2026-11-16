@@ -101,11 +101,11 @@ jobs:
           curl -fL "$grim_url" -o "$ROOT/SMP/plugins/GrimAC.jar"
           test -s "$ROOT/SMP/plugins/GrimAC.jar"
           mkdir -p "$ROOT/SMP/plugins/GrimAC"
-          cat > "$ROOT/SMP/plugins/GrimAC/cat > "$ROOT/SMP/plugins/GrimAC/config.yml" <<'EOF'
-          cat > "$ROOT/SMP/plugins/GrimAC/# -1 désactive TimerLimit, source des alertes répétitives constatées.
-          cat > "$ROOT/SMP/plugins/GrimAC/TimerLimit:
-          cat > "$ROOT/SMP/plugins/GrimAC/  ping-abuse-limit-threshold: -1
-          cat > "$ROOT/SMP/plugins/GrimAC/EOF
+          cat > "$ROOT/SMP/plugins/GrimAC/config.yml" <<'EOF'
+          # -1 désactive TimerLimit, source des alertes répétitives constatées.
+          TimerLimit:
+            ping-abuse-limit-threshold: -1
+          EOF
           cat > "$ROOT/SMP/plugins/GrimAC/punishments.yml" <<'EOF'
           Punishments:
             Movement:
