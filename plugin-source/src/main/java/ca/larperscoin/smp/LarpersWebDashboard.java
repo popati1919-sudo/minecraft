@@ -182,10 +182,10 @@ final class LarpersWebDashboard {
                         if (core.getAntiCheat() != null) core.getAntiCheat().clearDashboardReports();
                         return true;
                     }).get(15, TimeUnit.SECONDS);
-                    send(exchange, 200, "application/json; charset=utf-8", "{\\"ok\\":true,\\"message\\":\\"Signalements effacés. Les détections continuent normalement.\\"}");
+                    send(exchange, 200, "application/json; charset=utf-8", "{\"ok\":true,\"message\":\"Signalements effacés. Les détections continuent normalement.\"}");
                 } catch (Exception ex) {
                     plugin.getLogger().warning("Effacement des signalements impossible: " + ex.getMessage());
-                    send(exchange, 503, "application/json; charset=utf-8", "{\\"error\\":\\"Impossible d'effacer les signalements pour le moment.\\"}");
+                    send(exchange, 503, "application/json; charset=utf-8", "{\"error\":\"Impossible d'effacer les signalements pour le moment.\"}");
                 }
                 return;
             }
@@ -215,12 +215,12 @@ final class LarpersWebDashboard {
                         return Bukkit.dispatchCommand(Bukkit.getConsoleSender(), safeCommand);
                     }).get(30, TimeUnit.SECONDS);
                     send(exchange, accepted ? 200 : 400, "application/json; charset=utf-8",
-                            accepted ? "{\\"ok\\":true,\\"message\\":\\"Commande exécutée par la console.\\"}"
-                                     : "{\\"ok\\":false,\\"message\\":\\"Commande inconnue ou refusée; vérifie la syntaxe.\\"}");
+                            accepted ? "{\"ok\":true,\"message\":\"Commande exécutée par la console.\"}"
+                                     : "{\"ok\":false,\"message\":\"Commande inconnue ou refusée; vérifie la syntaxe.\"}");
                 } catch (Exception ex) {
                     plugin.getLogger().warning("Commande web non exécutée (" + safeCommand + "): " + ex.getClass().getSimpleName()
                             + (ex.getMessage() == null ? "" : " - " + ex.getMessage()));
-                    send(exchange, 503, "application/json; charset=utf-8", "{\\"error\\":\\"Le serveur ne répond pas à temps. Réessaie.\\"}");
+                    send(exchange, 503, "application/json; charset=utf-8", "{\"error\":\"Le serveur ne répond pas à temps. Réessaie.\"}");
                 }
                 return;
             }
@@ -418,7 +418,7 @@ final class LarpersWebDashboard {
 
     private String json(String value) {
         if (value == null) return "";
-        return value.replace("\\", "\\\\").replace("\"", "\\\"")
+        return value.replace("\", "\\\").replace("\"", "\\"")
                 .replace("\n", "\\n").replace("\r", "\\r");
     }
 
