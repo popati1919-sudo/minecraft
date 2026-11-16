@@ -1,11 +1,11 @@
-LARPERS COIN SMP 26.3
+LARRY SMP SMP 26.3
 CHANGELOG — 0.8.0
 Date: 2026-11-12
 
 Added
-- Secure player trades with invitation, item offers, LPC offers, two-player confirmation, cancellation and inventory/balance validation.
+- Secure player trades with invitation, item offers, Larry offers, two-player confirmation, cancellation and inventory/balance validation.
 - Daily and weekly quest objectives: block breaking, mature crop harvesting, mob kills and fishing.
-- LPC shop purchases with configurable prices stored in plugins/LarpersCoin/features.yml, plus a clickable shop GUI.
+- Larry shop purchases with configurable prices stored in plugins/LarpersCoin/features.yml, plus a clickable shop GUI.
 - Clan and quest inventory menus.
 - Persistent transaction history for player payments, daily rewards, bounty, lottery, shop, auction, clan bank, quiz and trades.
 - Multiple-choice Minecraft quiz GUI with configurable question bank and score leaderboard.
@@ -34,7 +34,7 @@ Not yet complete / not yet verified
 - Geyser/Floodgate Java-Bedrock validation.
 - GitHub Actions build succeeded with Java 25 and Paper 26.3 API on commit c081497fdb512fb0be74b798ab088c2638f3b5c5; a live server session is still required.
 
-- Ajout du module anti-triche LPC: détection de vitesse, déplacement aérien suspect et portée de frappe, alertes staff et commandes de diagnostic; aucune sanction automatique.
+- Ajout du module anti-triche Larry: détection de vitesse, déplacement aérien suspect et portée de frappe, alertes staff et commandes de diagnostic; aucune sanction automatique.
 
 ## 1.0.0 — Anti-triche v1
 - Ajout de réglages anticheat dans config.yml pour activer le module et ajuster les seuils Speed, Fly et Reach.
@@ -50,9 +50,9 @@ Not yet complete / not yet verified
 ## 1.0.5 — Inscription, économie et menus Bedrock
 - Simplification de /register: un seul mot de passe demandé, sans confirmation répétée.
 - Retrait des commandes Quiz et Boutique; ajout du menu de classements /top.
-- Récompense quotidienne ramenée à 60 LPC + 10 LPC par jour de série (maximum 130 LPC).
-- Récompenses des quêtes ajustées à 100 LPC (quotidienne) et 400 LPC (hebdomadaire), avec objectifs hebdomadaires adaptés.
-- Ticket de loterie ajusté à 50 LPC.
+- Récompense quotidienne ramenée à 60 Larry + 10 Larry par jour de série (maximum 130 Larry).
+- Récompenses des quêtes ajustées à 100 Larry (quotidienne) et 400 Larry (hebdomadaire), avec objectifs hebdomadaires adaptés.
+- Ticket de loterie ajusté à 50 Larry.
 - Menus avec bordures grises discrètes; recherche de joueurs utilisable au clavier dans le chat Bedrock.
 - Coffre de clan: 1 emplacement pour les nouveaux clans, améliorations payantes par paliers jusqu'à 54; conservation des anciens coffres déjà remplis.
 - Ajout de /money comme alias de /balance.
