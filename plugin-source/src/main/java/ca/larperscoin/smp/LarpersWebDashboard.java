@@ -49,9 +49,9 @@ final class LarpersWebDashboard {
             while (recent.size() > 5) recent.pollLast();
         }
         synchronized String toJson(String player, LarpersWebDashboard owner) {
-            StringBuilder out = new StringBuilder("{\\"player\\":\\"")
-                    .append(owner.json(player)).append("\\",\\"count\\":").append(count)
-                    .append(",\\"latest\\":\\"").append(owner.json(latest)).append("\\",\\"details\\":[");
+            StringBuilder out = new StringBuilder("{\"player\":\"")
+                    .append(owner.json(player)).append("\",\"count\":").append(count)
+                    .append(",\"latest\":\"").append(owner.json(latest)).append("\",\"details\":[");
             boolean first = true;
             for (String item : recent) {
                 if (!first) out.append(',');
@@ -67,10 +67,10 @@ final class LarpersWebDashboard {
         if (!lower.contains("grim") || !(lower.contains("alert") || lower.contains("flag")
                 || lower.contains("violat") || lower.contains("failed") || lower.contains("punish"))) return;
         String player = null;
-        Matcher named = Pattern.compile("(?i)\\\\[?grim(?:ac)?\\\\]?\\\\s*(?:»|:|-)\\\\s*([A-Za-z0-9_]{3,16})\\\\s+(?:failed|flagged|violated|triggered)").matcher(message);
+        Matcher named = Pattern.compile("(?i)\\[?grim(?:ac)?\\]?\\s*(?:»|:|-)\\s*([A-Za-z0-9_]{3,16})\\s+(?:failed|flagged|violated|triggered)").matcher(message);
         if (named.find()) player = named.group(1);
         if (player == null) {
-            Matcher labelled = Pattern.compile("(?i)(?:player|joueur)\\\\s*[:=]\\\\s*([A-Za-z0-9_]{3,16})").matcher(message);
+            Matcher labelled = Pattern.compile("(?i)(?:player|joueur)\\s*[:=]\\s*([A-Za-z0-9_]{3,16})").matcher(message);
             if (labelled.find()) player = labelled.group(1);
         }
         if (player == null) player = "GrimAC — joueur non identifié";
