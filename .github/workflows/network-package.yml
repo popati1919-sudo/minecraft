@@ -283,7 +283,7 @@ jobs:
             remember-ip: false
             storage-file: ../Lobby/plugins/LarpersCoin/auth.yml
           server-display:
-            name: Larry SMP SMP
+            name: Larry SMP
             ip: Non configurée
           anticheat:
             enabled: true
