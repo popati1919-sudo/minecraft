@@ -500,7 +500,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                 ? YamlConfiguration.loadConfiguration(sharedDisplayFile) : getConfig();
         for(Player p:Bukkit.getOnlinePlayers()) {
             p.setPlayerListName(rankPrefix(p)+ChatColor.WHITE+p.getName());
-            String serverName=display.getString("server-display.name",getConfig().getString("server-display.name","Larry SMP SMP"));
+            String serverName=display.getString("server-display.name",getConfig().getString("server-display.name","Larry SMP"));
             String serverIp=display.getString("server-display.ip",getConfig().getString("server-display.ip","Non configurée"));
             String status=lotteryActive()?ChatColor.LIGHT_PURPLE+"✦ LOTERIE • "+format(lotteryPot())+" Larry ✦":ChatColor.GRAY+"Bienvenue sur le SMP";
             p.setPlayerListHeaderFooter(ChatColor.GOLD+serverName,status+ChatColor.DARK_GRAY+" | "+ChatColor.YELLOW+"IP: "+serverIp+ChatColor.DARK_GRAY+" | "+ChatColor.GREEN+"Ping: "+p.getPing()+" ms");
@@ -518,7 +518,6 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             }
         }
         Bukkit.getScheduler().runTask(this,()->updatePlayerTags());
-        player.sendMessage(ChatColor.GOLD+"Bienvenue sur Larry SMP SMP!");
     }
     @EventHandler public void onPlayerChat(AsyncPlayerChatEvent e) {
         e.setFormat(rankPrefix(e.getPlayer())+ChatColor.WHITE+"%1$s"+ChatColor.DARK_GRAY+" » "+ChatColor.RESET+"%2$s");
