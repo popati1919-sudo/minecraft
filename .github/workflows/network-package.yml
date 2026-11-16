@@ -102,9 +102,12 @@ jobs:
           test -s "$ROOT/SMP/plugins/GrimAC.jar"
           mkdir -p "$ROOT/SMP/plugins/GrimAC"
           cat > "$ROOT/SMP/plugins/GrimAC/config.yml" <<'EOF'
-          # -1 désactive TimerLimit, source des alertes répétitives constatées.
-          TimerLimit:
-            ping-abuse-limit-threshold: -1
+          # Grim continue de détecter et d'envoyer les alertes au dashboard,
+          # mais ne les imprime plus une par une dans la console Paper.
+          alerts:
+            print-to-console: false
+          verbose:
+            print-to-console: false
           EOF
           cat > "$ROOT/SMP/plugins/GrimAC/punishments.yml" <<'EOF'
           Punishments:
