@@ -182,7 +182,7 @@ public final class ChatEvents implements Listener {
     };
 
     private static final String[] REACTION_WORDS = {
-        "LPC","MINECRAFT","LARPERS","DIAMANT","CREEPER","REDSTONE","NETHERITE","ELYTRA",
+        "Larry","MINECRAFT","LARPERS","DIAMANT","CREEPER","REDSTONE","NETHERITE","ELYTRA",
         "VILLAGE","ENDERMAN","SQUELETTE","ZOMBIE","BLAZE","GHAST","WARDEN","ALLAY",
         "AXOLOTL","TORTUE","DAUPHIN","RENARD","CHEVAL","MOUTON","ABEILLE","VILLAGEOIS",
         "OBSIDienne","EMERAUDE","AMETHYSTE","CUIVRE","QUARTZ","PRISMARINE","SCULK","PIoche",
@@ -245,9 +245,9 @@ public final class ChatEvents implements Listener {
         }
         active=new ActiveEvent(type.toLowerCase(Locale.ROOT),answer,reward);
         Bukkit.broadcastMessage("");
-        Bukkit.broadcastMessage(ChatColor.GOLD+"§l✦ ÉVÉNEMENT CHAT LPC ✦");
+        Bukkit.broadcastMessage(ChatColor.GOLD+"§l✦ ÉVÉNEMENT CHAT Larry ✦");
         Bukkit.broadcastMessage(ChatColor.YELLOW+question);
-        Bukkit.broadcastMessage(ChatColor.GRAY+"Récompense: "+ChatColor.GOLD+String.format(Locale.CANADA_FRENCH,"%.0f",reward)+" LPC");
+        Bukkit.broadcastMessage(ChatColor.GRAY+"Récompense: "+ChatColor.GOLD+String.format(Locale.CANADA_FRENCH,"%.0f",reward)+" Larry");
         Bukkit.broadcastMessage(ChatColor.GRAY+"Tu as 45 secondes pour répondre!");
         Bukkit.broadcastMessage("");
         timeout=Bukkit.getScheduler().runTaskLater(plugin,()->{
@@ -294,7 +294,7 @@ public final class ChatEvents implements Listener {
             core.credit(winner.getUniqueId(),current.reward);
             core.recordTransaction("CHAT_EVENT_"+current.type.toUpperCase(Locale.ROOT),new UUID(0L,0L),winner.getUniqueId(),current.reward);
             core.saveData();
-            Bukkit.broadcastMessage(ChatColor.GREEN+"[ÉVÉNEMENT] "+winner.getName()+" a gagné "+String.format(Locale.CANADA_FRENCH,"%.0f",current.reward)+" LPC!");
+            Bukkit.broadcastMessage(ChatColor.GREEN+"[ÉVÉNEMENT] "+winner.getName()+" a gagné "+String.format(Locale.CANADA_FRENCH,"%.0f",current.reward)+" Larry!");
         });
     }
 
