@@ -174,6 +174,21 @@ final class LarpersWebDashboard {
                 send(exchange, 200, "application/json; charset=utf-8", statusJsonOnMainThread());
                 return;
             }
+            if (path.equals("/api/alerts/clear") && exchange.getRequestMethod().equals("POST")) {
+                try {
+                    Bukkit.getScheduler().callSyncMethod(plugin, () -> {
+                        grimAlerts.clear();
+                        consoleLines.removeIf(line -> line.contains("[GRIM]") || line.contains("[AntiCheat]"));
+                        if (core.getAntiCheat() != null) core.getAntiCheat().clearDashboardReports();
+                        return true;
+                    }).get(15, TimeUnit.SECONDS);
+                    send(exchange, 200, "application/json; charset=utf-8", "{\\"ok\\":true,\\"message\\":\\"Signalements effacés. Les détections continuent normalement.\\"}");
+                } catch (Exception ex) {
+                    plugin.getLogger().warning("Effacement des signalements impossible: " + ex.getMessage());
+                    send(exchange, 503, "application/json; charset=utf-8", "{\\"error\\":\\"Impossible d'effacer les signalements pour le moment.\\"}");
+                }
+                return;
+            }
             if (path.equals("/api/command") && exchange.getRequestMethod().equals("POST")) {
                 String body = new String(exchange.getRequestBody().readNBytes(2048), StandardCharsets.UTF_8);
                 Matcher matcher = Pattern.compile("\"command\"\\s*:\\s*\"([^\\r\\n]{1,512})\"").matcher(body);
@@ -194,20 +209,19 @@ final class LarpersWebDashboard {
                     commandText = "give " + legacyLog.group(1) + " minecraft:oak_log " + legacyLog.group(2) + legacyLog.group(3);
                 }
                 final String safeCommand = commandText;
-                java.util.concurrent.CompletableFuture<Boolean> result = new java.util.concurrent.CompletableFuture<>();
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    consoleLines.addLast(java.time.LocalTime.now().withNano(0) + " [WEB] > " + safeCommand);
-                    while (consoleLines.size() > 400) consoleLines.pollFirst();
-                    try { result.complete(Bukkit.dispatchCommand(Bukkit.getConsoleSender(), safeCommand)); }
-                    catch (Throwable error) { result.completeExceptionally(error); }
-                });
                 try {
-                    boolean accepted = result.get(10, TimeUnit.SECONDS);
+                    boolean accepted = Bukkit.getScheduler().callSyncMethod(plugin, () -> {
+                        consoleLines.addLast(java.time.LocalTime.now().withNano(0) + " [WEB] > " + safeCommand);
+                        while (consoleLines.size() > 400) consoleLines.pollFirst();
+                        return Bukkit.dispatchCommand(Bukkit.getConsoleSender(), safeCommand);
+                    }).get(30, TimeUnit.SECONDS);
                     send(exchange, accepted ? 200 : 400, "application/json; charset=utf-8",
-                            accepted ? "{\"ok\":true,\"message\":\"Commande envoyée à la console.\"}"
-                                     : "{\"ok\":false,\"message\":\"Commande inconnue ou refusée; consulte la console.\"}");
+                            accepted ? "{\\"ok\\":true,\\"message\\":\\"Commande exécutée par la console.\\"}"
+                                     : "{\\"ok\\":false,\\"message\\":\\"Commande inconnue ou refusée; vérifie la syntaxe.\\"}");
                 } catch (Exception ex) {
-                    send(exchange, 503, "application/json; charset=utf-8", "{\"error\":\"Console indisponible\"}");
+                    plugin.getLogger().warning("Commande web non exécutée (" + safeCommand + "): " + ex.getClass().getSimpleName()
+                            + (ex.getMessage() == null ? "" : " - " + ex.getMessage()));
+                    send(exchange, 503, "application/json; charset=utf-8", "{\\"error\\":\\"Le serveur ne répond pas à temps. Réessaie.\\"}");
                 }
                 return;
             }
@@ -429,7 +443,7 @@ final class LarpersWebDashboard {
 <div class="card"><h2>Joueurs en ligne</h2><p class="muted">Clique sur un joueur pour afficher ses statistiques et son inventaire.</p><ul id="players"></ul></div><div class="card"><h2>Fiche joueur</h2><div class="row"><input id="inspectName" placeholder="Pseudo exact"><button id="inspectButton">Afficher</button></div><p id="playerError" class="muted"></p><div id="playerDetails"></div></div>
 <div class="card"><h2>Réinitialiser un mot de passe</h2><p class="muted">Le compte est révoqué, le joueur est expulsé s'il est connecté et devra créer un nouveau mot de passe avec /register.</p><div class="row"><input id="playerName" placeholder="Pseudo exact"><button class="danger" onclick="resetPass()">Réinitialiser</button></div><p id="resetResult"></p></div>
 <div class="card"><h2>Console du serveur — temps réel</h2><p class="muted">Les dernières lignes du journal. Les commandes sont exécutées comme console serveur.</p><pre id="consoleOutput">Connexion à la console…</pre><div class="row"><input id="consoleCommand" autocomplete="off" placeholder="Commande Minecraft (ex. list, say Bonjour, lp...)"><button onclick="sendCommand()">Exécuter</button></div><div id="suggestions"></div><div class="row" id="quickCommands"><button data-cmd="list">Joueurs</button><button data-cmd="tps">TPS</button><button data-cmd="plugins">Plugins</button><button data-cmd="version">Version</button><button data-cmd="whitelist list">Whitelist</button><button data-cmd="save-all">Sauvegarder</button></div><p id="commandResult"></p></div>
-<div class="card"><h2>Alertes GrimAC — regroupées par joueur</h2><small>Chaque joueur apparaît une seule fois. Les catégories indiquent le type de contrôle déclenché; une alerte est un indice à vérifier, pas une preuve certaine.</small><ul id="grimAlerts"></ul></div>
+<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><h2>Alertes GrimAC — regroupées par joueur</h2><button id="clearReports" class="secondary">Effacer les signalements</button></div><small>Chaque joueur apparaît une seule fois. Les catégories indiquent le type de contrôle déclenché; une alerte est un indice à vérifier, pas une preuve certaine.</small><ul id="grimAlerts"></ul></div>
 <div class="card"><h2>Alertes anti-triche Larry</h2><small>Les alertes ne déclenchent jamais de kick ni de ban automatique. Vérifie les preuves avant toute sanction manuelle.</small><ul id="alerts"></ul></div>
 <div class="card"><h2>Joueurs signalés</h2><ul id="violations"></ul></div></section></main>
 <script>
@@ -449,6 +463,8 @@ async function viewPlayer(name){name=String(name||'').trim();if(!name)return;$('
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 $('quickCommands').addEventListener('click',e=>{let b=e.target.closest('button[data-cmd]');if(b){$('consoleCommand').value=b.dataset.cmd;sendCommand()}});
 async function sendCommand(){let command=$('consoleCommand').value.trim();if(!command)return;let r=await api('/api/command',{method:'POST',body:JSON.stringify({command})});let d=await r.json();$('commandResult').textContent=d.message||d.error||'Commande envoyée';$('consoleCommand').value='';refresh()}
+async function clearReports(){if(!confirm('Effacer les signalements et remettre à zéro les compteurs anti-triche Larry ?'))return;let r=await api('/api/alerts/clear',{method:'POST'});let d=await r.json();$('commandResult').textContent=d.message||d.error||'Opération terminée';refresh()}
+$('clearReports')?.addEventListener('click',clearReports);
 $('consoleCommand')?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendCommand()}});
 async function resetPass(){let name=$('playerName').value.trim();if(!/^[A-Za-z0-9_]{3,16}$/.test(name)){$('resetResult').textContent='Pseudo invalide.';return}if(!confirm('Réinitialiser le compte de '+name+' ?'))return;let r=await api('/api/reset-password',{method:'POST',body:JSON.stringify({player:name})});let d=await r.json();$('resetResult').textContent=d.message||d.error;refresh()}
 if(key){$('token').value=key;connect()}setInterval(()=>{if(!$('app').classList.contains('hidden'))refresh()},2000);
