@@ -202,9 +202,8 @@ final class LarpersWebDashboard {
                     send(exchange, 400, "application/json; charset=utf-8", "{\"error\":\"Commande invalide\"}");
                     return;
                 }
-                // Compatibilité avec l'ancien nom d'item "log" : depuis Minecraft 1.13,
-                // le bloc de bois s'appelle oak_log. Les autres commandes restent inchangées.
-                Matcher legacyLog = Pattern.compile("(?i)^give\\s+(\\S+)\\s+log\\s+(\\d+)(.*)$").matcher(commandText);
+                // Accepte aussi les termes courants "bois", "wood" et "log" pour le chêne.
+                Matcher legacyLog = Pattern.compile("(?i)^give\\s+(\\S+)\\s+(?:log|wood|bois)\\s+(\\d+)(.*)$").matcher(commandText);
                 if (legacyLog.matches()) {
                     commandText = "give " + legacyLog.group(1) + " minecraft:oak_log " + legacyLog.group(2) + legacyLog.group(3);
                 }
