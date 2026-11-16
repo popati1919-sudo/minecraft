@@ -1100,6 +1100,24 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             }
         }
     }
+    // Les menus LPC sont des interfaces: un glisser-déposer ne doit jamais y déposer
+    // les objets du joueur (notamment sur les vitres de remplissage).
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onLpcMenuDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
+        String title = e.getView().getTitle();
+        boolean lpcMenu = title.startsWith("LPC |")
+            || title.startsWith("LPC I")
+            || title.startsWith("Coffre clan:");
+        if (!lpcMenu) return;
+        int topSize = e.getView().getTopInventory().getSize();
+        for (int rawSlot : e.getRawSlots()) {
+            if (rawSlot >= 0 && rawSlot < topSize) {
+                e.setCancelled(true);
+                return;
+            }
+        }
+    }
+
     @EventHandler public void onClanChestDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
         String title=e.getView().getTitle();
         if(!title.startsWith("Coffre clan:"))return;
