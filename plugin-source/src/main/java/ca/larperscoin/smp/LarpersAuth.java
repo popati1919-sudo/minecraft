@@ -120,7 +120,6 @@ final class LarpersAuth implements Listener {
         boolean mustReRegister = accounts.getLong("revoked." + player.getName().toLowerCase(Locale.ROOT), 0L) > 0L;
         sessionJoinedAt.put(player.getUniqueId(), System.currentTimeMillis());
         joinLocations.put(player.getUniqueId(), player.getLocation().clone());
-        player.sendMessage(ChatColor.GOLD + "Bienvenue sur Larry SMP.");
         player.sendMessage(ChatColor.YELLOW + "Vérification de ton compte...");
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!player.isOnline() || authenticated.containsKey(player.getUniqueId())) return;
