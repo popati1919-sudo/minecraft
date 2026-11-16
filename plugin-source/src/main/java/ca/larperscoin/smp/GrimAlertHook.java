@@ -13,13 +13,11 @@ public final class GrimAlertHook {
     public static void register(JavaPlugin owner, LarpersWebDashboard dashboard) {
         GrimAbstractAPI api = GrimAPIProvider.get();
         GrimPlugin grim = api.getGrimPlugin(owner);
-        // La surcharge Supplier évite l'API dépréciée et ne construit le texte
-        // détaillé que lorsque le tableau de bord en a réellement besoin.
         api.getEventBus().get(FlagEvent.class).onFlag(grim, (user, check, verbose, cancelled) -> {
             dashboard.recordGrimFlag(
                     user.getName(),
                     check.getCheckName(),
-                    verbose == null ? "" : verbose.get()
+                    String.valueOf(verbose)
             );
             return cancelled;
         });
