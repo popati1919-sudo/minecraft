@@ -1241,6 +1241,14 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
     }
     @Override public List<String> onTabComplete(CommandSender s,Command c,String alias,String[] a) {
+        if(c.getName().equalsIgnoreCase("trade")) {
+            if(a.length==1) {
+                List<String> options=new ArrayList<>(List.of("accept","cancel","item","money","confirm"));
+                Bukkit.getOnlinePlayers().stream().filter(p->!p.equals(s)).map(Player::getName).forEach(options::add);
+                return options.stream().filter(v->v.toLowerCase(Locale.ROOT).startsWith(a[0].toLowerCase(Locale.ROOT))).toList();
+            }
+            if(a.length==2&&a[0].equalsIgnoreCase("money"))return List.of("10","50","100","500","1000");
+        }
         if(c.getName().equalsIgnoreCase("admin")&&a.length==1)return List.of("reset","ip");
         if(c.getName().equalsIgnoreCase("admin")&&a.length==2&&a[0].equalsIgnoreCase("reset"))
             return Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
