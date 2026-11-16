@@ -159,7 +159,7 @@ jobs:
           pvp=true
           server-port=25565
           server-ip=
-          motd=Larry SMP SMP
+          motd=Bienvenue sur Larry SMP!
           view-distance=6
           simulation-distance=4
           network-compression-threshold=512
@@ -174,15 +174,19 @@ jobs:
             proxy-authenticated: false
             remember-ip: false
           server-display:
-            name: Larry SMP SMP
+            name: Larry SMP
             ip: Non configurée
           anticheat:
             enabled: true
+          web-admin:
+            enabled: true
+            bind: 127.0.0.1
+            port: 80
           EOF
           cat > "$ROOT/START-SERVER.bat" <<'EOF'
           @echo off
           cd /d "%~dp0"
-          title Larry SMP SMP - Paper 26.3
+          title Larry SMP - Paper 26.3
           where java >nul 2>nul
           if errorlevel 1 (
             echo Java 25 est requis. Installe un JDK 25 puis relance.
@@ -291,7 +295,7 @@ jobs:
           6. Lance CONFIGURER-BEDROCK.bat pour régler Geyser sur Floodgate, puis redemarre.
           7. Lance OUVRIR-PORTS-WINDOWS.bat en administrateur; redirige aussi les ports sur le routeur.
           8. Configure les groupes avec CONFIGURER-LES-GROUPES.bat.
-          9. Dashboard: http://127.0.0.1:8765; jeton dans plugins/LarpersCoin/web-admin.yml.
+          9. Dashboard: http://127.0.0.1 (si le port 80 est occupé, http://127.0.0.1:8765); jeton dans plugins/LarpersCoin/web-admin.yml.
           10. La console du site execute les commandes avec les droits console: garde le jeton secret.
           11. Tous les joueurs Java utilisent /register puis /login avec leur mot de passe Larry.
           10. Les comptes Java crack utilisent /register <motdepasse> <confirmation>, puis /login <motdepasse>.
