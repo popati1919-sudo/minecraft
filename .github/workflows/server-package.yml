@@ -145,6 +145,52 @@ jobs:
           # Lis https://aka.ms/MinecraftEULA puis remplace eula=false par eula=true si tu acceptes.
           eula=false
           EOF
+          mkdir -p "$ROOT/config"
+          cat > "$ROOT/config/paper-world-defaults.yml" <<'EOF'
+          _version: 31
+          anticheat:
+            anti-xray:
+              enabled: true
+              engine-mode: 3
+              hidden-blocks:
+                - copper_ore
+                - deepslate_copper_ore
+                - raw_copper_block
+                - diamond_ore
+                - deepslate_diamond_ore
+                - gold_ore
+                - deepslate_gold_ore
+                - iron_ore
+                - deepslate_iron_ore
+                - raw_iron_block
+                - lapis_ore
+                - deepslate_lapis_ore
+                - redstone_ore
+                - deepslate_redstone_ore
+              lava-obscures: false
+              max-block-height: 64
+              replacement-blocks:
+                - chest
+                - amethyst_block
+                - andesite
+                - budding_amethyst
+                - calcite
+                - coal_ore
+                - deepslate_coal_ore
+                - deepslate
+                - diorite
+                - dirt
+                - emerald_ore
+                - deepslate_emerald_ore
+                - granite
+                - gravel
+                - oak_planks
+                - smooth_basalt
+                - stone
+                - tuff
+              update-radius: 2
+              use-permission: false
+          EOF
           cat > "$ROOT/server.properties" <<'EOF'
           enable-jmx-monitoring=false
           enable-query=false
