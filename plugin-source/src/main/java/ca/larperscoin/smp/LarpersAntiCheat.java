@@ -44,7 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Conservative detection and staff alerts only. No automatic punishments.
  */
 public final class LarpersAntiCheat implements Listener, CommandExecutor {
-    private static final String PREFIX = ChatColor.DARK_RED + "[LPC AC] " + ChatColor.RESET;
+    private static final String PREFIX = ChatColor.DARK_RED + "[Larry AC] " + ChatColor.RESET;
     private static final long ALERT_COOLDOWN_MS = 4_000L;
     private static final long GRACE_MS = 1_500L;
     private static final int MAX_EVIDENCE = 50;
@@ -74,7 +74,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         if (plugin.getCommand("ac") != null) plugin.getCommand("ac").setExecutor(this);
         for (Player player : Bukkit.getOnlinePlayers()) grantGrace(player);
         plugin.getServer().getScheduler().runTaskTimer(plugin, this::saveViolations, 20L * 300L, 20L * 300L);
-        plugin.getLogger().info("LPC AntiCheat v1.0 chargé — alertes et journal activés, sanctions automatiques désactivées.");
+        plugin.getLogger().info("Larry AntiCheat v1.0 chargé — alertes et journal activés, sanctions automatiques désactivées.");
     }
 
     private void applyDefaults() {
