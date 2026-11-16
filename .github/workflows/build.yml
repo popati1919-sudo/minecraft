@@ -1,4 +1,4 @@
-name: Build LarpersCoin
+name: Build Larry SMP
 
 on:
   push:
@@ -33,7 +33,7 @@ jobs:
       - name: Upload plugin JAR
         uses: actions/upload-artifact@v4
         with:
-          name: LarpersCoin-Paper-26.3
+          name: LarrySMP-Paper-26.3
           path: plugin-source/build/libs/LarpersCoin-*.jar
           if-no-files-found: error
           retention-days: 30
