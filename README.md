@@ -24,12 +24,12 @@ Le workflow **Package reseau complet Larry SMP (Velocity + Lobby + SMP)** produi
 - Geyser + Floodgate sur Velocity, Floodgate sur les backends.
 - Clé de forwarding Velocity, scripts Windows de démarrage, configuration Bedrock et ouverture du pare-feu.
 
-Dans GitHub, ouvre **Actions** puis **Package reseau complet Larry SMP (Velocity + Lobby + SMP)** et télécharge l'artefact `LarpersCoin-Network`. Suis impérativement `LISEZ-MOI.txt` et exécute `CONFIGURER-RESEAU.bat` après le premier démarrage de Velocity. Les ports backend 25566/25567 ne doivent jamais être exposés à Internet.
+Dans GitHub, ouvre **Actions** puis **Package reseau complet Larry SMP (Velocity + Lobby + SMP)** et télécharge l'artefact `LarrySMP-Network`. Suis impérativement `LISEZ-MOI.txt` et exécute `CONFIGURER-RESEAU.bat` après le premier démarrage de Velocity. Les ports backend 25566/25567 ne doivent jamais être exposés à Internet.
 
 Le pack est un déploiement initial: accepte l'EULA toi-même, configure la redirection des ports du routeur et teste une connexion Java premium, Java non premium et Bedrock avant l'ouverture publique.
 
 ## Compilation automatique
-Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `LarpersCoin-Paper-26.3`.
+Onglet **Actions** → workflow **Build Larry SMP**. L'artefact s'appelle `LarrySMP-Paper-26.3`.
 
 ## Commandes incluses
 
