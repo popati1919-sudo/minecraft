@@ -73,6 +73,8 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             }
         }
         getServer().getPluginManager().registerEvents(this, this);
+        // Désactive la barre de localisation des joueurs dans tous les mondes chargés.
+        Bukkit.getWorlds().forEach(this::disablePlayerLocatorBar);
         auth = new LarpersAuth(this);
         features = new LarpersFeatures(this);
         antiCheat = new LarpersAntiCheat(this);
@@ -96,6 +98,19 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             }
         }, 1L);
         getLogger().info("LarpersCoin 1.0.8 actif. Aucun claim ni protection de parcelle n'est enregistré.");
+    }
+
+    private void disablePlayerLocatorBar(org.bukkit.World world) {
+        try {
+            world.setGameRule(org.bukkit.GameRule.LOCATOR_BAR, false);
+        } catch (IllegalArgumentException ex) {
+            getLogger().warning("Impossible de désactiver locator_bar dans " + world.getName() + ": " + ex.getMessage());
+        }
+    }
+
+    @EventHandler
+    public void onWorldLoad(org.bukkit.event.world.WorldLoadEvent event) {
+        disablePlayerLocatorBar(event.getWorld());
     }
 
     @Override
