@@ -1,15 +1,15 @@
-# État du projet Larpers Coin SMP 26.3
+# État du projet Larry SMP SMP 26.3
 
 Dernière mise à jour: 2026-11-13 — version 1.0.4.
 
 ## Implémenté dans le dépôt
-- [x] Économie LPC persistante: soldes, paiements, classement, daily, primes, commandes admin et historique des 10 dernières transactions par joueur.
+- [x] Économie Larry persistante: soldes, paiements, classement, daily, primes, commandes admin et historique des 10 dernières transactions par joueur.
 - [x] Menu graphique des primes actives, liste triée, sélection d'une cible en ligne et saisie du montant dans le chat.
 - [x] Hôtel des ventes avec recherche interactive par objet ou vendeur, filtre effaçable et commande `/ah search`.
 - [x] Loterie: menu graphique, achat de tickets pendant une période active, démarrage/arrêt réservé aux admins, annonces globales et affichage de l'événement dans le tab.
-- [x] Hôtel des ventes: mise en vente, liste et achat avec validation d'inventaire et paiement LPC.
-- [x] Boutique LPC: GUI cliquable, catalogue, recherche et achats de 1 à 64 objets; prix stockés dans features.yml et modifiables.
-- [x] Échanges joueurs: invitations, offres d'objets et de LPC, double confirmation, invalidation des confirmations après modification, contrôle du solde et de l'espace d'inventaire avant transfert. Les objets restent dans l'inventaire avant validation.
+- [x] Hôtel des ventes: mise en vente, liste et achat avec validation d'inventaire et paiement Larry.
+- [x] Boutique Larry: GUI cliquable, catalogue, recherche et achats de 1 à 64 objets; prix stockés dans features.yml et modifiables.
+- [x] Échanges joueurs: invitations, offres d'objets et de Larry, double confirmation, invalidation des confirmations après modification, contrôle du solde et de l'espace d'inventaire avant transfert. Les objets restent dans l'inventaire avant validation.
 - [x] Quêtes quotidiennes et hebdomadaires: suivi automatique des blocs cassés, cultures mûres récoltées, créatures vaincues et poissons pêchés; récompense unique par période.
 - [x] Clans: création, invitation, adhésion, départ, banque, coffre, XP et niveaux par activité, rôles leader/officer/member, alliances bilatérales sur demande et acceptation, statistiques et classements.
 - [x] Menus GUI pour clans, quêtes, loterie, classements, primes et hôtel des ventes; bordures sobres et recherches par chat compatibles Bedrock.
@@ -53,9 +53,9 @@ Dernière mise à jour: 2026-11-13 — version 1.0.4.
 ## Mise à jour 1.0.5 — Authentification, économie et menus Bedrock
 - Inscription simplifiée: une seule saisie avec /register <motdepasse>.
 - Récompense quotidienne de connexion retirée; les quêtes quotidiennes restent disponibles.
-- Quêtes quotidiennes: 100 LPC; hebdomadaires: 400 LPC, avec objectifs hebdomadaires réduits.
-- Ticket de loterie: 50 LPC.
-- Menus LPC avec bordure grise discrète, recherche de joueurs par chat et menu /top.
+- Quêtes quotidiennes: 100 Larry; hebdomadaires: 400 Larry, avec objectifs hebdomadaires réduits.
+- Ticket de loterie: 50 Larry.
+- Menus Larry avec bordure grise discrète, recherche de joueurs par chat et menu /top.
 - Coffre de clan limité à 1 emplacement au départ, puis améliorations payantes jusqu'à 54 emplacements.
 - Commandes Quiz et Boutique retirées.
 - Compilation et essais en jeu Bedrock à confirmer après les workflows.
