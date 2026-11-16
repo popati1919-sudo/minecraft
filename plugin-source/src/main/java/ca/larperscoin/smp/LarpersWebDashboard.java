@@ -174,6 +174,12 @@ final class LarpersWebDashboard {
                     send(exchange, 400, "application/json; charset=utf-8", "{\"error\":\"Commande invalide\"}");
                     return;
                 }
+                // Compatibilité avec l'ancien nom d'item "log" : depuis Minecraft 1.13,
+                // le bloc de bois s'appelle oak_log. Les autres commandes restent inchangées.
+                Matcher legacyLog = Pattern.compile("(?i)^give\\\\s+(\\\\S+)\\\\s+log\\\\s+(\\\\d+)(.*)$").matcher(commandText);
+                if (legacyLog.matches()) {
+                    commandText = "give " + legacyLog.group(1) + " minecraft:oak_log " + legacyLog.group(2) + legacyLog.group(3);
+                }
                 final String safeCommand = commandText;
                 java.util.concurrent.CompletableFuture<Boolean> result = new java.util.concurrent.CompletableFuture<>();
                 Bukkit.getScheduler().runTask(plugin, () -> {
