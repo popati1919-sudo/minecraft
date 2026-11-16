@@ -6,11 +6,11 @@ Arrête le serveur avant de modifier les fichiers YAML, puis redémarre-le pour 
 
 ## Économie
 
-- Récompense quotidienne: 60 LPC + 10 LPC par jour de série, jusqu'à 130 LPC.
-- Quête quotidienne: 100 LPC lorsqu'un objectif est atteint.
-- Quête hebdomadaire: 400 LPC lorsqu'un objectif est atteint.
-- Ticket de loterie: 50 LPC; achat de 1 à 10 tickets pendant une loterie active.
-- Coffre de clan: 1 emplacement au départ; améliorations successives à 250, 500, 1 000, 2 000, 4 000 et 8 000 LPC, jusqu'à 54 emplacements.
+- Récompense quotidienne: 60 Larry + 10 Larry par jour de série, jusqu'à 130 Larry.
+- Quête quotidienne: 100 Larry lorsqu'un objectif est atteint.
+- Quête hebdomadaire: 400 Larry lorsqu'un objectif est atteint.
+- Ticket de loterie: 50 Larry; achat de 1 à 10 tickets pendant une loterie active.
+- Coffre de clan: 1 emplacement au départ; améliorations successives à 250, 500, 1 000, 2 000, 4 000 et 8 000 Larry, jusqu'à 54 emplacements.
 - Les échanges entre joueurs et l'hôtel des ventes constituent les moyens principaux de commerce; la boutique NPC et le quiz ont été retirés.
 
 ## Permissions
