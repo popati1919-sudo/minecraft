@@ -211,6 +211,51 @@ final class LarpersWebDashboard {
                 }
                 return;
             }
+            if (path.equals("/api/suggest") && exchange.getRequestMethod().equals("GET")) {
+                String query = exchange.getRequestURI().getRawQuery();
+                String prefix = "";
+                if (query != null) for (String part : query.split("&")) {
+                    String[] pair = part.split("=", 2);
+                    if (pair.length == 2 && pair[0].equals("q")) prefix = URLDecoder.decode(pair[1], StandardCharsets.UTF_8);
+                }
+                final String completionInput = prefix.startsWith("/") ? prefix.substring(1) : prefix;
+                java.util.concurrent.CompletableFuture<List<String>> result = new java.util.concurrent.CompletableFuture<>();
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    try { result.complete(Bukkit.getServer().tabCompleteCommand(completionInput).stream().limit(30).toList()); }
+                    catch (Throwable error) { result.complete(List.of()); }
+                });
+                try {
+                    StringBuilder json = new StringBuilder("{\"suggestions\":[");
+                    boolean first = true;
+                    for (String item : result.get(5, TimeUnit.SECONDS)) {
+                        if (!first) json.append(',');
+                        first = false;
+                        json.append("\"").append(json(item)).append("\"");
+                    }
+                    send(exchange, 200, "application/json; charset=utf-8", json.append("]}").toString());
+                } catch (Exception ex) { send(exchange, 503, "application/json; charset=utf-8", "{\"error\":\"Suggestions indisponibles\"}"); }
+                return;
+            }
+            if (path.equals("/api/player") && exchange.getRequestMethod().equals("GET")) {
+                String requested = "";
+                String query = exchange.getRequestURI().getRawQuery();
+                if (query != null) for (String part : query.split("&")) {
+                    String[] pair = part.split("=", 2);
+                    if (pair.length == 2 && pair[0].equals("name")) requested = URLDecoder.decode(pair[1], StandardCharsets.UTF_8);
+                }
+                final String playerName = requested;
+                java.util.concurrent.CompletableFuture<String> result = new java.util.concurrent.CompletableFuture<>();
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    Player target = Bukkit.getPlayerExact(playerName);
+                    result.complete(target == null ? null : playerJson(target));
+                });
+                try {
+                    String json = result.get(8, TimeUnit.SECONDS);
+                    if (json == null) send(exchange, 404, "application/json; charset=utf-8", "{\"error\":\"Joueur non connecté. Les statistiques détaillées et l'inventaire sont disponibles lorsqu'il est en ligne.\"}");
+                    else send(exchange, 200, "application/json; charset=utf-8", json);
+                } catch (Exception ex) { send(exchange, 503, "application/json; charset=utf-8", "{\"error\":\"Lecture du joueur indisponible\"}"); }
+                return;
+            }
             if (path.equals("/api/reset-password") && exchange.getRequestMethod().equals("POST")) {
                 String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
                 Matcher matcher = Pattern.compile("\"player\"\\s*:\\s*\"([A-Za-z0-9_]{3,16})\"").matcher(body);
@@ -302,6 +347,52 @@ final class LarpersWebDashboard {
         if (value.contains("aura") || value.contains("reach") || value.contains("hitbox") || value.contains("aim") || value.contains("rotation") || value.contains("autoclick") || value.contains("attack")) return "Combat suspect";
         if (value.contains("scaffold") || value.contains("tower") || value.contains("jesus") || value.contains("nofall") || value.contains("step") || value.contains("vehicle")) return "Déplacement / Scaffold suspect";
         return "Autre vérification Grim";
+    }
+
+    private String itemJson(ItemStack item, int slot) {
+        if (item == null || item.getType().isAir()) return "null";
+        ItemMeta meta = item.getItemMeta();
+        String display = meta != null && meta.hasDisplayName() ? meta.getDisplayName() : item.getType().name();
+        return "{\"slot\":" + slot + ",\"type\":\"" + json(item.getType().getKey().toString())
+                + "\",\"name\":\"" + json(display) + "\",\"amount\":" + item.getAmount() + "}";
+    }
+
+    private String playerJson(Player p) {
+        StringBuilder out = new StringBuilder("{\"name\":\"").append(json(p.getName()))
+                .append("\",\"uuid\":\"").append(p.getUniqueId())
+                .append("\",\"ping\":").append(p.getPing())
+                .append(",\"health\":").append(String.format(java.util.Locale.ROOT, "%.1f", p.getHealth()))
+                .append(",\"maxHealth\":").append(String.format(java.util.Locale.ROOT, "%.1f", p.getMaxHealth()))
+                .append(",\"food\":").append(p.getFoodLevel()).append(",\"level\":").append(p.getLevel())
+                .append(",\"xp\":").append(String.format(java.util.Locale.ROOT, "%.1f", p.getExp()))
+                .append(",\"world\":\"").append(json(p.getWorld().getName()))
+                .append("\",\"x\":").append(p.getLocation().getBlockX())
+                .append(",\"y\":").append(p.getLocation().getBlockY())
+                .append(",\"z\":").append(p.getLocation().getBlockZ())
+                .append(",\"gameMode\":\"").append(p.getGameMode().name())
+                .append("\",\"playTicks\":").append(p.getStatistic(Statistic.PLAY_ONE_MINUTE))
+                .append(",\"deaths\":").append(p.getStatistic(Statistic.DEATHS))
+                .append(",\"playerKills\":").append(p.getStatistic(Statistic.PLAYER_KILLS))
+                .append(",\"mobKills\":").append(p.getStatistic(Statistic.MOB_KILLS))
+                .append(",\"inventory\":[");
+        boolean first = true;
+        ItemStack[] contents = p.getInventory().getStorageContents();
+        for (int i = 0; i < contents.length; i++) {
+            if (contents[i] == null || contents[i].getType().isAir()) continue;
+            if (!first) out.append(',');
+            first = false;
+            out.append(itemJson(contents[i], i));
+        }
+        out.append("],\"armor\":[");
+        first = true;
+        ItemStack[] armor = p.getInventory().getArmorContents();
+        for (int i = 0; i < armor.length; i++) {
+            if (armor[i] == null || armor[i].getType().isAir()) continue;
+            if (!first) out.append(',');
+            first = false;
+            out.append(itemJson(armor[i], i));
+        }
+        return out.append("],\"offhand\":").append(itemJson(p.getInventory().getItemInOffHand(), -1)).append('}').toString();
     }
 
     private String json(String value) {
