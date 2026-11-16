@@ -1,4 +1,4 @@
-name: Package reseau complet Larpers Coin (Velocity + Lobby + SMP)
+name: Package reseau complet Larry SMP (Velocity + Lobby + SMP)
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
         with:
           gradle-version: "9.2.1"
 
-      - name: Compiler LarpersCoin
+      - name: Compiler Larry SMP
         working-directory: plugin-source
         run: gradle --no-daemon clean build
 
@@ -38,19 +38,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ROOT="package/LarpersCoin-Network"
+          ROOT="package/LarrySMP-Network"
           mkdir -p "$ROOT/Velocity/plugins" "$ROOT/Lobby/plugins" "$ROOT/SMP/plugins"
 
-          paper_meta="$(curl -fsSL -H 'User-Agent: LarpersCoin-Packager/1.0' "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds?channel=STABLE&limit=1")"
+          paper_meta="$(curl -fsSL -H 'User-Agent: LarrySMP-Packager/1.0' "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds?channel=STABLE&limit=1")"
           paper_url="$(echo "$paper_meta" | jq -r '.[0].downloads["server:default"].url // empty')"
           test -n "$paper_url"
           curl -fL "$paper_url" -o "$ROOT/Lobby/paper.jar"
           cp "$ROOT/Lobby/paper.jar" "$ROOT/SMP/paper.jar"
 
-          velocity_versions="$(curl -fsSL -H 'User-Agent: LarpersCoin-Packager/1.0' "https://fill.papermc.io/v3/projects/velocity")"
+          velocity_versions="$(curl -fsSL -H 'User-Agent: LarrySMP-Packager/1.0' "https://fill.papermc.io/v3/projects/velocity")"
           velocity_version="$(echo "$velocity_versions" | jq -r '[.versions[][] | select(type == "string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))] | first // empty')"
           test -n "$velocity_version"
-          velocity_meta="$(curl -fsSL -H 'User-Agent: LarpersCoin-Packager/1.0' "https://fill.papermc.io/v3/projects/velocity/versions/$velocity_version/builds?channel=STABLE&limit=1")"
+          velocity_meta="$(curl -fsSL -H 'User-Agent: LarrySMP-Packager/1.0' "https://fill.papermc.io/v3/projects/velocity/versions/$velocity_version/builds?channel=STABLE&limit=1")"
           velocity_url="$(echo "$velocity_meta" | jq -r '.[0].downloads["server:default"].url // empty')"
           test -n "$velocity_url"
           curl -fL "$velocity_url" -o "$ROOT/Velocity/velocity.jar"
@@ -167,14 +167,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ROOT="package/LarpersCoin-Network"
+          ROOT="package/LarrySMP-Network"
           SECRET="$(openssl rand -hex 32)"
           printf '%s' "$SECRET" > "$ROOT/Velocity/forwarding.secret"
 
           cat > "$ROOT/Velocity/velocity.toml" <<EOF
           config-version = "2.7"
           bind = "0.0.0.0:25565"
-          motd = "<gold>Larpers Coin Network</gold>"
+          motd = "<gold>Larry SMP Network</gold>"
           show-max-players = 100
           online-mode = false
           force-key-authentication = false
@@ -238,7 +238,7 @@ jobs:
           pvp=false
           server-port=$PORT
           server-ip=127.0.0.1
-          motd=Larpers Coin $SERVER
+          motd=Larry SMP $SERVER
           view-distance=$([ "$SERVER" = "Lobby" ] && echo 3 || echo 6)
           simulation-distance=$([ "$SERVER" = "Lobby" ] && echo 2 || echo 4)
           network-compression-threshold=512
@@ -274,7 +274,7 @@ jobs:
             connect-to-smp: true
             storage-file: plugins/LarpersCoin/auth.yml
           server-display:
-            name: Larpers Coin SMP
+            name: Larry SMP SMP
             ip: Non configurée
           EOF
           cat > "$ROOT/SMP/plugins/LarpersCoin/config.yml" <<'EOF'
@@ -283,7 +283,7 @@ jobs:
             remember-ip: false
             storage-file: ../Lobby/plugins/LarpersCoin/auth.yml
           server-display:
-            name: Larpers Coin SMP
+            name: Larry SMP SMP
             ip: Non configurée
           anticheat:
             enabled: true
@@ -304,11 +304,11 @@ jobs:
               exit /b 1
             )
           )
-          start "Larpers Lobby" cmd /k "cd /d ""%~dp0Lobby"" && java -Xms512M -Xmx1G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
+          start "Larry Lobby" cmd /k "cd /d ""%~dp0Lobby"" && java -Xms512M -Xmx1G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
           timeout /t 8 /nobreak >nul
-          start "Larpers SMP" cmd /k "cd /d ""%~dp0SMP"" && java -Xms1G -Xmx4G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
+          start "Larry SMP" cmd /k "cd /d ""%~dp0SMP"" && java -Xms1G -Xmx4G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
           timeout /t 8 /nobreak >nul
-          start "Larpers Velocity" cmd /k "cd /d ""%~dp0Velocity"" && java -Xms512M -Xmx1G -jar velocity.jar"
+          start "Larry Velocity" cmd /k "cd /d ""%~dp0Velocity"" && java -Xms512M -Xmx1G -jar velocity.jar"
           echo Reseau demarre. Les joueurs se connectent sur le port Java 25565.
           echo Bedrock: port UDP 19132 apres configuration Geyser.
           pause
@@ -398,7 +398,7 @@ jobs:
           EOF
 
           cat > "$ROOT/LISEZ-MOI.txt" <<'EOF'
-          LARPERS COIN - RESEAU COMPLET
+          LARRY SMP - RESEAU COMPLET
           =============================
           Contenu:
           - Velocity proxy: port public Java 25565
@@ -439,12 +439,12 @@ jobs:
       - name: Creer le ZIP reseau
         run: |
           cd package
-          zip -qr ../LarpersCoin-Network.zip LarpersCoin-Network
+          zip -qr ../LarrySMP-Network.zip LarrySMP-Network
 
       - name: Publier le ZIP
         uses: actions/upload-artifact@v4
         with:
-          name: LarpersCoin-Network
-          path: LarpersCoin-Network.zip
+          name: LarrySMP-Network
+          path: LarrySMP-Network.zip
           if-no-files-found: error
           retention-days: 90
