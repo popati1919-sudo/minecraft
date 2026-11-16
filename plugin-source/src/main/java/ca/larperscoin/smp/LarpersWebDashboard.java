@@ -62,19 +62,13 @@ final class LarpersWebDashboard {
         }
     }
 
-    private void recordGrimAlert(String message, String formattedLine) {
-        String lower = message.toLowerCase(java.util.Locale.ROOT);
-        if (!lower.contains("grim") || !(lower.contains("alert") || lower.contains("flag")
-                || lower.contains("violat") || lower.contains("failed") || lower.contains("punish"))) return;
-        String player = null;
-        Matcher named = Pattern.compile("(?i)\\[?grim(?:ac)?\\]?\\s*(?:»|:|-)\\s*([A-Za-z0-9_]{3,16})\\s+(?:failed|flagged|violated|triggered)").matcher(message);
-        if (named.find()) player = named.group(1);
-        if (player == null) {
-            Matcher labelled = Pattern.compile("(?i)(?:player|joueur)\\s*[:=]\\s*([A-Za-z0-9_]{3,16})").matcher(message);
-            if (labelled.find()) player = labelled.group(1);
-        }
-        if (player == null) player = "GrimAC — joueur non identifié";
-        grimAlerts.computeIfAbsent(player, ignored -> new GrimAlertSummary()).add(formattedLine);
+    void recordGrimFlag(String player, String check, String verbose) {
+        String name = (player == null || player.isBlank()) ? "Joueur inconnu" : player;
+        String detail = java.time.LocalTime.now().withNano(0) + " [GRIM] " + name + " | "
+                + (check == null ? "Check inconnu" : check) + " | " + (verbose == null ? "" : verbose);
+        grimAlerts.computeIfAbsent(name, ignored -> new GrimAlertSummary()).add(detail);
+        consoleLines.addLast(detail);
+        while (consoleLines.size() > 400) consoleLines.pollFirst();
     }
 
     LarpersWebDashboard(JavaPlugin plugin, LarpersCoin core) {
@@ -118,7 +112,6 @@ final class LarpersWebDashboard {
                             + "] " + message;
                     consoleLines.addLast(line);
                     while (consoleLines.size() > 400) consoleLines.pollFirst();
-                    recordGrimAlert(message, line);
                     if (record.getThrown() != null) {
                         String detail = record.getThrown().toString();
                         consoleLines.addLast(java.time.LocalTime.now().withNano(0) + " [ERROR] " + detail);
@@ -128,6 +121,16 @@ final class LarpersWebDashboard {
                 @Override public void close() { }
             };
             Logger.getLogger("").addHandler(consoleHandler);
+            if (Bukkit.getPluginManager().isPluginEnabled("GrimAC")) {
+                try {
+                    Class<?> hook = Class.forName("ca.larperscoin.smp.GrimAlertHook");
+                    hook.getMethod("register", JavaPlugin.class, LarpersWebDashboard.class).invoke(null, plugin, this);
+                } catch (Throwable error) {
+                    plugin.getLogger().severe("Impossible de connecter les alertes Grim au dashboard: " + error.getMessage());
+                }
+            } else {
+                plugin.getLogger().warning("GrimAC absent: le panneau d'alertes Grim restera vide sur cette instance.");
+            }
             server.start();
             String dashboardUrl = port == 80 ? "http://" + bind : "http://" + bind + ":" + port;
             plugin.getLogger().info("Dashboard Larry actif sur " + dashboardUrl
