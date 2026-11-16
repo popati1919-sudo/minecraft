@@ -1,9 +1,9 @@
 @echo off
 setlocal
-title LarpersCoin - Compilation du plugin
+title Larry SMP - Compilation du plugin
 cd /d "%~dp0"
 echo ==========================================
-echo       LARPERS COIN - BUILD WINDOWS
+echo       LARRY SMP - BUILD WINDOWS
 echo ==========================================
 echo.
 where java >nul 2>nul
