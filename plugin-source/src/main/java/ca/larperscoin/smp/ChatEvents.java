@@ -294,7 +294,7 @@ public final class ChatEvents implements Listener {
             core.credit(winner.getUniqueId(),current.reward);
             core.recordTransaction("CHAT_EVENT_"+current.type.toUpperCase(Locale.ROOT),new UUID(0L,0L),winner.getUniqueId(),current.reward);
             core.saveData();
-            Bukkit.broadcastMessage(ChatColor.GREEN+"[ÉVÉNEMENT] "+winner.getName()+" a gagné "+String.format(Locale.CANADA_FRENCH,"%.0f",current.reward)+" Larry!");
+            Bukkit.broadcastMessage(ChatColor.GREEN+"[ÉVÉNEMENT] "+winner.getName()+" a trouvé la bonne réponse : "+ChatColor.YELLOW+current.answer+ChatColor.GREEN+" et remporte "+String.format(Locale.CANADA_FRENCH,"%.0f",current.reward)+" Larry !");
         });
     }
 
