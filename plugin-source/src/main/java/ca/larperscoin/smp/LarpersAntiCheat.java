@@ -305,6 +305,15 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         return new java.util.HashMap<>(violations);
     }
 
+    /** Efface les signalements visibles et remet à zéro les compteurs Larry. */
+    public void clearDashboardReports() {
+        synchronized (evidence) {
+            evidence.clear();
+        }
+        violations.clear();
+        saveViolations();
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent event) {
         if (!globallyEnabled() || !plugin.getConfig().getBoolean("anticheat.checks.reach.enabled", true)) return;
