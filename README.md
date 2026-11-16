@@ -1,6 +1,6 @@
-# Larpers Coin SMP 26.3
+# Larry SMP SMP 26.3
 
-Plugin Paper pour le serveur **Larpers Coin SMP**, avec monnaie LPC et systèmes communautaires. Le dépôt contient le code source, les ressources, le script Windows et le workflow GitHub Actions.
+Plugin Paper pour le serveur **Larry SMP SMP**, avec monnaie Larry et systèmes communautaires. Le dépôt contient le code source, les ressources, le script Windows et le workflow GitHub Actions.
 
 ## Cible
 - Minecraft Java avec Paper 26.3 / Java 25.
@@ -17,14 +17,14 @@ Plugin Paper pour le serveur **Larpers Coin SMP**, avec monnaie LPC et systèmes
 
 ## Pack réseau prêt à générer (Velocity + Lobby + SMP)
 
-Le workflow **Package reseau complet Larpers Coin (Velocity + Lobby + SMP)** produit un ZIP séparé avec:
+Le workflow **Package reseau complet Larry SMP (Velocity + Lobby + SMP)** produit un ZIP séparé avec:
 - Velocity public sur TCP 25565.
 - Lobby Paper privé sur 127.0.0.1:25566.
 - SMP Paper privé sur 127.0.0.1:25567.
 - Geyser + Floodgate sur Velocity, Floodgate sur les backends.
 - Clé de forwarding Velocity, scripts Windows de démarrage, configuration Bedrock et ouverture du pare-feu.
 
-Dans GitHub, ouvre **Actions** puis **Package reseau complet Larpers Coin (Velocity + Lobby + SMP)** et télécharge l'artefact `LarpersCoin-Network`. Suis impérativement `LISEZ-MOI.txt` et exécute `CONFIGURER-RESEAU.bat` après le premier démarrage de Velocity. Les ports backend 25566/25567 ne doivent jamais être exposés à Internet.
+Dans GitHub, ouvre **Actions** puis **Package reseau complet Larry SMP (Velocity + Lobby + SMP)** et télécharge l'artefact `LarpersCoin-Network`. Suis impérativement `LISEZ-MOI.txt` et exécute `CONFIGURER-RESEAU.bat` après le premier démarrage de Velocity. Les ports backend 25566/25567 ne doivent jamais être exposés à Internet.
 
 Le pack est un déploiement initial: accepte l'EULA toi-même, configure la redirection des ports du routeur et teste une connexion Java premium, Java non premium et Bedrock avant l'ouverture publique.
 
@@ -42,7 +42,7 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/bounty <joueur> <montant>` — prime payée au joueur qui élimine la cible.
 - `/eco give|take|set <joueur> <montant>` — administration.
 - `/lottery` — menu graphique pour tous: jackpot, nombre de tickets et achat de tickets.
-- `/lottery buy <nombre>` — choisir le nombre de tickets (1 à 1 000) à 50 LPC chacun; le menu propose un achat personnalisé.
+- `/lottery buy <nombre>` — choisir le nombre de tickets (1 à 1 000) à 50 Larry chacun; le menu propose un achat personnalisé.
 - `/lottery start [minutes]` — démarrer une loterie (1 à 1440 minutes), réservé aux administrateurs; annonce globale dans le chat et bannière dans la liste des joueurs.
 - `/lottery draw` — terminer et tirer immédiatement, réservé aux administrateurs.
 
@@ -54,12 +54,12 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 - `/clan bank [deposit|withdraw <montant>]`.
 - `/clan allies request|accept|remove <clan>` — alliances bilatérales.
 - `/clan role <joueur> <officer|member>` — rôle d'officier ou membre.
-- `/clan chest` — coffre partagé du clan (1 emplacement au départ); `/clan chest upgrade` augmente sa capacité contre des LPC.
+- `/clan chest` — coffre partagé du clan (1 emplacement au départ); `/clan chest upgrade` augmente sa capacité contre des Larry.
 - `/clan top`, `/clan leaderboard`.
 
 ### Activités et commerce
 - `/quests` ouvre le menu des objectifs; `/quests claim`, `/quests weekly`, `/quests weekly claim` — objectifs automatiques quotidiens et hebdomadaires.
-- `/top` — ouvre un menu de classements LPC (fortunes, clans et primes).
+- `/top` — ouvre un menu de classements Larry (fortunes, clans et primes).
 - `/ah` ou `/ah list` — hôtel des ventes graphique persistant avec barre de recherche (clic sur la boussole, puis saisie dans le chat), filtre vendeur/objet et bouton pour effacer la recherche.
 - `/ah search <objet|vendeur>` et `/ah search clear` — recherche directe; `/ah sell <prix>`, `/ah buy <id>` — gestion des annonces.
 - `/trade <joueur>`, `/trade accept`, `/trade item`, `/trade money <montant>`, `/trade confirm`, `/trade cancel` — échange avec double confirmation.
@@ -91,7 +91,7 @@ Onglet **Actions** → workflow **Build LarpersCoin**. L'artefact s'appelle `Lar
 Les soldes sont dans `plugins/LarpersCoin/data.yml`; clans, quêtes, coffre partagé et hôtel des ventes sont dans `plugins/LarpersCoin/features.yml`.
 
 ## État et limites à connaître
-Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et hôtel des ventes ont une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Les menus LPC utilisent une bordure commune et des recherches par chat compatibles avec Bedrock. Le menu primes et la recherche AH sont ajoutés dans la version 1.0.2. La version 1.0.3 ajoute le menu de loterie administrable et les préfixes de rang dans le chat et le tab. Geyser/Floodgate sont empaquetés automatiquement; les connexions Bedrock et hors-ligne doivent encore être testées sur le serveur réel.
+Ce dépôt reste en développement et ne doit pas encore être considéré comme prêt pour la production. Les échanges, quêtes, niveaux/rôles de clans et hôtel des ventes ont une première implémentation côté code, mais les tests automatisés et les essais sur un vrai serveur Paper 26.3 ne sont pas encore confirmés. Les menus Larry utilisent une bordure commune et des recherches par chat compatibles avec Bedrock. Le menu primes et la recherche AH sont ajoutés dans la version 1.0.2. La version 1.0.3 ajoute le menu de loterie administrable et les préfixes de rang dans le chat et le tab. Geyser/Floodgate sont empaquetés automatiquement; les connexions Bedrock et hors-ligne doivent encore être testées sur le serveur réel.
 
 Consulter [docs/STATUS.md](docs/STATUS.md) pour le suivi des fonctions, [docs/CONFIGURATION.md](docs/CONFIGURATION.md) pour les permissions et [CHANGELOG.txt](CHANGELOG.txt) pour les changements de la version 1.0.0.
 
