@@ -1,6 +1,6 @@
 # Permissions anti-triche
 
-L'anti-triche LPC distingue deux niveaux d'accès :
+L'anti-triche Larry distingue deux niveaux d'accès :
 
 - **Administrateur** : accès complet à `/ac`, y compris `/ac reset <joueur>` et `/ac reload`.
 - **Modérateur** : consultation avec `/ac status`, `/ac alerts`, `/ac info <joueur>`, `/ac top` et `/ac log`. Un modérateur ne peut ni réinitialiser les violations ni recharger la configuration.
