@@ -105,7 +105,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         seedQuizQuestion("faces","Combien de faces possède un bloc standard?","6",List.of("4","6","8"));
         seedQuizQuestion("creeper","Quel mob explose près du joueur?","creeper",List.of("creeper","zombie","squelette"));
         save();
-        for (String cmd : List.of("clan","quest","quests","top","admin","vanish","invsee","freeze","staffchat","ah","trade")) {
+        for (String cmd : List.of("clan","quest","quests","succes","top","admin","vanish","invsee","freeze","staffchat","ah","trade")) {
             PluginCommand c = plugin.getCommand(cmd);
             if (c != null) { c.setExecutor(this); c.setTabCompleter(this); }
         }
@@ -388,6 +388,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             switch (c) {
                 case "clan" -> { return clan(sender,a); }
                 case "quest", "quests" -> { return quests(sender,a); }
+                case "succes" -> { Player p=player(sender); if(p!=null)openAchievementMenu(p); return true; }
                 case "top" -> { Player p=player(sender); if(p!=null)openTopMenu(p); return true; }
                 case "admin" -> { return adminCommand(sender,a); }
                 case "vanish" -> {
@@ -699,6 +700,104 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         addClanXp(p,1);
         saveSoon();
     }
+
+    private String achievementPath(Player p) { return "achievements."+id(p); }
+    private long achievementStat(Player p,String stat) {
+        return Math.max(0L,db.getLong(achievementPath(p)+".stats."+stat,0L));
+    }
+    private void addAchievementProgress(Player p,String stat,long amount) {
+        String path=achievementPath(p)+".stats."+stat;
+        db.set(path,Math.max(0L,db.getLong(path,0L)+amount));
+        checkAchievements(p);
+        saveSoon();
+    }
+    private boolean achievementClaimed(Player p,String key) {
+        return db.getBoolean(achievementPath(p)+".claimed."+key,false);
+    }
+    private void unlockAchievement(Player p,String key,String label,double money,Material rewardMaterial,int rewardAmount) {
+        if(achievementClaimed(p,key)) return;
+        db.set(achievementPath(p)+".claimed."+key,true);
+        if(money>0 && Double.isFinite(core.balance(p.getUniqueId())+money)) {
+            give(p,money);
+            core.recordTransaction("ACHIEVEMENT_"+key.toUpperCase(Locale.ROOT),new UUID(0L,0L),p.getUniqueId(),money);
+            msg(p,ChatColor.GOLD+"Succès débloqué: "+label+" — +"+money+" Larry!");
+        } else if(rewardMaterial!=null && rewardAmount>0) {
+            ItemStack reward=new ItemStack(rewardMaterial,rewardAmount);
+            Map<Integer,ItemStack> leftovers=p.getInventory().addItem(reward);
+            leftovers.values().forEach(item->p.getWorld().dropItemNaturally(p.getLocation(),item));
+            msg(p,ChatColor.GOLD+"Succès débloqué: "+label+" — récompense: "+rewardAmount+" "+rewardMaterial.name()+"!");
+        } else {
+            msg(p,ChatColor.GOLD+"Succès débloqué: "+label+"!");
+        }
+        saveSoon();
+    }
+    private void checkAchievements(Player p) {
+        long kills=achievementStat(p,"monster-kills");
+        long blocks=achievementStat(p,"blocks-mined");
+        long fish=achievementStat(p,"fish-caught");
+        long chunks=achievementStat(p,"chunks-cleared");
+        if(kills>=1000) unlockAchievement(p,"hunter_1","Chasseur",5000,null,0);
+        if(kills>=10000) unlockAchievement(p,"hunter_2","Chasseur légendaire",25000,null,0);
+        if(blocks>=10000) unlockAchievement(p,"miner_1","Mineur acharné",2500,null,0);
+        if(blocks>=100000) unlockAchievement(p,"miner_2","Maître mineur",0,Material.DIAMOND_BLOCK,1);
+        if(fish>=500) unlockAchievement(p,"fisher","Pêcheur expert",0,Material.DIAMOND,16);
+        if(chunks>=10) unlockAchievement(p,"chunk_master","Dévoreur de chunks",0,Material.NETHERITE_INGOT,5);
+    }
+    private boolean isAchievementColumnCleared(org.bukkit.World world,int x,int z) {
+        for(int y=world.getMinHeight()+1;y<world.getMaxHeight();y++) {
+            var block=world.getBlockAt(x,y,z);
+            if(block.getType()==Material.BEDROCK || block.getType().isAir()) continue;
+            String loc=world.getUID()+":"+x+":"+y+":"+z;
+            if(playerPlacedBlocks.contains(loc)) continue;
+            return false;
+        }
+        return true;
+    }
+    private void checkMinedColumn(Player p,org.bukkit.World world,int x,int z) {
+        if(!isAchievementColumnCleared(world,x,z)) return;
+        String chunkKey=world.getUID()+":"+Math.floorDiv(x,16)+":"+Math.floorDiv(z,16);
+        String path=achievementPath(p)+".chunk-columns."+chunkKey;
+        List<String> columns=db.getStringList(path);
+        String columnKey=Math.floorMod(x,16)+":"+Math.floorMod(z,16);
+        if(!columns.contains(columnKey)) {
+            columns.add(columnKey);
+            db.set(path,columns);
+            if(columns.size()>=256) {
+                String completedPath=achievementPath(p)+".completed-chunks";
+                List<String> completed=db.getStringList(completedPath);
+                if(!completed.contains(chunkKey)) {
+                    completed.add(chunkKey);
+                    db.set(completedPath,completed);
+                    db.set(achievementPath(p)+".stats.chunks-cleared",completed.size());
+                    checkAchievements(p);
+                    msg(p,ChatColor.GREEN+"Chunk entièrement miné! Progression: "+completed.size()+"/10.");
+                }
+            }
+            saveSoon();
+        }
+    }
+    private ItemStack achievementItem(Player p,Material icon,String key,String name,String stat,long goal,String reward) {
+        long progress=stat.equals("chunks-cleared")?achievementStat(p,stat):achievementStat(p,stat);
+        boolean done=achievementClaimed(p,key);
+        return item(done?Material.LIME_STAINED_GLASS_PANE:icon,
+            (done?ChatColor.GREEN+"✓ ":ChatColor.YELLOW)+name,
+            "Progression: "+Math.min(progress,goal)+"/"+goal,
+            done?"Succès terminé et récompense reçue.":"Récompense: "+reward,
+            "Les récompenses sont données automatiquement.");
+    }
+    private void openAchievementMenu(Player p) {
+        Inventory inv=Bukkit.createInventory(null,27,"Larry | Succès");
+        inv.setItem(10,achievementItem(p,Material.ZOMBIE_HEAD,"hunter_1","Chasseur","monster-kills",1000,"5 000 Larry"));
+        inv.setItem(11,achievementItem(p,Material.WITHER_SKELETON_SKULL,"hunter_2","Chasseur légendaire","monster-kills",10000,"25 000 Larry"));
+        inv.setItem(12,achievementItem(p,Material.IRON_PICKAXE,"miner_1","Mineur acharné","blocks-mined",10000,"2 500 Larry"));
+        inv.setItem(14,achievementItem(p,Material.DIAMOND_PICKAXE,"miner_2","Maître mineur","blocks-mined",100000,"1 bloc de diamant"));
+        inv.setItem(15,achievementItem(p,Material.FISHING_ROD,"fisher","Pêcheur expert","fish-caught",500,"16 diamants"));
+        inv.setItem(16,achievementItem(p,Material.DIAMOND_ORE,"chunk_master","Dévoreur de chunks","chunks-cleared",10,"5 lingots de Netherite"));
+        inv.setItem(22,item(Material.SUNFLOWER,"Actualiser","Mettre à jour ta progression."));
+        inv.setItem(26,item(Material.BARRIER,"Fermer"));
+        LpcMenuTheme.frame(inv);
+        p.openInventory(inv);
+    }
     private void addClanXp(Player p,int amount) {
         String clan=clanOf(p.getUniqueId());
         if(clan==null) return;
@@ -767,14 +866,25 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             progressQuest(p,"crops");
         } else if(!b.getType().isAir() && b.getType()!=Material.BEDROCK) {
             progressQuest(p,"blocks");
+            addAchievementProgress(p,"blocks-mined",1);
+            if(b.getY()<=b.getWorld().getMinHeight()+5) {
+                org.bukkit.World world=b.getWorld();int x=b.getX(),z=b.getZ();
+                Bukkit.getScheduler().runTask(plugin,()->checkMinedColumn(p,world,x,z));
+            }
         }
     }
     @EventHandler public void onQuestMobKill(EntityDeathEvent e) {
         Player killer=e.getEntity().getKiller();
-        if(killer!=null) progressQuest(killer,"kills");
+        if(killer!=null) {
+            progressQuest(killer,"kills");
+            if(e.getEntity() instanceof org.bukkit.entity.Monster) addAchievementProgress(killer,"monster-kills",1);
+        }
     }
     @EventHandler public void onQuestFish(PlayerFishEvent e) {
-        if(e.getState()==PlayerFishEvent.State.CAUGHT_FISH) progressQuest(e.getPlayer(),"fish");
+        if(e.getState()==PlayerFishEvent.State.CAUGHT_FISH) {
+            progressQuest(e.getPlayer(),"fish");
+            addAchievementProgress(e.getPlayer(),"fish-caught",1);
+        }
     }
     private void openQuiz(Player p,String question,String[] choices) {
         Inventory inv=Bukkit.createInventory(null,27,"Larry | Quiz");
@@ -924,6 +1034,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             int level=Math.max(1,db.getInt(clanPath(clan)+".chest-level",1));
             int unlocked=Math.max(1,Math.min(54,level==1?1:(level-1)*9));
             if(e.getRawSlot()>=unlocked){e.setCancelled(true);if(e.getWhoClicked() instanceof Player p)msg(p,"Emplacement verrouillé. Utilise /clan chest upgrade.");}
+            return;
+        }
+        if(title.equals("Larry | Succès")) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player viewer)) return;
+            if(e.getRawSlot()==26) { viewer.closeInventory(); return; }
+            if(e.getRawSlot()==22) { openAchievementMenu(viewer); return; }
             return;
         }
         if(title.equals("Larry | Classements")) {
