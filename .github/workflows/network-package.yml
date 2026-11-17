@@ -358,13 +358,325 @@ jobs:
               exit /b 1
             )
           )
-          start "Larry Lobby" cmd /k "cd /d ""%~dp0Lobby"" && java -Xms512M -Xmx1G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
+          start "Larry Lobby" cmd /k "cd /d ""%~dp0Lobby"" && java -Dlarpers.server=Lobby -Xms512M -Xmx1G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
           timeout /t 8 /nobreak >nul
-          start "Larry SMP" cmd /k "cd /d ""%~dp0SMP"" && java -Xms1G -Xmx4G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
+          start "Larry SMP" cmd /k "cd /d ""%~dp0SMP"" && java -Dlarpers.server=SMP -Xms1G -Xmx4G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
           timeout /t 8 /nobreak >nul
           start "Larry Velocity" cmd /k "cd /d ""%~dp0Velocity"" && java -Xms512M -Xmx1G -jar velocity.jar"
           echo Reseau demarre. Les joueurs se connectent sur le port Java 25565.
           echo Bedrock: port UDP 19132 apres configuration Geyser.
+          pause
+          EOF
+
+          # Redemarrage individuel et arret propre par la console du serveur.
+          cat > "$ROOT/REDEMARRER-SERVEUR.ps1" <<'EOF'
+          param([Parameter(Mandatory=$true)][ValidateSet("Lobby","SMP")][string]$Server)
+          $ErrorActionPreference = "Stop"
+          $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+          $serverDir = Join-Path $root $Server
+          if (-not (Test-Path (Join-Path $serverDir "paper.jar"))) { Write-Host "$Server : paper.jar introuvable."; exit 1 }
+          if (-not (Select-String -Path (Join-Path $serverDir "eula.txt") -Pattern '^\s*eula=true\s*          @echo off
+          cd /d "%~dp0Velocity"
+          where java >nul 2>nul
+          if errorlevel 1 (echo Java 25 est requis.& pause & exit /b 1)
+          if not exist "velocity.jar" (echo velocity.jar introuvable.& pause & exit /b 1)
+          echo Premier lancement: attends que Velocity genere les fichiers de Geyser et Floodgate.
+          echo Quand Velocity est pret, tape CTRL+C dans cette fenetre pour l'arreter.
+          java -Xms512M -Xmx1G -jar velocity.jar
+          pause
+          EOF
+
+          cat > "$ROOT/CONFIGURER-BEDROCK.bat" <<'EOF'
+          @echo off
+          cd /d "%~dp0Velocity"
+          if not exist "plugins\Geyser-Velocity\config.yml" (
+            echo Lance Velocity une fois, puis ferme-le avec CTRL+C.
+            pause
+            exit /b 1
+          )
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='plugins\Geyser-Velocity\config.yml'; $s=Get-Content -Raw $p; $s=[regex]::Replace($s,'(?m)^(\s*auth-type\s*:\s*)[^\r\n]+','$1floodgate'); $s=[regex]::Replace($s,'(?m)^(\s*transport\s*:\s*)[^\r\n]+','$1nethernet'); Set-Content -Path $p -Value $s -Encoding utf8"
+          if errorlevel 1 (echo Echec de configuration Geyser.& pause & exit /b 1)
+          echo Geyser configure: Floodgate + NetherNet. Ouvre TCP et UDP 19132.
+          pause
+          EOF
+
+          cat > "$ROOT/CONFIGURER-RESEAU.bat" <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          set "FGKEY=%~dp0Velocity\plugins\floodgate\key.pem"
+          if not exist "%FGKEY%" (
+            echo Cle Floodgate introuvable.
+            echo Demarre Velocity une fois, puis ferme-le proprement.
+            pause
+            exit /b 1
+          )
+          for %%S in (Lobby SMP) do (
+            if not exist "%%S\plugins\floodgate" mkdir "%%S\plugins\floodgate"
+            copy /Y "%FGKEY%" "%%S\plugins\floodgate\key.pem" >nul
+          )
+          echo.
+          echo Cle Floodgate partagee avec Lobby et SMP.
+          echo L'authentification des joueurs est geree par LarpersCoin.
+          echo Redemarre Lobby, SMP puis Velocity.
+          pause
+          EOF
+
+          cat > "$ROOT/CONFIGURER-LES-GROUPES.bat" <<'EOF'
+          @echo off
+          echo Entre ces commandes dans la console du SMP, sans slash:
+          echo.
+          echo lp creategroup admin
+          echo lp group admin permission set larpers.admin true
+          echo lp group admin permission set larpers.staff true
+          echo lp group admin permission set larpers.anticheat.use true
+          echo lp group admin permission set larpers.anticheat.alerts true
+          echo lp group admin permission set grim.alerts true
+          echo.
+          echo lp creategroup moderator
+          echo lp group moderator permission set larpers.staff true
+          echo lp group moderator permission set larpers.anticheat.mod true
+          echo lp group moderator permission set larpers.anticheat.use true
+          echo lp group moderator permission set larpers.anticheat.alerts true
+          echo lp group moderator permission set grim.alerts true
+          echo.
+          echo lp user PSEUDO parent set admin
+          echo lp user PSEUDO parent set moderator
+          echo Remplace PSEUDO par le pseudo exact. Ne donne admin qu'aux personnes de confiance.
+          pause
+          EOF
+
+          cat > "$ROOT/OUVRIR-PORTS-WINDOWS.bat" <<'EOF'
+          @echo off
+          net session >nul 2>&1
+          if errorlevel 1 (echo Execute ce fichier en administrateur.& pause & exit /b 1)
+          netsh advfirewall firewall add rule name="Larpers Java Velocity TCP 25565" dir=in action=allow protocol=TCP localport=25565
+          netsh advfirewall firewall add rule name="Larpers Bedrock TCP 19132" dir=in action=allow protocol=TCP localport=19132
+          netsh advfirewall firewall add rule name="Larpers Bedrock UDP 19132" dir=in action=allow protocol=UDP localport=19132
+          echo Pare-feu Windows configure. Redirige aussi ces ports sur ton routeur.
+          echo N'ouvre JAMAIS les ports backend 25566 et 25567 sur Internet.
+          pause
+          EOF
+
+          cat > "$ROOT/LISEZ-MOI.txt" <<'EOF'
+          LARRY SMP - RESEAU COMPLET
+          =============================
+          Contenu:
+          - Velocity proxy: port public Java 25565
+          - Lobby Paper separe: 127.0.0.1:25566 (authentification uniquement: /register et /login)
+          - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
+          - Geyser + Floodgate installes sur Velocity, Floodgate aussi sur Lobby et SMP pour reconnaitre les joueurs Bedrock
+          - Authentification des joueurs geree par LarpersCoin; Floodgate identifie les joueurs Bedrock
+          - Apres authentification, transfert automatique vers le SMP
+          - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend
+          - Geyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login
+          - Backend Paper lie a Velocity avec forwarding moderne et secret prive
+
+          INSTALLATION:
+          1. Installer Java 25.
+          2. Lire https://aka.ms/MinecraftEULA et accepter l'EULA dans Lobby/eula.txt et SMP/eula.txt.
+          3. Lancer DEMARRER-VELOCITY-INITIAL.bat une seule fois; attendre la generation des fichiers, puis arreter Velocity avec CTRL+C.
+          4. Lancer CONFIGURER-RESEAU.bat pour partager la cle Floodgate sur Lobby/SMP.
+          5. Lancer CONFIGURER-BEDROCK.bat (auth-type floodgate + transport nethernet).
+          6. Lancer START-NETWORK.bat: il demarre Lobby, SMP, puis Velocity.
+          7. Lancer OUVRIR-PORTS-WINDOWS.bat en administrateur; rediriger TCP 25565 et TCP+UDP 19132 sur le routeur.
+          8. Les ports 25566 et 25567 restent locaux: ne pas les exposer sur Internet.
+          9. Execute CONFIGURER-LES-GROUPES.bat et attribue les groupes depuis la console SMP.
+          10. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
+
+          IMPORTANT:
+          - Garde le forwarding moderne et le secret prive identiques sur les deux Paper. Le mode online-mode du proxy et celui de proxies.velocity.online-mode dans Paper doivent rester false pour ce mode mixte.
+          - Bedrock doit passer par Geyser auth-type floodgate + NetherNet; la meme cle Floodgate doit etre partagee avec les deux backends.
+          - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
+          - Ne change pas online-mode du proxy et ne rends jamais les ports backend publics.
+          - GrimAC est configure pour alerter et journaliser uniquement: aucun kick/ban automatique.
+          - Les permissions grim.alerts sont proposees aux groupes admin et moderator.
+          - Dashboard web: http://127.0.0.1 sur la machine SMP (port 8765 si le port 80 est occupé); jeton dans SMP/plugins/LarpersCoin/web-admin.yml.
+          - La console web execute des commandes avec les droits console: protege le jeton et passe par HTTPS si tu l'exposes via un reverse proxy.
+          - Les mondes et donnees existants ne sont pas inclus: ce ZIP est un paquet serveur propre.
+          - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
+          EOF
+
+      - name: Creer le ZIP reseau
+        run: |
+          cd package
+          zip -qr ../LarrySMP-Network.zip LarrySMP-Network
+
+      - name: Publier le ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: LarrySMP-Network
+          path: LarrySMP-Network.zip
+          if-no-files-found: error
+          retention-days: 90
+ -Quiet)) { Write-Host "EULA non acceptee pour $Server."; exit 1 }
+          $marker = "-Dlarpers.server=$Server"
+          $running = @(Get-CimInstance Win32_Process | Where-Object { $_.Name -match '^javaw?\.exe          @echo off
+          cd /d "%~dp0Velocity"
+          where java >nul 2>nul
+          if errorlevel 1 (echo Java 25 est requis.& pause & exit /b 1)
+          if not exist "velocity.jar" (echo velocity.jar introuvable.& pause & exit /b 1)
+          echo Premier lancement: attends que Velocity genere les fichiers de Geyser et Floodgate.
+          echo Quand Velocity est pret, tape CTRL+C dans cette fenetre pour l'arreter.
+          java -Xms512M -Xmx1G -jar velocity.jar
+          pause
+          EOF
+
+          cat > "$ROOT/CONFIGURER-BEDROCK.bat" <<'EOF'
+          @echo off
+          cd /d "%~dp0Velocity"
+          if not exist "plugins\Geyser-Velocity\config.yml" (
+            echo Lance Velocity une fois, puis ferme-le avec CTRL+C.
+            pause
+            exit /b 1
+          )
+          powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='plugins\Geyser-Velocity\config.yml'; $s=Get-Content -Raw $p; $s=[regex]::Replace($s,'(?m)^(\s*auth-type\s*:\s*)[^\r\n]+','$1floodgate'); $s=[regex]::Replace($s,'(?m)^(\s*transport\s*:\s*)[^\r\n]+','$1nethernet'); Set-Content -Path $p -Value $s -Encoding utf8"
+          if errorlevel 1 (echo Echec de configuration Geyser.& pause & exit /b 1)
+          echo Geyser configure: Floodgate + NetherNet. Ouvre TCP et UDP 19132.
+          pause
+          EOF
+
+          cat > "$ROOT/CONFIGURER-RESEAU.bat" <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          set "FGKEY=%~dp0Velocity\plugins\floodgate\key.pem"
+          if not exist "%FGKEY%" (
+            echo Cle Floodgate introuvable.
+            echo Demarre Velocity une fois, puis ferme-le proprement.
+            pause
+            exit /b 1
+          )
+          for %%S in (Lobby SMP) do (
+            if not exist "%%S\plugins\floodgate" mkdir "%%S\plugins\floodgate"
+            copy /Y "%FGKEY%" "%%S\plugins\floodgate\key.pem" >nul
+          )
+          echo.
+          echo Cle Floodgate partagee avec Lobby et SMP.
+          echo L'authentification des joueurs est geree par LarpersCoin.
+          echo Redemarre Lobby, SMP puis Velocity.
+          pause
+          EOF
+
+          cat > "$ROOT/CONFIGURER-LES-GROUPES.bat" <<'EOF'
+          @echo off
+          echo Entre ces commandes dans la console du SMP, sans slash:
+          echo.
+          echo lp creategroup admin
+          echo lp group admin permission set larpers.admin true
+          echo lp group admin permission set larpers.staff true
+          echo lp group admin permission set larpers.anticheat.use true
+          echo lp group admin permission set larpers.anticheat.alerts true
+          echo lp group admin permission set grim.alerts true
+          echo.
+          echo lp creategroup moderator
+          echo lp group moderator permission set larpers.staff true
+          echo lp group moderator permission set larpers.anticheat.mod true
+          echo lp group moderator permission set larpers.anticheat.use true
+          echo lp group moderator permission set larpers.anticheat.alerts true
+          echo lp group moderator permission set grim.alerts true
+          echo.
+          echo lp user PSEUDO parent set admin
+          echo lp user PSEUDO parent set moderator
+          echo Remplace PSEUDO par le pseudo exact. Ne donne admin qu'aux personnes de confiance.
+          pause
+          EOF
+
+          cat > "$ROOT/OUVRIR-PORTS-WINDOWS.bat" <<'EOF'
+          @echo off
+          net session >nul 2>&1
+          if errorlevel 1 (echo Execute ce fichier en administrateur.& pause & exit /b 1)
+          netsh advfirewall firewall add rule name="Larpers Java Velocity TCP 25565" dir=in action=allow protocol=TCP localport=25565
+          netsh advfirewall firewall add rule name="Larpers Bedrock TCP 19132" dir=in action=allow protocol=TCP localport=19132
+          netsh advfirewall firewall add rule name="Larpers Bedrock UDP 19132" dir=in action=allow protocol=UDP localport=19132
+          echo Pare-feu Windows configure. Redirige aussi ces ports sur ton routeur.
+          echo N'ouvre JAMAIS les ports backend 25566 et 25567 sur Internet.
+          pause
+          EOF
+
+          cat > "$ROOT/LISEZ-MOI.txt" <<'EOF'
+          LARRY SMP - RESEAU COMPLET
+          =============================
+          Contenu:
+          - Velocity proxy: port public Java 25565
+          - Lobby Paper separe: 127.0.0.1:25566 (authentification uniquement: /register et /login)
+          - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
+          - Geyser + Floodgate installes sur Velocity, Floodgate aussi sur Lobby et SMP pour reconnaitre les joueurs Bedrock
+          - Authentification des joueurs geree par LarpersCoin; Floodgate identifie les joueurs Bedrock
+          - Apres authentification, transfert automatique vers le SMP
+          - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend
+          - Geyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login
+          - Backend Paper lie a Velocity avec forwarding moderne et secret prive
+
+          INSTALLATION:
+          1. Installer Java 25.
+          2. Lire https://aka.ms/MinecraftEULA et accepter l'EULA dans Lobby/eula.txt et SMP/eula.txt.
+          3. Lancer DEMARRER-VELOCITY-INITIAL.bat une seule fois; attendre la generation des fichiers, puis arreter Velocity avec CTRL+C.
+          4. Lancer CONFIGURER-RESEAU.bat pour partager la cle Floodgate sur Lobby/SMP.
+          5. Lancer CONFIGURER-BEDROCK.bat (auth-type floodgate + transport nethernet).
+          6. Lancer START-NETWORK.bat: il demarre Lobby, SMP, puis Velocity.
+          7. Lancer OUVRIR-PORTS-WINDOWS.bat en administrateur; rediriger TCP 25565 et TCP+UDP 19132 sur le routeur.
+          8. Les ports 25566 et 25567 restent locaux: ne pas les exposer sur Internet.
+          9. Execute CONFIGURER-LES-GROUPES.bat et attribue les groupes depuis la console SMP.
+          10. Dans Velocity, le lobby est le serveur d'arrivee; ajoute ensuite un NPC/portail/menu pour envoyer les joueurs au SMP.
+
+          IMPORTANT:
+          - Garde le forwarding moderne et le secret prive identiques sur les deux Paper. Le mode online-mode du proxy et celui de proxies.velocity.online-mode dans Paper doivent rester false pour ce mode mixte.
+          - Bedrock doit passer par Geyser auth-type floodgate + NetherNet; la meme cle Floodgate doit etre partagee avec les deux backends.
+          - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
+          - Ne change pas online-mode du proxy et ne rends jamais les ports backend publics.
+          - GrimAC est configure pour alerter et journaliser uniquement: aucun kick/ban automatique.
+          - Les permissions grim.alerts sont proposees aux groupes admin et moderator.
+          - Dashboard web: http://127.0.0.1 sur la machine SMP (port 8765 si le port 80 est occupé); jeton dans SMP/plugins/LarpersCoin/web-admin.yml.
+          - La console web execute des commandes avec les droits console: protege le jeton et passe par HTTPS si tu l'exposes via un reverse proxy.
+          - Les mondes et donnees existants ne sont pas inclus: ce ZIP est un paquet serveur propre.
+          - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
+          EOF
+
+      - name: Creer le ZIP reseau
+        run: |
+          cd package
+          zip -qr ../LarrySMP-Network.zip LarrySMP-Network
+
+      - name: Publier le ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: LarrySMP-Network
+          path: LarrySMP-Network.zip
+          if-no-files-found: error
+          retention-days: 90
+ -and $_.CommandLine -and $_.CommandLine.Contains($marker) })
+          if ($running.Count -gt 1) { Write-Host "Plusieurs processus $Server detectes; annulation."; exit 1 }
+          if ($running.Count -eq 1) {
+            $shell = New-Object -ComObject WScript.Shell
+            if (-not $shell.AppActivate("Larry $Server")) { Write-Host "Console Larry $Server introuvable. Laisse sa fenetre ouverte et reessaie."; exit 1 }
+            Start-Sleep -Milliseconds 500
+            $shell.SendKeys("stop{ENTER}")
+            Write-Host "Arret propre demande; attente (maximum 120 secondes)... "
+            $pidToWait = [int]$running[0].ProcessId
+            $deadline = (Get-Date).AddSeconds(120)
+            do { Start-Sleep -Seconds 2; $stillRunning = Get-Process -Id $pidToWait -ErrorAction SilentlyContinue } while ($stillRunning -and (Get-Date) -lt $deadline)
+            if ($stillRunning) { Write-Host "Arret non confirme. Aucun redemarrage force."; exit 1 }
+          } else { Write-Host "$Server est deja arrete; demarrage..." }
+          if ($Server -eq "Lobby") { $javaArgs = "-Dlarpers.server=Lobby -Xms512M -Xmx1G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui" }
+          else { $javaArgs = "-Dlarpers.server=SMP -Xms1G -Xmx4G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui" }
+          Start-Process -FilePath $env:ComSpec -WorkingDirectory $serverDir -ArgumentList @("/k", "title Larry $Server && java $javaArgs")
+          Write-Host "$Server relance. Velocity et l’autre serveur ne sont pas modifies."
+          EOF
+
+          cat > "$ROOT/REDEMARRER-LOBBY.bat" <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          where java >nul 2>nul
+          if errorlevel 1 (echo Java 25 est requis.& pause & exit /b 1)
+          powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0REDEMARRER-SERVEUR.ps1" -Server Lobby
+          pause
+          EOF
+
+          cat > "$ROOT/REDEMARRER-SMP.bat" <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          where java >nul 2>nul
+          if errorlevel 1 (echo Java 25 est requis.& pause & exit /b 1)
+          powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0REDEMARRER-SERVEUR.ps1" -Server SMP
           pause
           EOF
 
