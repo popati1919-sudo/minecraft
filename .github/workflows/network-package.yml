@@ -396,7 +396,24 @@ jobs:
           Write-Host "$Server relance. Velocity et l’autre serveur restent actifs."
           EOF
 
-          cat > "$ROOT/REDEMARRER-LOBBY.bat" <<'EOF'
+          cat > "$ROOT/REDEMARRER.bat" <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          title Larry SMP - Redemarrage
+          echo.
+          echo ===== REDEMARRER UN SERVEUR =====
+          echo 1. Lobby
+          echo 2. SMP
+          echo 0. Quitter
+          echo.
+          choice /c 120 /n /m "Choisis le serveur a redemarrer : "
+          if errorlevel 3 exit /b 0
+          if errorlevel 2 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0REDEMARRER-SERVEUR.ps1" -Server SMP
+          if errorlevel 1 if not errorlevel 2 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0REDEMARRER-SERVEUR.ps1" -Server Lobby
+          pause
+          EOF
+
+                    cat > "$ROOT/REDEMARRER-LOBBY.bat" <<'EOF'
           @echo off
           cd /d "%~dp0"
           where java >nul 2>nul
