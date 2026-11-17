@@ -240,14 +240,30 @@ final class LarpersWebDashboard {
                 java.util.concurrent.CompletableFuture<List<String>> result = new java.util.concurrent.CompletableFuture<>();
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     try {
-                        Object raw = Bukkit.getServer().getClass().getMethod("tabCompleteCommand", String.class)
-                                .invoke(Bukkit.getServer(), completionInput);
+                        // Utilise la CommandMap Bukkit/Paper: elle connait les commandes vanilla
+                        // ET celles des plugins, y compris les suggestions d'arguments.
+                        Object commandMap = Bukkit.getServer().getClass().getMethod("getCommandMap")
+                                .invoke(Bukkit.getServer());
+                        Object raw = commandMap.getClass()
+                                .getMethod("tabComplete", org.bukkit.command.CommandSender.class, String.class)
+                                .invoke(commandMap, Bukkit.getConsoleSender(), completionInput);
                         if (raw instanceof List<?> values) {
-                            result.complete(values.stream().filter(String.class::isInstance).map(String.class::cast).limit(30).toList());
+                            result.complete(values.stream().filter(String.class::isInstance)
+                                    .map(String.class::cast).distinct().limit(30).toList());
                         } else result.complete(List.of());
                     } catch (Throwable error) {
-                        result.complete(List.of("list", "tps", "plugins", "version", "whitelist list", "save-all")
-                                .stream().filter(x -> x.startsWith(completionInput)).toList());
+                        try {
+                            // Compatibilité avec les implémentations qui exposent cette méthode.
+                            Object raw = Bukkit.getServer().getClass().getMethod("tabCompleteCommand", String.class)
+                                    .invoke(Bukkit.getServer(), completionInput);
+                            if (raw instanceof List<?> values) {
+                                result.complete(values.stream().filter(String.class::isInstance)
+                                        .map(String.class::cast).distinct().limit(30).toList());
+                            } else result.complete(List.of());
+                        } catch (Throwable ignored) {
+                            result.complete(List.of("list", "tps", "plugins", "version", "whitelist list", "save-all")
+                                    .stream().filter(x -> x.startsWith(completionInput)).toList());
+                        }
                     }
                 });
                 try {
@@ -460,6 +476,17 @@ $('grimAlerts').innerHTML=(d.grimAlerts||[]).sort((a,b)=>b.count-a.count).map(a=
 async function getSuggestions(){let q=$('consoleCommand').value.trim();if(!q){$('suggestions').innerHTML='';return}try{let r=await api('/api/suggest?q='+encodeURIComponent(q));let d=await r.json();$('suggestions').innerHTML=(d.suggestions||[]).slice(0,15).map(x=>'<button type="button" data-suggestion="'+esc(x)+'">'+esc(x)+'</button>').join('')}catch(e){$('suggestions').innerHTML=''}}
 $('consoleCommand').addEventListener('input',getSuggestions);
 $('suggestions').addEventListener('click',e=>{let b=e.target.closest('button[data-suggestion]');if(b){$('consoleCommand').value=b.dataset.suggestion;$('consoleCommand').focus();getSuggestions()}});
+// Tab applique la première suggestion, comme dans une console Minecraft.
+$('consoleCommand').addEventListener('keydown',async e=>{
+ if(e.key==='Tab'){
+  e.preventDefault();
+  let buttons=$('suggestions').querySelectorAll('button[data-suggestion]');
+  if(buttons.length){$('consoleCommand').value=buttons[0].dataset.suggestion;getSuggestions();return}
+  await getSuggestions();
+  buttons=$('suggestions').querySelectorAll('button[data-suggestion]');
+  if(buttons.length)$('consoleCommand').value=buttons[0].dataset.suggestion;
+ }
+});
 $('players').addEventListener('click',e=>{let b=e.target.closest('button[data-player]');if(b)viewPlayer(b.dataset.player)});
 $('inspectButton').addEventListener('click',()=>viewPlayer($('inspectName').value));
 async function viewPlayer(name){name=String(name||'').trim();if(!name)return;$('inspectName').value=name;$('playerError').textContent='Chargement…';$('playerDetails').innerHTML='';try{let r=await api('/api/player?name='+encodeURIComponent(name));let d=await r.json();if(!r.ok)throw Error(d.error||'Impossible de charger le joueur');$('playerError').textContent='';let minutes=Math.floor(d.playTicks/20/60),hours=Math.floor(minutes/60);let stats=[['Vie',d.health+'/'+d.maxHealth],['Nourriture',d.food+'/20'],['Niveau',d.level],['XP',d.xp],['Ping',d.ping+' ms'],['Temps joué',hours+' h '+(minutes%60)+' min'],['Morts',d.deaths],['Kills joueurs',d.playerKills],['Kills mobs',d.mobKills],['Mode',d.gameMode],['Monde',d.world],['Position',d.x+', '+d.y+', '+d.z]];let item=x=>'<div class="slot"><b>'+esc(x.name)+'</b>'+esc(x.type)+' × '+x.amount+'</div>';$('playerDetails').innerHTML='<h3>'+esc(d.name)+'</h3><div class="statgrid">'+stats.map(x=>'<div class="stat"><small>'+x[0]+'</small><strong>'+esc(x[1])+'</strong></div>').join('')+'</div><h3>Inventaire</h3><div id="inventoryGrid">'+(d.inventory.map(item).join('')||'<p>Inventaire vide</p>')+'</div><h3>Armure</h3><div id="inventoryGrid">'+(d.armor.map(item).join('')||'<p>Aucune armure</p>')+'</div><h3>Main secondaire</h3>'+(d.offhand?item(d.offhand):'<p>Vide</p>');}catch(e){$('playerError').textContent=e.message}}
