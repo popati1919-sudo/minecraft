@@ -50,6 +50,9 @@ commands:
     description: Menu des succès et récompenses
     aliases: [success]
     usage: /succes
+  check:
+    description: Affiche la progression du chunk Overworld actuel
+    usage: /check
   admin:
     description: Menu graphique d'administration
     permission: larpers.admin
