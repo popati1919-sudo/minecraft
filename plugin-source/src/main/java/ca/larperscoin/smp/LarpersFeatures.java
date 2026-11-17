@@ -831,8 +831,15 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private List<String> achievementCategories() { return List.of("Mineur","Fermier","PvP","Chasseur","Divers"); }
     private void checkAchievements(Player p) {
         for(String category:achievementCategories()) for(List<AchievementTier> lane:achievementLanes(category))
-            for(AchievementTier tier:lane) if(achievementStat(p,tier.stat())>=tier.goal())
-                unlockAchievement(p,tier.key(),tier.name(),"PROGRESSION",tier.reward(),null,0);
+            for(AchievementTier tier:lane) if(achievementStat(p,tier.stat())>=tier.goal()) {
+                String rarity="PROGRESSION";
+                if(tier.goal()>=1000000 || tier.key().equals("dragon_25")
+                        || tier.key().equals("wither_50") || tier.key().equals("overworld_biomes_3")
+                        || tier.key().equals("nether_biomes_3")) rarity="MYTHIQUE";
+                else if(tier.goal()>=500000 || tier.key().equals("dragon_10")
+                        || tier.key().equals("wither_25")) rarity="EXTRÊME";
+                unlockAchievement(p,tier.key(),tier.name(),rarity,tier.reward(),null,0);
+            }
     }
     private boolean hasNoMineableBlocksBelow(org.bukkit.World world,int x,int y,int z) {
         for(int scan=world.getMinHeight()+1;scan<y;scan++) {
@@ -905,7 +912,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private void openAchievementCategory(Player p,String category) {
         List<List<AchievementTier>> lanes=achievementLanes(category);
         Inventory inv=Bukkit.createInventory(null,27,"Larry | "+category);
-        int[] slots={11,15,22};
+        int[] slots={10,12,14,16,22};
         for(int i=0;i<lanes.size()&&i<slots.length;i++) inv.setItem(slots[i],achievementLaneItem(p,lanes.get(i)));
         inv.setItem(18,item(Material.ARROW,"Retour","Revenir aux catégories"));
         inv.setItem(26,item(Material.BARRIER,"Fermer"));
