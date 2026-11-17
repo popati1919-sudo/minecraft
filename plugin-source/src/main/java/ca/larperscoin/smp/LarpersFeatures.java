@@ -107,7 +107,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         seedQuizQuestion("faces","Combien de faces possède un bloc standard?","6",List.of("4","6","8"));
         seedQuizQuestion("creeper","Quel mob explose près du joueur?","creeper",List.of("creeper","zombie","squelette"));
         save();
-        for (String cmd : List.of("clan","quest","quests","succes","top","admin","vanish","invsee","freeze","staffchat","ah","trade")) {
+        for (String cmd : List.of("clan","quest","quests","succes","top","admin","vanish","invsee","freeze","staffchat","ah","trade","check")) {
             PluginCommand c = plugin.getCommand(cmd);
             if (c != null) { c.setExecutor(this); c.setTabCompleter(this); }
         }
@@ -384,6 +384,37 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         viewer.openInventory(inv);
     }
 
+    private boolean checkCurrentChunk(Player p) {
+        org.bukkit.World world=p.getWorld();
+        if(world.getEnvironment()!=org.bukkit.World.Environment.NORMAL) {
+            msg(p,"/check fonctionne uniquement dans l'Overworld.");
+            return true;
+        }
+        int cx=p.getLocation().getChunk().getX(),cz=p.getLocation().getChunk().getZ();
+        String key=achievementChunkKey(world,cx,cz);
+        int remaining=0;
+        for(int x=cx*16;x<cx*16+16;x++) for(int z=cz*16;z<cz*16+16;z++)
+            for(int y=world.getMinHeight()+1;y<world.getMaxHeight();y++) {
+                Material type=world.getBlockAt(x,y,z).getType();
+                if(type!=Material.BEDROCK && !type.isAir()) remaining++;
+            }
+        List<String> columns=db.getStringList(achievementPath(p)+".chunk-columns."+key);
+        int creepers=db.getInt("achievement-explosions."+key,0);
+        boolean invalid=db.contains("achievement-invalid-chunks."+key);
+        boolean completed=db.getStringList(achievementPath(p)+".completed-chunks").contains(key);
+        String owner=db.getString("achievement-chunk-owners."+key,"Aucun");
+        msg(p,ChatColor.GOLD+"========== CHECK CHUNK ==========");
+        msg(p,"Monde: Overworld | Chunk: X "+cx+" / Z "+cz);
+        msg(p,"Colonnes terminées: "+Math.min(columns.size(),256)+" / 256");
+        msg(p,"Blocs encore à casser: "+remaining);
+        msg(p,"Explosions de creepers: "+creepers+" / 4");
+        msg(p,"État: "+(invalid?ChatColor.RED+"INVALIDE":completed?ChatColor.GREEN+"TERMINÉ":ChatColor.YELLOW+"VALIDABLE"));
+        if(invalid) msg(p,"Raison: "+db.getString("achievement-invalid-chunks."+key,"Explosion interdite"));
+        msg(p,"Joueur ayant terminé le chunk: "+owner);
+        msg(p,ChatColor.GOLD+"================================");
+        return true;
+    }
+
     @Override public boolean onCommand(CommandSender sender, Command command, String label, String[] a) {
         String c = command.getName().toLowerCase(Locale.ROOT);
         try {
@@ -391,6 +422,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 case "clan" -> { return clan(sender,a); }
                 case "quest", "quests" -> { return quests(sender,a); }
                 case "succes" -> { Player p=player(sender); if(p!=null)openAchievementMenu(p); return true; }
+                case "check" -> { Player p=player(sender); return p!=null && checkCurrentChunk(p); }
                 case "top" -> { Player p=player(sender); if(p!=null)openTopMenu(p); return true; }
                 case "admin" -> { return adminCommand(sender,a); }
                 case "vanish" -> {
@@ -880,6 +912,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     completed.add(chunkKey);
                     db.set(completedPath,completed);
                     db.set(achievementPath(p)+".stats.chunks-cleared",completed.size());
+                    db.set("achievement-chunk-owners."+chunkKey,p.getName());
                     checkAchievements(p);
                     msg(p,ChatColor.GREEN+"Chunk entièrement miné! Progression: "+completed.size()+"/10.");
                 }
