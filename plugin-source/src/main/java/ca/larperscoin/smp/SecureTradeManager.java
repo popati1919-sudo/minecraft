@@ -18,6 +18,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.*;
+import java.util.function.Consumer;
 
 public final class SecureTradeManager implements Listener {
     private static final String PREFIX = ChatColor.GOLD + "[Larry] " + ChatColor.RESET;
@@ -27,6 +28,7 @@ public final class SecureTradeManager implements Listener {
     private static final int[] OTHER_SLOTS = {27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47};
     private final JavaPlugin plugin;
     private final LarpersCoin economy;
+    private final Consumer<UUID> completedTrade;
     private final Map<UUID, UUID> invitations = new HashMap<>();
     private final Map<UUID, Session> sessions = new HashMap<>();
     private final Set<UUID> opening = new HashSet<>();
@@ -43,8 +45,8 @@ public final class SecureTradeManager implements Listener {
         UUID other(UUID id) { return first.equals(id) ? second : first; }
     }
 
-    public SecureTradeManager(JavaPlugin plugin, LarpersCoin economy) {
-        this.plugin=plugin; this.economy=economy;
+    public SecureTradeManager(JavaPlugin plugin, LarpersCoin economy, Consumer<UUID> completedTrade) {
+        this.plugin=plugin; this.economy=economy; this.completedTrade=completedTrade;
         Bukkit.getPluginManager().registerEvents(this,plugin);
     }
     private void msg(CommandSender sender,String message) { sender.sendMessage(PREFIX+message); }
@@ -234,6 +236,8 @@ public final class SecureTradeManager implements Listener {
         closeViews(s);
         msg(a,"Échange terminé avec "+b.getName()+".");
         msg(b,"Échange terminé avec "+a.getName()+".");
+        completedTrade.accept(a.getUniqueId());
+        completedTrade.accept(b.getUniqueId());
     }
     @EventHandler public void onClose(InventoryCloseEvent e) {
         if(!e.getView().getTitle().equals(TITLE)||opening.contains(e.getPlayer().getUniqueId()))return;
