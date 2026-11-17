@@ -806,6 +806,49 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             for(AchievementTier tier:lane) if(achievementStat(p,tier.stat())>=tier.goal())
                 unlockAchievement(p,tier.key(),tier.name(),"PROGRESSION",tier.reward(),null,0);
     }
+    private boolean hasNoMineableBlocksBelow(org.bukkit.World world,int x,int y,int z) {
+        for(int scan=world.getMinHeight()+1;scan<y;scan++) {
+            var block=world.getBlockAt(x,scan,z);
+            if(block.getType()==Material.BEDROCK || block.getType().isAir()) continue;
+            String loc=world.getUID()+":"+x+":"+scan+":"+z;
+            if(playerPlacedBlocks.contains(loc) || db.getBoolean("player-placed-blocks."+loc,false)) continue;
+            return false;
+        }
+        return true;
+    }
+    private boolean isAchievementColumnCleared(org.bukkit.World world,int x,int z) {
+        for(int y=world.getMinHeight()+1;y<world.getMaxHeight();y++) {
+            var block=world.getBlockAt(x,y,z);
+            if(block.getType()==Material.BEDROCK || block.getType().isAir()) continue;
+            String loc=world.getUID()+":"+x+":"+y+":"+z;
+            if(playerPlacedBlocks.contains(loc) || db.getBoolean("player-placed-blocks."+loc,false)) continue;
+            return false;
+        }
+        return true;
+    }
+    private void checkMinedColumn(Player p,org.bukkit.World world,int x,int z) {
+        if(!isAchievementColumnCleared(world,x,z)) return;
+        String chunkKey=world.getUID()+":"+Math.floorDiv(x,16)+":"+Math.floorDiv(z,16);
+        String path=achievementPath(p)+".chunk-columns."+chunkKey;
+        List<String> columns=db.getStringList(path);
+        String columnKey=Math.floorMod(x,16)+":"+Math.floorMod(z,16);
+        if(!columns.contains(columnKey)) {
+            columns.add(columnKey);
+            db.set(path,columns);
+            if(columns.size()>=256) {
+                String completedPath=achievementPath(p)+".completed-chunks";
+                List<String> completed=db.getStringList(completedPath);
+                if(!completed.contains(chunkKey)) {
+                    completed.add(chunkKey);
+                    db.set(completedPath,completed);
+                    db.set(achievementPath(p)+".stats.chunks-cleared",completed.size());
+                    checkAchievements(p);
+                    msg(p,ChatColor.GREEN+"Chunk entièrement miné! Progression: "+completed.size()+"/10.");
+                }
+            }
+            saveSoon();
+        }
+    }
     private ItemStack achievementLaneItem(Player p,List<AchievementTier> lane) {
         AchievementTier next=null;
         for(AchievementTier tier:lane) if(!achievementClaimed(p,tier.key())) { next=tier; break; }
@@ -895,7 +938,10 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
 
     @EventHandler public void onQuestBlockPlace(BlockPlaceEvent e) {
         var b=e.getBlockPlaced();
-        playerPlacedBlocks.add(b.getWorld().getUID()+":"+b.getX()+":"+b.getY()+":"+b.getZ());
+        String loc=b.getWorld().getUID()+":"+b.getX()+":"+b.getY()+":"+b.getZ();
+        playerPlacedBlocks.add(loc);
+        db.set("player-placed-blocks."+loc,true);
+        saveSoon();
     }
     @EventHandler public void onCreeperExplosion(EntityExplodeEvent e) {
         if(!(e.getEntity() instanceof org.bukkit.entity.Creeper)) return;
@@ -926,16 +972,23 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(p.getGameMode()==org.bukkit.GameMode.CREATIVE) return;
         var b=e.getBlock();
         String loc=b.getWorld().getUID()+":"+b.getX()+":"+b.getY()+":"+b.getZ();
-        if(playerPlacedBlocks.remove(loc)) return;
+        if(playerPlacedBlocks.remove(loc) || db.getBoolean("player-placed-blocks."+loc,false)) {
+            db.set("player-placed-blocks."+loc,null);
+            saveSoon();
+            return;
+        }
         if(b.getBlockData() instanceof Ageable age && age.getAge()>=age.getMaximumAge()) {
             progressQuest(p,"crops");
             addAchievementProgress(p,"farm-crops",1);
         } else if(!b.getType().isAir() && b.getType()!=Material.BEDROCK) {
             progressQuest(p,"blocks");
-            addAchievementProgress(p,"blocks-mined",1);
-            if(b.getY()<=b.getWorld().getMinHeight()+5 || hasNoMineableBlocksBelow(b.getWorld(),b.getX(),b.getY(),b.getZ())) {
-                org.bukkit.World world=b.getWorld();int x=b.getX(),z=b.getZ();
-                Bukkit.getScheduler().runTask(plugin,()->checkMinedColumn(p,world,x,z));
+            boolean usedPickaxe=p.getInventory().getItemInMainHand().getType().name().endsWith("_PICKAXE");
+            if(usedPickaxe) {
+                addAchievementProgress(p,"blocks-mined",1);
+                if(b.getY()<=b.getWorld().getMinHeight()+5 || hasNoMineableBlocksBelow(b.getWorld(),b.getX(),b.getY(),b.getZ())) {
+                    org.bukkit.World world=b.getWorld();int x=b.getX(),z=b.getZ();
+                    Bukkit.getScheduler().runTask(plugin,()->checkMinedColumn(p,world,x,z));
+                }
             }
         }
     }
