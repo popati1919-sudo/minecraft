@@ -782,12 +782,16 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     new AchievementTier("miner_blocks_4","Mineur expérimenté","blocks-mined",1000,100,Material.GOLDEN_PICKAXE),
                     new AchievementTier("miner_blocks_5","Mineur expert","blocks-mined",5000,250,Material.DIAMOND_PICKAXE),
                     new AchievementTier("miner_blocks_6","Maître mineur","blocks-mined",10000,500,Material.NETHERITE_PICKAXE),
-                    new AchievementTier("miner_blocks_7","Mineur légendaire","blocks-mined",50000,1000,Material.NETHERITE_PICKAXE)
+                    new AchievementTier("miner_blocks_7","Mineur légendaire","blocks-mined",50000,1000,Material.NETHERITE_PICKAXE),
+                    new AchievementTier("miner_blocks_8","Seigneur des profondeurs","blocks-mined",100000,1500,Material.NETHERITE_PICKAXE),
+                    new AchievementTier("miner_blocks_9","Maître absolu de la pioche","blocks-mined",250000,2500,Material.NETHERITE_PICKAXE)
                 ),
                 List.of(
                     new AchievementTier("miner_chunks_1","Premier chunk","chunks-cleared",1,50,Material.DEEPSLATE),
                     new AchievementTier("miner_chunks_2","Explorateur souterrain","chunks-cleared",3,150,Material.DIAMOND_ORE),
-                    new AchievementTier("miner_chunks_3","Dévoreur de chunks","chunks-cleared",10,500,Material.ANCIENT_DEBRIS)
+                    new AchievementTier("miner_chunks_3","Dévoreur de chunks","chunks-cleared",10,500,Material.ANCIENT_DEBRIS),
+                    new AchievementTier("miner_chunks_4","Conquérant du sous-sol","chunks-cleared",25,1000,Material.DIAMOND_BLOCK),
+                    new AchievementTier("miner_chunks_5","Légende des territoires","chunks-cleared",50,2000,Material.NETHERITE_BLOCK)
                 )
             );
             case "Fermier" -> List.of(List.of(
@@ -798,7 +802,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 new AchievementTier("farm_5","Fermier confirmé","farm-crops",5000,200,Material.SUGAR_CANE),
                 new AchievementTier("farm_6","Maître des récoltes","farm-crops",25000,350,Material.MELON),
                 new AchievementTier("farm_7","Empire agricole","farm-crops",100000,750,Material.GOLDEN_CARROT),
-                new AchievementTier("farm_8","Dieu de l'agriculture","farm-crops",500000,1000,Material.GOLDEN_APPLE)
+                new AchievementTier("farm_8","Dieu de l'agriculture","farm-crops",500000,1000,Material.GOLDEN_APPLE),
+                new AchievementTier("farm_9","Empereur des récoltes","farm-crops",1000000,1500,Material.GOLDEN_CARROT),
+                new AchievementTier("farm_10","Jardinier mythique","farm-crops",2000000,2500,Material.ENCHANTED_GOLDEN_APPLE)
             ));
             case "PvP" -> List.of(List.of(
                 new AchievementTier("pvp_1","Premier duel","player-kills",1,10,Material.WOODEN_SWORD),
@@ -806,7 +812,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 new AchievementTier("pvp_3","Guerrier","player-kills",10,50,Material.IRON_SWORD),
                 new AchievementTier("pvp_4","Champion","player-kills",25,100,Material.DIAMOND_SWORD),
                 new AchievementTier("pvp_5","Maître du PvP","player-kills",50,250,Material.NETHERITE_SWORD),
-                new AchievementTier("pvp_6","Légende du PvP","player-kills",100,500,Material.NETHERITE_SWORD)
+                new AchievementTier("pvp_6","Légende du PvP","player-kills",100,500,Material.NETHERITE_SWORD),
+                new AchievementTier("pvp_7","Champion des arènes","player-kills",250,1000,Material.NETHERITE_AXE),
+                new AchievementTier("pvp_8","Mythe du combat","player-kills",500,2000,Material.TRIDENT)
             ));
             case "Chasseur" -> List.of(
                 List.of(
@@ -817,21 +825,27 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     new AchievementTier("hunter_5","Chasseur légendaire","monster-kills",1000,250,Material.WITHER_SKELETON_SKULL),
                     new AchievementTier("hunter_6","Terreur des monstres","monster-kills",5000,750,Material.NETHER_STAR),
                     new AchievementTier("hunter_7","Fléau des créatures","monster-kills",500000,1000,Material.NETHER_STAR),
-                    new AchievementTier("hunter_8","Extinction contrôlée","monster-kills",2000000,1000,Material.NETHER_STAR)
+                    new AchievementTier("hunter_8","Extinction contrôlée","monster-kills",2000000,1000,Material.NETHER_STAR),
+                    new AchievementTier("hunter_9","Fléau légendaire","monster-kills",3000000,1500,Material.NETHER_STAR),
+                    new AchievementTier("hunter_10","Éradicateur mythique","monster-kills",5000000,2500,Material.NETHER_STAR)
                 ),
                 List.of(
                     new AchievementTier("wither_1","Premier Wither","wither-kills",1,100,Material.NETHER_STAR),
                     new AchievementTier("wither_5","Chasseur de Withers","wither-kills",5,250,Material.NETHER_STAR),
                     new AchievementTier("wither_10","Terreur du Wither","wither-kills",10,500,Material.NETHER_STAR),
                     new AchievementTier("wither_25","Briseur de Withers","wither-kills",25,750,Material.NETHER_STAR),
-                    new AchievementTier("wither_50","Légende du Wither","wither-kills",50,1000,Material.NETHER_STAR)
+                    new AchievementTier("wither_50","Légende du Wither","wither-kills",50,1000,Material.NETHER_STAR),
+                    new AchievementTier("wither_75","Fléau des Withers","wither-kills",75,1500,Material.NETHER_STAR),
+                    new AchievementTier("wither_100","Roi des Withers","wither-kills",100,2500,Material.NETHER_STAR)
                 ),
                 List.of(
                     new AchievementTier("dragon_1","Premier dragon","dragon-kills",1,150,Material.DRAGON_EGG),
                     new AchievementTier("dragon_3","Tueur de dragons","dragon-kills",3,300,Material.DRAGON_HEAD),
                     new AchievementTier("dragon_5","Chasseur draconique","dragon-kills",5,500,Material.DRAGON_BREATH),
                     new AchievementTier("dragon_10","Dominateur de l'End","dragon-kills",10,750,Material.END_CRYSTAL),
-                    new AchievementTier("dragon_25","Légende des dragons","dragon-kills",25,1000,Material.DRAGON_EGG)
+                    new AchievementTier("dragon_25","Légende des dragons","dragon-kills",25,1000,Material.DRAGON_EGG),
+                    new AchievementTier("dragon_50","Terreur draconique","dragon-kills",50,1500,Material.DRAGON_HEAD),
+                    new AchievementTier("dragon_100","Maître de l'End","dragon-kills",100,2500,Material.DRAGON_EGG)
                 )
             );
             case "Divers" -> List.of(
@@ -840,21 +854,29 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     new AchievementTier("misc_fish_2","Pêcheur débutant","fish-caught",10,25,Material.SALMON),
                     new AchievementTier("misc_fish_3","Pêcheur confirmé","fish-caught",50,50,Material.TROPICAL_FISH),
                     new AchievementTier("misc_fish_4","Pêcheur expert","fish-caught",100,100,Material.PUFFERFISH),
-                    new AchievementTier("misc_fish_5","Maître pêcheur","fish-caught",500,250,Material.FISHING_ROD)
+                    new AchievementTier("misc_fish_5","Maître pêcheur","fish-caught",500,250,Material.FISHING_ROD),
+                    new AchievementTier("misc_fish_6","Légende des océans","fish-caught",2000,500,Material.FISHING_ROD),
+                    new AchievementTier("misc_fish_7","Seigneur des mers","fish-caught",10000,1000,Material.NAUTILUS_SHELL)
                 ),
                 List.of(
                     new AchievementTier("misc_chunks_1","Premier territoire","chunks-cleared",1,25,Material.MAP),
-                    new AchievementTier("misc_chunks_2","Cartographe","chunks-cleared",5,100,Material.FILLED_MAP)
+                    new AchievementTier("misc_chunks_2","Cartographe","chunks-cleared",5,100,Material.FILLED_MAP),
+                    new AchievementTier("misc_chunks_3","Grand arpenteur","chunks-cleared",15,300,Material.MAP),
+                    new AchievementTier("misc_chunks_4","Atlas des territoires","chunks-cleared",30,750,Material.FILLED_MAP)
                 ),
                 List.of(
                     new AchievementTier("overworld_biomes_1","Voyageur de l'Overworld","overworld-biomes",10,100,Material.GRASS_BLOCK),
                     new AchievementTier("overworld_biomes_2","Grand explorateur","overworld-biomes",25,250,Material.COMPASS),
-                    new AchievementTier("overworld_biomes_3","Atlas vivant","overworld-biomes",53,1000,Material.FILLED_MAP)
+                    new AchievementTier("overworld_biomes_3","Atlas vivant","overworld-biomes",53,1000,Material.FILLED_MAP),
+                    new AchievementTier("overworld_biomes_4","Voyageur légendaire","overworld-biomes",60,1500,Material.FILLED_MAP),
+                    new AchievementTier("overworld_biomes_5","Maître de tous les paysages","overworld-biomes",65,2500,Material.FILLED_MAP)
                 ),
                 List.of(
                     new AchievementTier("nether_biomes_1","Premier voyage au Nether","nether-biomes",2,100,Material.NETHERRACK),
                     new AchievementTier("nether_biomes_2","Cartographe infernal","nether-biomes",4,300,Material.COMPASS),
-                    new AchievementTier("nether_biomes_3","Tous les biomes du Nether","nether-biomes",5,1000,Material.NETHER_STAR)
+                    new AchievementTier("nether_biomes_3","Tous les biomes du Nether","nether-biomes",5,1000,Material.NETHER_STAR),
+                    new AchievementTier("nether_biomes_4","Explorateur infernal","nether-biomes",6,1500,Material.NETHER_STAR),
+                    new AchievementTier("nether_biomes_5","Seigneur du Nether","nether-biomes",7,2500,Material.NETHER_STAR)
                 )
             );
             default -> List.of();
