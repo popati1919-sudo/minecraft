@@ -8,10 +8,12 @@ import org.bukkit.command.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.*;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.CraftItemEvent;
 import org.bukkit.event.player.*;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.block.data.Ageable;
@@ -94,7 +96,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     public LarpersFeatures(JavaPlugin plugin) {
         this.plugin = plugin;
         this.core = (LarpersCoin) plugin;
-        this.tradeManager = new SecureTradeManager(plugin, core);
+        this.tradeManager = new SecureTradeManager(plugin, core, this::recordTradeCompleted);
         this.chatEvents = new ChatEvents(plugin, core);
         if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
         file = new File(plugin.getDataFolder(), "features.yml");
@@ -879,10 +881,55 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     new AchievementTier("nether_biomes_5","Seigneur du Nether","nether-biomes",7,2500,Material.NETHER_STAR)
                 )
             );
+            case "Constructeur" -> List.of(List.of(
+                new AchievementTier("builder_1","Poseur débutant","blocks-placed",100,10,Material.BRICKS),
+                new AchievementTier("builder_2","Petit bâtisseur","blocks-placed",1000,25,Material.STONE_BRICKS),
+                new AchievementTier("builder_3","Constructeur confirmé","blocks-placed",5000,50,Material.BRICKS),
+                new AchievementTier("builder_4","Maître bâtisseur","blocks-placed",25000,100,Material.QUARTZ_BLOCK),
+                new AchievementTier("builder_5","Architecte","blocks-placed",100000,250,Material.COPPER_BLOCK),
+                new AchievementTier("builder_6","Grand architecte","blocks-placed",250000,500,Material.DIAMOND_BLOCK),
+                new AchievementTier("builder_7","Monument vivant","blocks-placed",500000,1000,Material.NETHERITE_BLOCK)
+            ));
+            case "Alchimiste" -> List.of(List.of(
+                new AchievementTier("alchemist_1","Première potion","potions-used",1,10,Material.POTION),
+                new AchievementTier("alchemist_2","Apprenti alchimiste","potions-used",25,25,Material.BREWING_STAND),
+                new AchievementTier("alchemist_3","Potionneur","potions-used",100,50,Material.SPLASH_POTION),
+                new AchievementTier("alchemist_4","Alchimiste confirmé","potions-used",500,100,Material.LINGERING_POTION),
+                new AchievementTier("alchemist_5","Maître des potions","potions-used",2000,250,Material.GHAST_TEAR),
+                new AchievementTier("alchemist_6","Grand alchimiste","potions-used",5000,500,Material.BLAZE_POWDER),
+                new AchievementTier("alchemist_7","Légende alchimique","potions-used",10000,1000,Material.DRAGON_BREATH)
+            ));
+            case "Aventurier" -> List.of(List.of(
+                new AchievementTier("adventurer_1","Premier pas","distance-traveled",1000,10,Material.LEATHER_BOOTS),
+                new AchievementTier("adventurer_2","Marcheur","distance-traveled",5000,25,Material.COMPASS),
+                new AchievementTier("adventurer_3","Voyageur","distance-traveled",25000,50,Material.MAP),
+                new AchievementTier("adventurer_4","Randonneur","distance-traveled",100000,100,Material.FILLED_MAP),
+                new AchievementTier("adventurer_5","Explorateur","distance-traveled",250000,250,Material.ENDER_EYE),
+                new AchievementTier("adventurer_6","Globe-trotter","distance-traveled",500000,500,Material.ELYTRA),
+                new AchievementTier("adventurer_7","Légende des chemins","distance-traveled",1000000,1000,Material.NETHER_STAR)
+            ));
+            case "Collectionneur" -> List.of(List.of(
+                new AchievementTier("collector_1","Premier objet","unique-items",10,10,Material.CHEST),
+                new AchievementTier("collector_2","Petit collectionneur","unique-items",25,25,Material.BARREL),
+                new AchievementTier("collector_3","Collectionneur","unique-items",50,50,Material.SHULKER_BOX),
+                new AchievementTier("collector_4","Collection complète","unique-items",100,100,Material.ENDER_CHEST),
+                new AchievementTier("collector_5","Curateur","unique-items",150,250,Material.DIAMOND),
+                new AchievementTier("collector_6","Conservateur","unique-items",200,500,Material.EMERALD_BLOCK),
+                new AchievementTier("collector_7","Musée vivant","unique-items",250,1000,Material.NETHER_STAR)
+            ));
+            case "Marchand" -> List.of(List.of(
+                new AchievementTier("merchant_1","Premier échange","trades-completed",1,10,Material.EMERALD),
+                new AchievementTier("merchant_2","Petit commerçant","trades-completed",5,25,Material.GOLD_INGOT),
+                new AchievementTier("merchant_3","Marchand","trades-completed",25,50,Material.BARREL),
+                new AchievementTier("merchant_4","Négociateur","trades-completed",100,100,Material.GOLD_BLOCK),
+                new AchievementTier("merchant_5","Commerçant confirmé","trades-completed",250,250,Material.EMERALD_BLOCK),
+                new AchievementTier("merchant_6","Grand marchand","trades-completed",500,500,Material.DIAMOND_BLOCK),
+                new AchievementTier("merchant_7","Magnat du commerce","trades-completed",1000,1000,Material.NETHERITE_INGOT)
+            ));
             default -> List.of();
         };
     }
-    private List<String> achievementCategories() { return List.of("Mineur","Fermier","PvP","Chasseur","Divers"); }
+    private List<String> achievementCategories() { return List.of("Mineur","Fermier","PvP","Chasseur","Divers","Constructeur","Alchimiste","Aventurier","Collectionneur","Marchand"); }
     private void checkAchievements(Player p) {
         for(String category:achievementCategories()) for(List<AchievementTier> lane:achievementLanes(category))
             for(AchievementTier tier:lane) if(achievementStat(p,tier.stat())>=tier.goal()) {
@@ -954,13 +1001,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             "Après validation, ce succès sera remplacé ici par le suivant.");
     }
     private void openAchievementMenu(Player p) {
-        Inventory inv=Bukkit.createInventory(null,27,"Larry | Succès");
-        inv.setItem(10,item(Material.IRON_PICKAXE,"Mineur","Blocs minés et chunks terminés"));
-        inv.setItem(12,item(Material.WHEAT,"Fermier","Récoltes et agriculture"));
-        inv.setItem(14,item(Material.DIAMOND_SWORD,"PvP","Victoires contre des joueurs"));
-        inv.setItem(16,item(Material.ZOMBIE_HEAD,"Chasseur","Monstres vaincus"));
-        inv.setItem(22,item(Material.NETHER_STAR,"Divers","Pêche, exploration et autres défis"));
-        inv.setItem(26,item(Material.BARRIER,"Fermer"));
+        Inventory inv=Bukkit.createInventory(null,54,"Larry | Succès");
+        String[] categories={"Mineur","Fermier","PvP","Chasseur","Divers","Constructeur","Alchimiste","Aventurier","Collectionneur","Marchand"};
+        Material[] icons={Material.IRON_PICKAXE,Material.WHEAT,Material.DIAMOND_SWORD,Material.ZOMBIE_HEAD,Material.NETHER_STAR,
+            Material.BRICKS,Material.BREWING_STAND,Material.COMPASS,Material.CHEST,Material.EMERALD};
+        int[] slots={10,12,14,16,28,30,32,34,20,24};
+        for(int i=0;i<categories.length;i++) inv.setItem(slots[i],item(icons[i],categories[i],"Voir les 7 paliers de cette catégorie"));
+        inv.setItem(49,item(Material.BARRIER,"Fermer"));
         LpcMenuTheme.frame(inv);
         p.openInventory(inv);
     }
@@ -1034,6 +1081,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         String loc=b.getWorld().getUID()+":"+b.getX()+":"+b.getY()+":"+b.getZ();
         playerPlacedBlocks.add(loc);
         db.set("player-placed-blocks."+loc,true);
+        addAchievementProgress(e.getPlayer(),"blocks-placed",1);
         saveSoon();
     }
     private String achievementChunkKey(org.bukkit.World world,int chunkX,int chunkZ) {
@@ -1149,6 +1197,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 && e.getFrom().getBlockY()==e.getTo().getBlockY()
                 && e.getFrom().getBlockZ()==e.getTo().getBlockZ()) return;
         Player p=e.getPlayer();
+        if(e.getFrom().getWorld().equals(e.getTo().getWorld())) {
+            int dx=e.getTo().getBlockX()-e.getFrom().getBlockX();
+            int dy=e.getTo().getBlockY()-e.getFrom().getBlockY();
+            int dz=e.getTo().getBlockZ()-e.getFrom().getBlockZ();
+            long distance=Math.round(Math.sqrt((double)dx*dx+(double)dy*dy+(double)dz*dz));
+            if(distance>0) addAchievementProgress(p,"distance-traveled",distance);
+        }
         org.bukkit.World.Environment env=e.getTo().getWorld().getEnvironment();
         String stat;
         if(env==org.bukkit.World.Environment.NORMAL) stat="overworld-biomes";
@@ -1163,6 +1218,43 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             db.set(achievementPath(p)+".stats."+stat,discovered.size());
             checkAchievements(p);
             saveSoon();
+        }
+    }
+    @EventHandler public void onPotionUsed(PlayerItemConsumeEvent e) {
+        Material type=e.getItem().getType();
+        if(type==Material.POTION || type==Material.SPLASH_POTION || type==Material.LINGERING_POTION)
+            addAchievementProgress(e.getPlayer(),"potions-used",1);
+    }
+    private void recordCollection(Player p) {
+        if(p==null) return;
+        String path=achievementPath(p)+".collected-materials";
+        Set<String> collected=new HashSet<>(db.getStringList(path));
+        for(ItemStack stack:p.getInventory().getContents()) {
+            if(stack!=null && !stack.getType().isAir()) collected.add(stack.getType().name());
+        }
+        if(collected.size()!=db.getStringList(path).size()) {
+            db.set(path,new ArrayList<>(collected));
+            db.set(achievementPath(p)+".stats.unique-items",collected.size());
+            checkAchievements(p);
+            saveSoon();
+        }
+    }
+    @EventHandler public void onItemPickup(EntityPickupItemEvent e) {
+        if(e.getEntity() instanceof Player p)
+            Bukkit.getScheduler().runTask(plugin,()->recordCollection(p));
+    }
+    @EventHandler public void onItemCraft(CraftItemEvent e) {
+        if(e.getWhoClicked() instanceof Player p)
+            Bukkit.getScheduler().runTask(plugin,()->recordCollection(p));
+    }
+    @EventHandler public void onPlayerJoinCollection(PlayerJoinEvent e) {
+        Bukkit.getScheduler().runTask(plugin,()->recordCollection(e.getPlayer()));
+    }
+    private void recordTradeCompleted(UUID playerId) {
+        Player p=Bukkit.getPlayer(playerId);
+        if(p!=null) {
+            addAchievementProgress(p,"trades-completed",1);
+            recordCollection(p);
         }
     }
     @EventHandler public void onQuestFish(PlayerFishEvent e) {
@@ -1324,15 +1416,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(title.equals("Larry | Succès")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player viewer)) return;
-            String category=switch(e.getRawSlot()) {
-                case 10 -> "Mineur";
-                case 12 -> "Fermier";
-                case 14 -> "PvP";
-                case 16 -> "Chasseur";
-                case 22 -> "Divers";
-                default -> null;
-            };
-            if(e.getRawSlot()==26) viewer.closeInventory();
+            int[] slots={10,12,14,16,28,30,32,34,20,24};
+            List<String> categories=achievementCategories();
+            String category=null;
+            for(int i=0;i<slots.length;i++) if(e.getRawSlot()==slots[i]) category=categories.get(i);
+            if(e.getRawSlot()==49) viewer.closeInventory();
             else if(category!=null) openAchievementCategory(viewer,category);
             return;
         }
