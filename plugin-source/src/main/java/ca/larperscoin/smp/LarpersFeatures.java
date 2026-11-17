@@ -918,13 +918,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 new AchievementTier("collector_7","Musée vivant","unique-items",250,1000,Material.NETHER_STAR)
             ));
             case "Marchand" -> List.of(List.of(
-                new AchievementTier("merchant_1","Premier échange","trades-completed",1,10,Material.EMERALD),
-                new AchievementTier("merchant_2","Petit commerçant","trades-completed",5,25,Material.GOLD_INGOT),
-                new AchievementTier("merchant_3","Marchand","trades-completed",25,50,Material.BARREL),
-                new AchievementTier("merchant_4","Négociateur","trades-completed",100,100,Material.GOLD_BLOCK),
-                new AchievementTier("merchant_5","Commerçant confirmé","trades-completed",250,250,Material.EMERALD_BLOCK),
-                new AchievementTier("merchant_6","Grand marchand","trades-completed",500,500,Material.DIAMOND_BLOCK),
-                new AchievementTier("merchant_7","Magnat du commerce","trades-completed",1000,1000,Material.NETHERITE_INGOT)
+                new AchievementTier("merchant_1","Premier échange","trades-completed",100,10,Material.EMERALD),
+                new AchievementTier("merchant_2","Petit commerçant","trades-completed",500,25,Material.GOLD_INGOT),
+                new AchievementTier("merchant_3","Marchand","trades-completed",2500,50,Material.BARREL),
+                new AchievementTier("merchant_4","Négociateur","trades-completed",10000,100,Material.GOLD_BLOCK),
+                new AchievementTier("merchant_5","Commerçant confirmé","trades-completed",25000,250,Material.EMERALD_BLOCK),
+                new AchievementTier("merchant_6","Grand marchand","trades-completed",50000,500,Material.DIAMOND_BLOCK),
+                new AchievementTier("merchant_7","Magnat du commerce","trades-completed",100000,1000,Material.NETHERITE_INGOT)
             ));
             default -> List.of();
         };
