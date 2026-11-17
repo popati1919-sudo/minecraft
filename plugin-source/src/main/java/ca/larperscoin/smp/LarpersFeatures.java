@@ -990,7 +990,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(allowedChunks.containsKey(key)) continue;
             if(!creeper) {
                 allowedChunks.put(key,false);
-                db.set("achievement-invalid-chunks."+key,e.getEntityType().name());
+                db.set("achievement-invalid-chunks."+key,e.getEntity().getType().name());
                 continue;
             }
             String path="achievement-explosions."+key;
@@ -1017,6 +1017,15 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     checkMinedColumn(online,explosionWorld,column[0],column[1]);
             });
         }
+    }
+
+    @EventHandler public void onBlockExplosion(org.bukkit.event.block.BlockExplodeEvent e) {
+        if(e.blockList().isEmpty()) return;
+        for(var block:e.blockList()) {
+            String key=achievementChunkKey(block.getWorld(),block.getChunk().getX(),block.getChunk().getZ());
+            db.set("achievement-invalid-chunks."+key,"BLOCK_EXPLOSION");
+        }
+        saveSoon();
     }
 
     @EventHandler public void onQuestBlockBreak(BlockBreakEvent e) {
