@@ -473,18 +473,26 @@ async function api(path,opts={}){return fetch(path,{...opts,headers:{'X-Larry-To
 async function connect(){key=$('token').value.trim();try{let r=await api('/api/status');if(!r.ok)throw Error('Jeton invalide ou accès refusé');localStorage.setItem('larry-admin-token',key);$('login').classList.add('hidden');$('app').classList.remove('hidden');refresh()}catch(e){$('loginError').textContent=e.message}}
 async function refresh(){try{let r=await api('/api/status');if(!r.ok)throw Error();let d=await r.json();$('count').textContent=d.onlineCount;$('alertsCount').textContent=d.alerts.length+(d.grimAlerts||[]).reduce((n,a)=>n+a.count,0);
 $('grimAlerts').innerHTML=(d.grimAlerts||[]).sort((a,b)=>b.count-a.count).map(a=>'<li><b>'+esc(a.player)+'</b> — <b>x'+a.count+'</b><br><small>Dernière alerte : '+esc(a.latest)+'</small><details><summary>Voir les 5 dernières</summary>'+a.details.map(x=>'<div>'+esc(x)+'</div>').join('')+'</details></li>').join('')||'<li>Aucune alerte Grim reçue dans le journal pour le moment</li>';$('players').innerHTML=d.online.map(p=>'<li><button data-player=\"'+esc(p.name)+'\" class=\"playerPick\">'+esc(p.name)+'</button> — ping '+p.ping+' ms</li>').join('')||'<li>Aucun joueur connecté</li>';$('alerts').innerHTML=d.alerts.map(x=>'<li>'+esc(x)+'</li>').join('')||'<li>Aucune alerte récente</li>';$('violations').innerHTML=d.violations.sort((a,b)=>b.count-a.count).map(x=>'<li>'+esc(x.name)+' — '+x.count+' signalement(s)</li>').join('')||'<li>Aucun joueur signalé</li>';$('consoleOutput').textContent=(d.console||[]).join('\\n')||'Aucune ligne reçue';$('consoleOutput').scrollTop=$('consoleOutput').scrollHeight}catch(e){$('app').classList.add('hidden');$('login').classList.remove('hidden');$('loginError').textContent='Session expirée. Reconnecte-toi.'}}
-async function getSuggestions(){let q=$('consoleCommand').value.trim();if(!q){$('suggestions').innerHTML='';return}try{let r=await api('/api/suggest?q='+encodeURIComponent(q));let d=await r.json();$('suggestions').innerHTML=(d.suggestions||[]).slice(0,15).map(x=>'<button type="button" data-suggestion="'+esc(x)+'">'+esc(x)+'</button>').join('')}catch(e){$('suggestions').innerHTML=''}}
+function applyConsoleSuggestion(suggestion){
+ const input=$('consoleCommand'), value=input.value, split=value.lastIndexOf(' ');
+ const prefix=split>=0?value.slice(0,split+1):'';
+ input.value=prefix+suggestion;
+ input.focus();
+ input.setSelectionRange(input.value.length,input.value.length);
+ getSuggestions();
+}
+async function getSuggestions(){let q=$('consoleCommand').value;if(!q.trim()){$('suggestions').innerHTML='';return}try{let r=await api('/api/suggest?q='+encodeURIComponent(q));let d=await r.json();$('suggestions').innerHTML=(d.suggestions||[]).slice(0,15).map(x=>'<button type="button" data-suggestion="'+esc(x)+'">'+esc(x)+'</button>').join('')}catch(e){$('suggestions').innerHTML=''}}
 $('consoleCommand').addEventListener('input',getSuggestions);
-$('suggestions').addEventListener('click',e=>{let b=e.target.closest('button[data-suggestion]');if(b){$('consoleCommand').value=b.dataset.suggestion;$('consoleCommand').focus();getSuggestions()}});
-// Tab applique la première suggestion, comme dans une console Minecraft.
+$('suggestions').addEventListener('click',e=>{let b=e.target.closest('button[data-suggestion]');if(b)applyConsoleSuggestion(b.dataset.suggestion)});
+// Tab insère la suggestion à la fin de la commande sans effacer les arguments déjà saisis.
 $('consoleCommand').addEventListener('keydown',async e=>{
  if(e.key==='Tab'){
   e.preventDefault();
   let buttons=$('suggestions').querySelectorAll('button[data-suggestion]');
-  if(buttons.length){$('consoleCommand').value=buttons[0].dataset.suggestion;getSuggestions();return}
+  if(buttons.length){applyConsoleSuggestion(buttons[0].dataset.suggestion);return}
   await getSuggestions();
   buttons=$('suggestions').querySelectorAll('button[data-suggestion]');
-  if(buttons.length)$('consoleCommand').value=buttons[0].dataset.suggestion;
+  if(buttons.length)applyConsoleSuggestion(buttons[0].dataset.suggestion);
  }
 });
 $('players').addEventListener('click',e=>{let b=e.target.closest('button[data-player]');if(b)viewPlayer(b.dataset.player)});
