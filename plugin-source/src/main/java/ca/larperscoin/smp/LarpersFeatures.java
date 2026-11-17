@@ -1000,13 +1000,12 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(allowed) db.set(path,used+1);
             else db.set("achievement-invalid-chunks."+key,"CREEPER_LIMIT");
         }
-        e.blockList().removeIf(block -> !allowedChunks.getOrDefault(
-            achievementChunkKey(block.getWorld(),block.getChunk().getX(),block.getChunk().getZ()),false));
+        // L'explosion reste naturelle: on invalide le chunk, sans annuler la destruction.
         Map<String,int[]> affectedColumns=new LinkedHashMap<>();
         org.bukkit.World explosionWorld=e.getLocation().getWorld();
         for(var block:e.blockList()) {
             String loc=block.getWorld().getUID()+":"+block.getX()+":"+block.getY()+":"+block.getZ();
-            db.set("achievement-block-history."+loc,"creeper");
+            if(creeper) db.set("achievement-block-history."+loc,"creeper");
             affectedColumns.put(block.getWorld().getUID()+":"+block.getX()+":"+block.getZ(),
                 new int[]{block.getX(),block.getZ()});
         }
