@@ -72,9 +72,8 @@ final class LarpersWebDashboard {
         String category = classifyGrimCheck(checkName);
         String detail = java.time.LocalTime.now().withNano(0) + " [GRIM] " + name + " | "
                 + category + " | " + checkName + " | " + (verbose == null ? "" : verbose);
+        // Les alertes Grim restent dans leur panneau regroupé; ne pas les dupliquer dans la console web.
         grimAlerts.computeIfAbsent(name, ignored -> new GrimAlertSummary()).add(detail);
-        consoleLines.addLast(detail);
-        while (consoleLines.size() > 400) consoleLines.pollFirst();
     }
 
     LarpersWebDashboard(JavaPlugin plugin, LarpersCoin core) {
@@ -114,6 +113,9 @@ final class LarpersWebDashboard {
                     if (record == null || !isLoggable(record)) return;
                     String message = record.getMessage();
                     if (message == null || message.isBlank()) return;
+                    // Grim peut émettre une ligne par tick/flag. Les événements sont déjà
+                    // conservés dans grimAlerts; ne pas les recopier dans la console temps réel.
+                    if (message.contains("[GRIM]")) return;
                     String line = java.time.LocalTime.now().withNano(0) + " [" + record.getLevel().getName()
                             + "] " + message;
                     consoleLines.addLast(line);
@@ -203,9 +205,12 @@ final class LarpersWebDashboard {
                     return;
                 }
                 // Accepte aussi les termes courants "bois", "wood" et "log" pour le chêne.
-                Matcher legacyLog = Pattern.compile("(?i)^give\\s+(\\S+)\\s+(?:log|wood|bois)\\s+(\\d+)(.*)$").matcher(commandText);
+                Matcher legacyLog = Pattern.compile("(?i)^give\\s+(\\S+)\\s+(?:log|wood|bois)(?:\\s+(\\d+))?(.*)$").matcher(commandText);
                 if (legacyLog.matches()) {
-                    commandText = "give " + legacyLog.group(1) + " minecraft:oak_log " + legacyLog.group(2) + legacyLog.group(3);
+                    String amount = legacyLog.group(1 + 1);
+                    if (amount == null || amount.isBlank()) amount = "1";
+                    String suffix = legacyLog.group(3) == null ? "" : legacyLog.group(3);
+                    commandText = "give " + legacyLog.group(1) + " minecraft:oak_log " + amount + suffix;
                 }
                 final String safeCommand = commandText;
                 try {
