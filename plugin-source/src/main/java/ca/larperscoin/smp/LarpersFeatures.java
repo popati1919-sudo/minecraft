@@ -1785,7 +1785,15 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(c.getName().equalsIgnoreCase("admin")&&a.length==3&&a[0].equalsIgnoreCase("event")&&a[1].equalsIgnoreCase("start"))return List.of("melange","quiz","calcul","reaction");
         if(c.getName().equalsIgnoreCase("admin")&&a.length==2&&a[0].equalsIgnoreCase("reset"))
             return Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
-        if(c.getName().equalsIgnoreCase("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","audit","stats","leaderboard");
+        if(c.getName().equalsIgnoreCase("clan")&&a.length==1)return List.of("create","invite","join","leave","transfer","disband","info","role","bank","top","allies","level","chest","audit","stats","leaderboard").stream().filter(v->v.toLowerCase(Locale.ROOT).startsWith(a[0].toLowerCase(Locale.ROOT))).toList();
+        if(c.getName().equalsIgnoreCase("clan")&&a.length==2&&a[0].equalsIgnoreCase("invite")) {
+            return Bukkit.getOnlinePlayers().stream()
+                    .filter(target->!target.getUniqueId().equals(s instanceof Player player?player.getUniqueId():null))
+                    .filter(target->!db.contains("clan-members."+target.getUniqueId()))
+                    .map(Player::getName)
+                    .filter(name->name.toLowerCase(Locale.ROOT).startsWith(a[1].toLowerCase(Locale.ROOT)))
+                    .sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        }
         if(c.getName().equalsIgnoreCase("ah")&&a.length==1)return List.of("list","search","sell","buy");
         if(c.getName().equalsIgnoreCase("ah")&&a.length==2&&a[0].equalsIgnoreCase("search"))return List.of("clear");
         if(c.getName().equalsIgnoreCase("lottery")&&a.length==2&&a[0].equalsIgnoreCase("buy"))return List.of("1","10","50","100","500","1000");
