@@ -776,14 +776,32 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 new AchievementTier("pvp_5","Maître du PvP","player-kills",50,250,Material.NETHERITE_SWORD),
                 new AchievementTier("pvp_6","Légende du PvP","player-kills",100,500,Material.NETHERITE_SWORD)
             ));
-            case "Chasseur" -> List.of(List.of(
-                new AchievementTier("hunter_1","Premier gibier","monster-kills",10,10,Material.ROTTEN_FLESH),
-                new AchievementTier("hunter_2","Chasseur débutant","monster-kills",50,25,Material.BONE),
-                new AchievementTier("hunter_3","Chasseur confirmé","monster-kills",100,50,Material.ZOMBIE_HEAD),
-                new AchievementTier("hunter_4","Chasseur expert","monster-kills",500,100,Material.SKELETON_SKULL),
-                new AchievementTier("hunter_5","Chasseur légendaire","monster-kills",1000,250,Material.WITHER_SKELETON_SKULL),
-                new AchievementTier("hunter_6","Terreur des monstres","monster-kills",5000,750,Material.NETHER_STAR)
-            ));
+            case "Chasseur" -> List.of(
+                List.of(
+                    new AchievementTier("hunter_1","Premier gibier","monster-kills",10,10,Material.ROTTEN_FLESH),
+                    new AchievementTier("hunter_2","Chasseur débutant","monster-kills",50,25,Material.BONE),
+                    new AchievementTier("hunter_3","Chasseur confirmé","monster-kills",100,50,Material.ZOMBIE_HEAD),
+                    new AchievementTier("hunter_4","Chasseur expert","monster-kills",500,100,Material.SKELETON_SKULL),
+                    new AchievementTier("hunter_5","Chasseur légendaire","monster-kills",1000,250,Material.WITHER_SKELETON_SKULL),
+                    new AchievementTier("hunter_6","Terreur des monstres","monster-kills",5000,750,Material.NETHER_STAR),
+                    new AchievementTier("hunter_7","Fléau des créatures","monster-kills",500000,1000,Material.NETHER_STAR),
+                    new AchievementTier("hunter_8","Extinction contrôlée","monster-kills",2000000,1000,Material.NETHER_STAR)
+                ),
+                List.of(
+                    new AchievementTier("wither_1","Premier Wither","wither-kills",1,100,Material.NETHER_STAR),
+                    new AchievementTier("wither_5","Chasseur de Withers","wither-kills",5,250,Material.NETHER_STAR),
+                    new AchievementTier("wither_10","Terreur du Wither","wither-kills",10,500,Material.NETHER_STAR),
+                    new AchievementTier("wither_25","Briseur de Withers","wither-kills",25,750,Material.NETHER_STAR),
+                    new AchievementTier("wither_50","Légende du Wither","wither-kills",50,1000,Material.NETHER_STAR)
+                ),
+                List.of(
+                    new AchievementTier("dragon_1","Premier dragon","dragon-kills",1,150,Material.DRAGON_EGG),
+                    new AchievementTier("dragon_3","Tueur de dragons","dragon-kills",3,300,Material.DRAGON_HEAD),
+                    new AchievementTier("dragon_5","Chasseur draconique","dragon-kills",5,500,Material.DRAGON_BREATH),
+                    new AchievementTier("dragon_10","Dominateur de l'End","dragon-kills",10,750,Material.END_CRYSTAL),
+                    new AchievementTier("dragon_25","Légende des dragons","dragon-kills",25,1000,Material.DRAGON_EGG)
+                )
+            );
             case "Divers" -> List.of(
                 List.of(
                     new AchievementTier("misc_fish_1","Premier poisson","fish-caught",1,10,Material.COD),
@@ -795,6 +813,16 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 List.of(
                     new AchievementTier("misc_chunks_1","Premier territoire","chunks-cleared",1,25,Material.MAP),
                     new AchievementTier("misc_chunks_2","Cartographe","chunks-cleared",5,100,Material.FILLED_MAP)
+                ),
+                List.of(
+                    new AchievementTier("overworld_biomes_1","Voyageur de l'Overworld","overworld-biomes",10,100,Material.GRASS_BLOCK),
+                    new AchievementTier("overworld_biomes_2","Grand explorateur","overworld-biomes",25,250,Material.COMPASS),
+                    new AchievementTier("overworld_biomes_3","Atlas vivant","overworld-biomes",53,1000,Material.FILLED_MAP)
+                ),
+                List.of(
+                    new AchievementTier("nether_biomes_1","Premier voyage au Nether","nether-biomes",2,100,Material.NETHERRACK),
+                    new AchievementTier("nether_biomes_2","Cartographe infernal","nether-biomes",4,300,Material.COMPASS),
+                    new AchievementTier("nether_biomes_3","Tous les biomes du Nether","nether-biomes",5,1000,Material.NETHER_STAR)
                 )
             );
             default -> List.of();
@@ -811,7 +839,6 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             var block=world.getBlockAt(x,scan,z);
             if(block.getType()==Material.BEDROCK || block.getType().isAir()) continue;
             String loc=world.getUID()+":"+x+":"+scan+":"+z;
-            if(playerPlacedBlocks.contains(loc) || db.getBoolean("player-placed-blocks."+loc,false)) continue;
             return false;
         }
         return true;
@@ -821,7 +848,6 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             var block=world.getBlockAt(x,y,z);
             if(block.getType()==Material.BEDROCK) continue;
             String loc=world.getUID()+":"+x+":"+y+":"+z;
-            if(playerPlacedBlocks.contains(loc) || db.getBoolean("player-placed-blocks."+loc,false)) continue;
             if(!block.getType().isAir()) return false;
             String history=db.getString("achievement-block-history."+loc,"");
             if(!history.isEmpty() && !history.equals("creeper")
@@ -830,8 +856,10 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         return true;
     }
     private void checkMinedColumn(Player p,org.bukkit.World world,int x,int z) {
+        if(world.getEnvironment()!=org.bukkit.World.Environment.NORMAL) return;
+        String chunkKey=achievementChunkKey(world,Math.floorDiv(x,16),Math.floorDiv(z,16));
+        if(db.contains("achievement-invalid-chunks."+chunkKey)) return;
         if(!isAchievementColumnCleared(p,world,x,z)) return;
-        String chunkKey=world.getUID()+":"+Math.floorDiv(x,16)+":"+Math.floorDiv(z,16);
         String path=achievementPath(p)+".chunk-columns."+chunkKey;
         List<String> columns=db.getStringList(path);
         String columnKey=Math.floorMod(x,16)+":"+Math.floorMod(z,16);
@@ -869,7 +897,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         inv.setItem(12,item(Material.WHEAT,"Fermier","Récoltes et agriculture"));
         inv.setItem(14,item(Material.DIAMOND_SWORD,"PvP","Victoires contre des joueurs"));
         inv.setItem(16,item(Material.ZOMBIE_HEAD,"Chasseur","Monstres vaincus"));
-        inv.setItem(22,item(Material.NETHER_STAR,"Divers","Pêche et autres défis"));
+        inv.setItem(22,item(Material.NETHER_STAR,"Divers","Pêche, exploration et autres défis"));
         inv.setItem(26,item(Material.BARRIER,"Fermer"));
         LpcMenuTheme.frame(inv);
         p.openInventory(inv);
@@ -946,21 +974,34 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         db.set("player-placed-blocks."+loc,true);
         saveSoon();
     }
-    @EventHandler public void onCreeperExplosion(EntityExplodeEvent e) {
-        if(!(e.getEntity() instanceof org.bukkit.entity.Creeper)) return;
+    private String achievementChunkKey(org.bukkit.World world,int chunkX,int chunkZ) {
+        return world.getUID()+":"+chunkX+":"+chunkZ;
+    }
+    private void invalidateAchievementChunk(org.bukkit.block.Block block,String reason) {
+        String key=achievementChunkKey(block.getWorld(),block.getChunk().getX(),block.getChunk().getZ());
+        db.set("achievement-invalid-chunks."+key,reason);
+    }
+    @EventHandler public void onAnyExplosion(EntityExplodeEvent e) {
+        if(e.blockList().isEmpty()) return;
+        boolean creeper=e.getEntity() instanceof org.bukkit.entity.Creeper;
         Map<String,Boolean> allowedChunks=new HashMap<>();
         for(var block:e.blockList()) {
-            String chunkKey=block.getWorld().getUID()+":"+block.getChunk().getX()+":"+block.getChunk().getZ();
-            if(allowedChunks.containsKey(chunkKey)) continue;
-            String path="achievement-explosions."+chunkKey;
+            String key=achievementChunkKey(block.getWorld(),block.getChunk().getX(),block.getChunk().getZ());
+            if(allowedChunks.containsKey(key)) continue;
+            if(!creeper) {
+                allowedChunks.put(key,false);
+                db.set("achievement-invalid-chunks."+key,e.getEntityType().name());
+                continue;
+            }
+            String path="achievement-explosions."+key;
             int used=db.getInt(path,0);
             boolean allowed=used<4;
-            allowedChunks.put(chunkKey,allowed);
+            allowedChunks.put(key,allowed);
             if(allowed) db.set(path,used+1);
+            else db.set("achievement-invalid-chunks."+key,"CREEPER_LIMIT");
         }
         e.blockList().removeIf(block -> !allowedChunks.getOrDefault(
-            block.getWorld().getUID()+":"+block.getChunk().getX()+":"+block.getChunk().getZ(),false));
-        if(!allowedChunks.isEmpty()) saveSoon();
+            achievementChunkKey(block.getWorld(),block.getChunk().getX(),block.getChunk().getZ()),false));
         Map<String,int[]> affectedColumns=new LinkedHashMap<>();
         org.bukkit.World explosionWorld=e.getLocation().getWorld();
         for(var block:e.blockList()) {
@@ -969,6 +1010,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             affectedColumns.put(block.getWorld().getUID()+":"+block.getX()+":"+block.getZ(),
                 new int[]{block.getX(),block.getZ()});
         }
+        if(!allowedChunks.isEmpty()) saveSoon();
         if(!affectedColumns.isEmpty()) {
             saveSoon();
             Bukkit.getScheduler().runTask(plugin,()->{
@@ -985,8 +1027,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         String loc=b.getWorld().getUID()+":"+b.getX()+":"+b.getY()+":"+b.getZ();
         if(playerPlacedBlocks.remove(loc) || db.getBoolean("player-placed-blocks."+loc,false)) {
             db.set("player-placed-blocks."+loc,null);
-            saveSoon();
-            return;
+            // Un bloc posé est un bloc supplémentaire à casser: on poursuit son comptage.
         }
         if(b.getBlockData() instanceof Ageable age && age.getAge()>=age.getMaximumAge()) {
             progressQuest(p,"crops");
@@ -1007,14 +1048,51 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onPvpKill(PlayerDeathEvent e) {
         Player killer=e.getEntity().getKiller();
-        if(killer!=null && !killer.getUniqueId().equals(e.getEntity().getUniqueId()))
-            addAchievementProgress(killer,"player-kills",1);
+        Player victim=e.getEntity();
+        if(killer==null || killer.getUniqueId().equals(victim.getUniqueId())) return;
+        String a=killer.getUniqueId().toString(),b=victim.getUniqueId().toString();
+        String pair=a.compareTo(b)<0?a+"|"+b:b+"|"+a;
+        String path="pvp-anti-farm."+pair;
+        long now=System.currentTimeMillis();
+        long previous=db.getLong(path,0L);
+        if(previous>0L && now-previous<24L*60L*60L*1000L) {
+            msg(killer,ChatColor.RED+"Kill PvP non comptabilisé: ce joueur a déjà été tué récemment par toi ou l'inverse.");
+            saveSoon();
+            return;
+        }
+        db.set(path,now);
+        addAchievementProgress(killer,"player-kills",1);
+        saveSoon();
     }
     @EventHandler public void onQuestMobKill(EntityDeathEvent e) {
         Player killer=e.getEntity().getKiller();
         if(killer!=null) {
             progressQuest(killer,"kills");
             if(e.getEntity() instanceof org.bukkit.entity.Monster) addAchievementProgress(killer,"monster-kills",1);
+            if(e.getEntity() instanceof org.bukkit.entity.Wither) addAchievementProgress(killer,"wither-kills",1);
+            if(e.getEntity() instanceof org.bukkit.entity.EnderDragon) addAchievementProgress(killer,"dragon-kills",1);
+        }
+    }
+    @EventHandler(ignoreCancelled=true)
+    public void onExploreBiome(PlayerMoveEvent e) {
+        if(e.getTo()==null || e.getFrom().getBlockX()==e.getTo().getBlockX()
+                && e.getFrom().getBlockY()==e.getTo().getBlockY()
+                && e.getFrom().getBlockZ()==e.getTo().getBlockZ()) return;
+        Player p=e.getPlayer();
+        org.bukkit.World.Environment env=e.getTo().getWorld().getEnvironment();
+        String stat;
+        if(env==org.bukkit.World.Environment.NORMAL) stat="overworld-biomes";
+        else if(env==org.bukkit.World.Environment.NETHER) stat="nether-biomes";
+        else return;
+        String biome=e.getTo().getBlock().getBiome().name();
+        String path=achievementPath(p)+".discovered-biomes."+stat;
+        List<String> discovered=db.getStringList(path);
+        if(!discovered.contains(biome)) {
+            discovered.add(biome);
+            db.set(path,discovered);
+            db.set(achievementPath(p)+".stats."+stat,discovered.size());
+            checkAchievements(p);
+            saveSoon();
         }
     }
     @EventHandler public void onQuestFish(PlayerFishEvent e) {
