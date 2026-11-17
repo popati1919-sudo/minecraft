@@ -12,6 +12,8 @@ import org.bukkit.event.player.*;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.block.data.Ageable;
 import org.bukkit.inventory.*;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -737,99 +739,103 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
         saveSoon();
     }
+    private record AchievementTier(String key,String name,String stat,long goal,double reward,Material icon) { }
+    private List<List<AchievementTier>> achievementLanes(String category) {
+        return switch(category) {
+            case "Mineur" -> List.of(
+                List.of(
+                    new AchievementTier("miner_blocks_1","Débutant de la pioche","blocks-mined",10,10,Material.WOODEN_PICKAXE),
+                    new AchievementTier("miner_blocks_2","Mineur régulier","blocks-mined",50,25,Material.STONE_PICKAXE),
+                    new AchievementTier("miner_blocks_3","Mineur confirmé","blocks-mined",250,50,Material.IRON_PICKAXE),
+                    new AchievementTier("miner_blocks_4","Mineur expérimenté","blocks-mined",1000,100,Material.GOLDEN_PICKAXE),
+                    new AchievementTier("miner_blocks_5","Mineur expert","blocks-mined",5000,250,Material.DIAMOND_PICKAXE),
+                    new AchievementTier("miner_blocks_6","Maître mineur","blocks-mined",10000,500,Material.NETHERITE_PICKAXE),
+                    new AchievementTier("miner_blocks_7","Mineur légendaire","blocks-mined",50000,1000,Material.NETHERITE_PICKAXE)
+                ),
+                List.of(
+                    new AchievementTier("miner_chunks_1","Premier chunk","chunks-cleared",1,50,Material.DEEPSLATE),
+                    new AchievementTier("miner_chunks_2","Explorateur souterrain","chunks-cleared",3,150,Material.DIAMOND_ORE),
+                    new AchievementTier("miner_chunks_3","Dévoreur de chunks","chunks-cleared",10,500,Material.ANCIENT_DEBRIS)
+                )
+            );
+            case "Fermier" -> List.of(List.of(
+                new AchievementTier("farm_1","Première récolte","farm-crops",10,10,Material.WHEAT),
+                new AchievementTier("farm_2","Petit fermier","farm-crops",50,25,Material.CARROT),
+                new AchievementTier("farm_3","Fermier débutant","farm-crops",250,50,Material.POTATO),
+                new AchievementTier("farm_4","Grand fermier","farm-crops",1000,100,Material.BEETROOT),
+                new AchievementTier("farm_5","Fermier confirmé","farm-crops",5000,200,Material.SUGAR_CANE),
+                new AchievementTier("farm_6","Maître des récoltes","farm-crops",25000,350,Material.MELON),
+                new AchievementTier("farm_7","Empire agricole","farm-crops",100000,750,Material.GOLDEN_CARROT),
+                new AchievementTier("farm_8","Dieu de l'agriculture","farm-crops",500000,1000,Material.GOLDEN_APPLE)
+            ));
+            case "PvP" -> List.of(List.of(
+                new AchievementTier("pvp_1","Premier duel","player-kills",1,10,Material.WOODEN_SWORD),
+                new AchievementTier("pvp_2","Combattant","player-kills",5,25,Material.STONE_SWORD),
+                new AchievementTier("pvp_3","Guerrier","player-kills",10,50,Material.IRON_SWORD),
+                new AchievementTier("pvp_4","Champion","player-kills",25,100,Material.DIAMOND_SWORD),
+                new AchievementTier("pvp_5","Maître du PvP","player-kills",50,250,Material.NETHERITE_SWORD),
+                new AchievementTier("pvp_6","Légende du PvP","player-kills",100,500,Material.NETHERITE_SWORD)
+            ));
+            case "Chasseur" -> List.of(List.of(
+                new AchievementTier("hunter_1","Premier gibier","monster-kills",10,10,Material.ROTTEN_FLESH),
+                new AchievementTier("hunter_2","Chasseur débutant","monster-kills",50,25,Material.BONE),
+                new AchievementTier("hunter_3","Chasseur confirmé","monster-kills",100,50,Material.ZOMBIE_HEAD),
+                new AchievementTier("hunter_4","Chasseur expert","monster-kills",500,100,Material.SKELETON_SKULL),
+                new AchievementTier("hunter_5","Chasseur légendaire","monster-kills",1000,250,Material.WITHER_SKELETON_SKULL),
+                new AchievementTier("hunter_6","Terreur des monstres","monster-kills",5000,750,Material.NETHER_STAR)
+            ));
+            case "Divers" -> List.of(
+                List.of(
+                    new AchievementTier("misc_fish_1","Premier poisson","fish-caught",1,10,Material.COD),
+                    new AchievementTier("misc_fish_2","Pêcheur débutant","fish-caught",10,25,Material.SALMON),
+                    new AchievementTier("misc_fish_3","Pêcheur confirmé","fish-caught",50,50,Material.TROPICAL_FISH),
+                    new AchievementTier("misc_fish_4","Pêcheur expert","fish-caught",100,100,Material.PUFFERFISH),
+                    new AchievementTier("misc_fish_5","Maître pêcheur","fish-caught",500,250,Material.FISHING_ROD)
+                ),
+                List.of(
+                    new AchievementTier("misc_chunks_1","Premier territoire","chunks-cleared",1,25,Material.MAP),
+                    new AchievementTier("misc_chunks_2","Cartographe","chunks-cleared",5,100,Material.FILLED_MAP)
+                )
+            );
+            default -> List.of();
+        };
+    }
+    private List<String> achievementCategories() { return List.of("Mineur","Fermier","PvP","Chasseur","Divers"); }
     private void checkAchievements(Player p) {
-        long kills=achievementStat(p,"monster-kills");
-        long blocks=achievementStat(p,"blocks-mined");
-        long fish=achievementStat(p,"fish-caught");
-        long chunks=achievementStat(p,"chunks-cleared");
-        long crops=achievementStat(p,"farm-crops");
-        if(kills>=1000) unlockAchievement(p,"hunter_1","Chasseur","MOYEN",50,null,0);
-        if(kills>=10000) unlockAchievement(p,"hunter_2","Chasseur légendaire","LÉGENDAIRE",1000,null,0);
-        if(blocks>=10000) unlockAchievement(p,"miner_1","Mineur acharné","DIFFICILE",100,null,0);
-        if(blocks>=100000) unlockAchievement(p,"miner_2","Maître mineur","EXPERT",0,Material.DIAMOND_BLOCK,1);
-        if(fish>=500) unlockAchievement(p,"fisher","Pêcheur expert","DIFFICILE",0,Material.DIAMOND,16);
-        if(chunks>=10) unlockAchievement(p,"chunk_master","Dévoreur de chunks","MYTHIQUE",0,Material.NETHERITE_INGOT,5);
-        if(crops>=32) unlockAchievement(p,"farm_1","Petit fermier","TRÈS FACILE",10,null,0);
-        if(crops>=500) unlockAchievement(p,"farm_2","Fermier débutant","FACILE",25,null,0);
-        if(crops>=5000) unlockAchievement(p,"farm_3","Grand fermier","MOYEN",75,null,0);
-        if(crops>=25000) unlockAchievement(p,"farm_4","Empire agricole","DIFFICILE",150,null,0);
-        if(crops>=100000) unlockAchievement(p,"farm_5","Fermier industriel","TRÈS DIFFICILE",250,null,0);
-        if(crops>=250000) unlockAchievement(p,"farm_6","Maître des récoltes","EXPERT",350,null,0);
-        if(crops>=500000) unlockAchievement(p,"farm_7","Dieu de l'agriculture","LÉGENDAIRE",500,null,0);
-        if(crops>=1000000) unlockAchievement(p,"farm_8","Production extrême","EXTRÊME",750,null,0);
-        if(crops>=5000000) unlockAchievement(p,"farm_9","Empire agricole mythique","MYTHIQUE",1000,null,0);
+        for(String category:achievementCategories()) for(List<AchievementTier> lane:achievementLanes(category))
+            for(AchievementTier tier:lane) if(achievementStat(p,tier.stat())>=tier.goal())
+                unlockAchievement(p,tier.key(),tier.name(),"PROGRESSION",tier.reward(),null,0);
     }
-    private boolean hasNoMineableBlocksBelow(org.bukkit.World world,int x,int y,int z) {
-        for(int scan=world.getMinHeight()+1;scan<y;scan++) {
-            var block=world.getBlockAt(x,scan,z);
-            if(block.getType()==Material.BEDROCK || block.getType().isAir()) continue;
-            String loc=world.getUID()+":"+x+":"+scan+":"+z;
-            if(playerPlacedBlocks.contains(loc)) continue;
-            return false;
-        }
-        return true;
-    }
-    private boolean isAchievementColumnCleared(org.bukkit.World world,int x,int z) {
-        for(int y=world.getMinHeight()+1;y<world.getMaxHeight();y++) {
-            var block=world.getBlockAt(x,y,z);
-            if(block.getType()==Material.BEDROCK || block.getType().isAir()) continue;
-            String loc=world.getUID()+":"+x+":"+y+":"+z;
-            if(playerPlacedBlocks.contains(loc)) continue;
-            return false;
-        }
-        return true;
-    }
-    private void checkMinedColumn(Player p,org.bukkit.World world,int x,int z) {
-        if(!isAchievementColumnCleared(world,x,z)) return;
-        String chunkKey=world.getUID()+":"+Math.floorDiv(x,16)+":"+Math.floorDiv(z,16);
-        String path=achievementPath(p)+".chunk-columns."+chunkKey;
-        List<String> columns=db.getStringList(path);
-        String columnKey=Math.floorMod(x,16)+":"+Math.floorMod(z,16);
-        if(!columns.contains(columnKey)) {
-            columns.add(columnKey);
-            db.set(path,columns);
-            if(columns.size()>=256) {
-                String completedPath=achievementPath(p)+".completed-chunks";
-                List<String> completed=db.getStringList(completedPath);
-                if(!completed.contains(chunkKey)) {
-                    completed.add(chunkKey);
-                    db.set(completedPath,completed);
-                    db.set(achievementPath(p)+".stats.chunks-cleared",completed.size());
-                    checkAchievements(p);
-                    msg(p,ChatColor.GREEN+"Chunk entièrement miné! Progression: "+completed.size()+"/10.");
-                }
-            }
-            saveSoon();
-        }
-    }
-    private ItemStack achievementItem(Player p,Material icon,String key,String name,String stat,long goal,String reward) {
-        long progress=stat.equals("chunks-cleared")?achievementStat(p,stat):achievementStat(p,stat);
-        boolean done=achievementClaimed(p,key);
-        return item(done?Material.LIME_STAINED_GLASS_PANE:icon,
-            (done?ChatColor.GREEN+"✓ ":ChatColor.YELLOW)+name,
-            "Progression: "+Math.min(progress,goal)+"/"+goal,
-            done?"Succès terminé et récompense reçue.":"Récompense: "+reward,
-            "Les récompenses sont données automatiquement.");
+    private ItemStack achievementLaneItem(Player p,List<AchievementTier> lane) {
+        AchievementTier next=null;
+        for(AchievementTier tier:lane) if(!achievementClaimed(p,tier.key())) { next=tier; break; }
+        if(next==null) return item(Material.LIME_STAINED_GLASS_PANE,"✓ Série terminée","Tous les objectifs de cette série sont réussis.");
+        long progress=achievementStat(p,next.stat());
+        return item(next.icon(),next.name(),
+            "Progression: "+Math.min(progress,next.goal())+"/"+next.goal(),
+            "Récompense: "+next.reward()+" LPC",
+            progress>=next.goal()?"Succès atteint — récompense en cours de validation.":"Continue pour débloquer le prochain palier.",
+            "Après validation, ce succès sera remplacé ici par le suivant.");
     }
     private void openAchievementMenu(Player p) {
-        Inventory inv=Bukkit.createInventory(null,54,"Larry | Succès");
-        inv.setItem(10,achievementItem(p,Material.ZOMBIE_HEAD,"hunter_1","Chasseur","monster-kills",1000,"50 LPC"));
-        inv.setItem(11,achievementItem(p,Material.WITHER_SKELETON_SKULL,"hunter_2","Chasseur légendaire","monster-kills",10000,"1 000 LPC"));
-        inv.setItem(12,achievementItem(p,Material.IRON_PICKAXE,"miner_1","Mineur acharné","blocks-mined",10000,"100 LPC"));
-        inv.setItem(13,achievementItem(p,Material.DIAMOND_PICKAXE,"miner_2","Maître mineur","blocks-mined",100000,"1 bloc de diamant"));
-        inv.setItem(14,achievementItem(p,Material.FISHING_ROD,"fisher","Pêcheur expert","fish-caught",500,"16 diamants"));
-        inv.setItem(15,achievementItem(p,Material.DIAMOND_ORE,"chunk_master","Dévoreur de chunks","chunks-cleared",10,"5 lingots de Netherite"));
-        inv.setItem(19,achievementItem(p,Material.WHEAT,"farm_1","Petit fermier","farm-crops",32,"10 LPC"));
-        inv.setItem(20,achievementItem(p,Material.CARROT,"farm_2","Fermier débutant","farm-crops",500,"25 LPC"));
-        inv.setItem(21,achievementItem(p,Material.POTATO,"farm_3","Grand fermier","farm-crops",5000,"75 LPC"));
-        inv.setItem(22,achievementItem(p,Material.BEETROOT,"farm_4","Empire agricole","farm-crops",25000,"150 LPC"));
-        inv.setItem(23,achievementItem(p,Material.SUGAR_CANE,"farm_5","Fermier industriel","farm-crops",100000,"250 LPC"));
-        inv.setItem(24,achievementItem(p,Material.MELON,"farm_6","Maître des récoltes","farm-crops",250000,"350 LPC"));
-        inv.setItem(25,achievementItem(p,Material.PUMPKIN,"farm_7","Dieu de l'agriculture","farm-crops",500000,"500 LPC"));
-        inv.setItem(28,achievementItem(p,Material.GOLDEN_CARROT,"farm_8","Production extrême","farm-crops",1000000,"750 LPC"));
-        inv.setItem(29,achievementItem(p,Material.GOLDEN_APPLE,"farm_9","Empire agricole mythique","farm-crops",5000000,"1 000 LPC"));
-        inv.setItem(49,item(Material.SUNFLOWER,"Actualiser","Mettre à jour ta progression."));
-        inv.setItem(53,item(Material.BARRIER,"Fermer"));
+        Inventory inv=Bukkit.createInventory(null,27,"Larry | Succès");
+        inv.setItem(10,item(Material.IRON_PICKAXE,"Mineur","Blocs minés et chunks terminés"));
+        inv.setItem(12,item(Material.WHEAT,"Fermier","Récoltes et agriculture"));
+        inv.setItem(14,item(Material.DIAMOND_SWORD,"PvP","Victoires contre des joueurs"));
+        inv.setItem(16,item(Material.ZOMBIE_HEAD,"Chasseur","Monstres vaincus"));
+        inv.setItem(22,item(Material.NETHER_STAR,"Divers","Pêche et autres défis"));
+        inv.setItem(26,item(Material.BARRIER,"Fermer"));
+        LpcMenuTheme.frame(inv);
+        p.openInventory(inv);
+    }
+    private void openAchievementCategory(Player p,String category) {
+        List<List<AchievementTier>> lanes=achievementLanes(category);
+        Inventory inv=Bukkit.createInventory(null,27,"Larry | "+category);
+        int[] slots={11,15,22};
+        for(int i=0;i<lanes.size()&&i<slots.length;i++) inv.setItem(slots[i],achievementLaneItem(p,lanes.get(i)));
+        inv.setItem(18,item(Material.ARROW,"Retour","Revenir aux catégories"));
+        inv.setItem(26,item(Material.BARRIER,"Fermer"));
+        inv.setItem(4,item(Material.BOOK,"Succès "+category,"Chaque série avance automatiquement.","Le prochain objectif remplace le précédent dans le même emplacement."));
         LpcMenuTheme.frame(inv);
         p.openInventory(inv);
     }
@@ -891,6 +897,30 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         var b=e.getBlockPlaced();
         playerPlacedBlocks.add(b.getWorld().getUID()+":"+b.getX()+":"+b.getY()+":"+b.getZ());
     }
+    @EventHandler public void onCreeperExplosion(EntityExplodeEvent e) {
+        if(!(e.getEntity() instanceof org.bukkit.entity.Creeper)) return;
+        Map<String,Boolean> allowedChunks=new HashMap<>();
+        for(var block:e.blockList()) {
+            String chunkKey=block.getWorld().getUID()+":"+block.getChunk().getX()+":"+block.getChunk().getZ();
+            if(allowedChunks.containsKey(chunkKey)) continue;
+            String path="achievement-explosions."+chunkKey;
+            int used=db.getInt(path,0);
+            boolean allowed=used<4;
+            allowedChunks.put(chunkKey,allowed);
+            if(allowed) db.set(path,used+1);
+        }
+        e.blockList().removeIf(block -> !allowedChunks.getOrDefault(
+            block.getWorld().getUID()+":"+block.getChunk().getX()+":"+block.getChunk().getZ(),false));
+        if(!allowedChunks.isEmpty()) saveSoon();
+        Map<String,int[]> affectedColumns=new LinkedHashMap<>();
+        for(var block:e.blockList()) affectedColumns.put(block.getWorld().getUID()+":"+block.getX()+":"+block.getZ(),
+            new int[]{block.getX(),block.getZ()});
+        if(!affectedColumns.isEmpty()) Bukkit.getScheduler().runTask(plugin,()->{
+            for(Player online:Bukkit.getOnlinePlayers()) for(int[] column:affectedColumns.values())
+                checkMinedColumn(online,e.getLocation().getWorld(),column[0],column[1]);
+        });
+    }
+
     @EventHandler public void onQuestBlockBreak(BlockBreakEvent e) {
         Player p=e.getPlayer();
         if(p.getGameMode()==org.bukkit.GameMode.CREATIVE) return;
@@ -908,6 +938,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 Bukkit.getScheduler().runTask(plugin,()->checkMinedColumn(p,world,x,z));
             }
         }
+    }
+    @EventHandler public void onPvpKill(PlayerDeathEvent e) {
+        Player killer=e.getEntity().getKiller();
+        if(killer!=null && !killer.getUniqueId().equals(e.getEntity().getUniqueId()))
+            addAchievementProgress(killer,"player-kills",1);
     }
     @EventHandler public void onQuestMobKill(EntityDeathEvent e) {
         Player killer=e.getEntity().getKiller();
@@ -1075,8 +1110,24 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(title.equals("Larry | Succès")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player viewer)) return;
-            if(e.getRawSlot()==53) { viewer.closeInventory(); return; }
-            if(e.getRawSlot()==49) { openAchievementMenu(viewer); return; }
+            String category=switch(e.getRawSlot()) {
+                case 10 -> "Mineur";
+                case 12 -> "Fermier";
+                case 14 -> "PvP";
+                case 16 -> "Chasseur";
+                case 22 -> "Divers";
+                default -> null;
+            };
+            if(e.getRawSlot()==26) viewer.closeInventory();
+            else if(category!=null) openAchievementCategory(viewer,category);
+            return;
+        }
+        if(title.startsWith("Larry | ") && achievementCategories().contains(title.substring("Larry | ".length()))) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player viewer)) return;
+            if(e.getRawSlot()==18) openAchievementMenu(viewer);
+            else if(e.getRawSlot()==26) viewer.closeInventory();
+            else openAchievementCategory(viewer,title.substring("Larry | ".length()));
             return;
         }
         if(title.equals("Larry | Classements")) {
