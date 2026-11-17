@@ -743,6 +743,16 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(fish>=500) unlockAchievement(p,"fisher","Pêcheur expert",0,Material.DIAMOND,16);
         if(chunks>=10) unlockAchievement(p,"chunk_master","Dévoreur de chunks",0,Material.NETHERITE_INGOT,5);
     }
+    private boolean hasNoMineableBlocksBelow(org.bukkit.World world,int x,int y,int z) {
+        for(int scan=world.getMinHeight()+1;scan<y;scan++) {
+            var block=world.getBlockAt(x,scan,z);
+            if(block.getType()==Material.BEDROCK || block.getType().isAir()) continue;
+            String loc=world.getUID()+":"+x+":"+scan+":"+z;
+            if(playerPlacedBlocks.contains(loc)) continue;
+            return false;
+        }
+        return true;
+    }
     private boolean isAchievementColumnCleared(org.bukkit.World world,int x,int z) {
         for(int y=world.getMinHeight()+1;y<world.getMaxHeight();y++) {
             var block=world.getBlockAt(x,y,z);
@@ -867,7 +877,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         } else if(!b.getType().isAir() && b.getType()!=Material.BEDROCK) {
             progressQuest(p,"blocks");
             addAchievementProgress(p,"blocks-mined",1);
-            if(b.getY()<=b.getWorld().getMinHeight()+5) {
+            if(b.getY()<=b.getWorld().getMinHeight()+5 || hasNoMineableBlocksBelow(b.getWorld(),b.getX(),b.getY(),b.getZ())) {
                 org.bukkit.World world=b.getWorld();int x=b.getX(),z=b.getZ();
                 Bukkit.getScheduler().runTask(plugin,()->checkMinedColumn(p,world,x,z));
             }
