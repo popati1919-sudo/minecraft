@@ -742,12 +742,22 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         long blocks=achievementStat(p,"blocks-mined");
         long fish=achievementStat(p,"fish-caught");
         long chunks=achievementStat(p,"chunks-cleared");
+        long crops=achievementStat(p,"farm-crops");
         if(kills>=1000) unlockAchievement(p,"hunter_1","Chasseur","MOYEN",50,null,0);
         if(kills>=10000) unlockAchievement(p,"hunter_2","Chasseur légendaire","LÉGENDAIRE",1000,null,0);
         if(blocks>=10000) unlockAchievement(p,"miner_1","Mineur acharné","DIFFICILE",100,null,0);
         if(blocks>=100000) unlockAchievement(p,"miner_2","Maître mineur","EXPERT",0,Material.DIAMOND_BLOCK,1);
         if(fish>=500) unlockAchievement(p,"fisher","Pêcheur expert","DIFFICILE",0,Material.DIAMOND,16);
         if(chunks>=10) unlockAchievement(p,"chunk_master","Dévoreur de chunks","MYTHIQUE",0,Material.NETHERITE_INGOT,5);
+        if(crops>=32) unlockAchievement(p,"farm_1","Petit fermier","TRÈS FACILE",10,null,0);
+        if(crops>=500) unlockAchievement(p,"farm_2","Fermier débutant","FACILE",25,null,0);
+        if(crops>=5000) unlockAchievement(p,"farm_3","Grand fermier","MOYEN",75,null,0);
+        if(crops>=25000) unlockAchievement(p,"farm_4","Empire agricole","DIFFICILE",150,null,0);
+        if(crops>=100000) unlockAchievement(p,"farm_5","Fermier industriel","TRÈS DIFFICILE",250,null,0);
+        if(crops>=250000) unlockAchievement(p,"farm_6","Maître des récoltes","EXPERT",350,null,0);
+        if(crops>=500000) unlockAchievement(p,"farm_7","Dieu de l'agriculture","LÉGENDAIRE",500,null,0);
+        if(crops>=1000000) unlockAchievement(p,"farm_8","Production extrême","EXTRÊME",750,null,0);
+        if(crops>=5000000) unlockAchievement(p,"farm_9","Empire agricole mythique","MYTHIQUE",1000,null,0);
     }
     private boolean hasNoMineableBlocksBelow(org.bukkit.World world,int x,int y,int z) {
         for(int scan=world.getMinHeight()+1;scan<y;scan++) {
@@ -802,15 +812,24 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             "Les récompenses sont données automatiquement.");
     }
     private void openAchievementMenu(Player p) {
-        Inventory inv=Bukkit.createInventory(null,27,"Larry | Succès");
+        Inventory inv=Bukkit.createInventory(null,54,"Larry | Succès");
         inv.setItem(10,achievementItem(p,Material.ZOMBIE_HEAD,"hunter_1","Chasseur","monster-kills",1000,"50 LPC"));
         inv.setItem(11,achievementItem(p,Material.WITHER_SKELETON_SKULL,"hunter_2","Chasseur légendaire","monster-kills",10000,"1 000 LPC"));
         inv.setItem(12,achievementItem(p,Material.IRON_PICKAXE,"miner_1","Mineur acharné","blocks-mined",10000,"100 LPC"));
-        inv.setItem(14,achievementItem(p,Material.DIAMOND_PICKAXE,"miner_2","Maître mineur","blocks-mined",100000,"1 bloc de diamant"));
-        inv.setItem(15,achievementItem(p,Material.FISHING_ROD,"fisher","Pêcheur expert","fish-caught",500,"16 diamants"));
-        inv.setItem(16,achievementItem(p,Material.DIAMOND_ORE,"chunk_master","Dévoreur de chunks","chunks-cleared",10,"5 lingots de Netherite"));
-        inv.setItem(22,item(Material.SUNFLOWER,"Actualiser","Mettre à jour ta progression."));
-        inv.setItem(26,item(Material.BARRIER,"Fermer"));
+        inv.setItem(13,achievementItem(p,Material.DIAMOND_PICKAXE,"miner_2","Maître mineur","blocks-mined",100000,"1 bloc de diamant"));
+        inv.setItem(14,achievementItem(p,Material.FISHING_ROD,"fisher","Pêcheur expert","fish-caught",500,"16 diamants"));
+        inv.setItem(15,achievementItem(p,Material.DIAMOND_ORE,"chunk_master","Dévoreur de chunks","chunks-cleared",10,"5 lingots de Netherite"));
+        inv.setItem(19,achievementItem(p,Material.WHEAT,"farm_1","Petit fermier","farm-crops",32,"10 LPC"));
+        inv.setItem(20,achievementItem(p,Material.CARROT,"farm_2","Fermier débutant","farm-crops",500,"25 LPC"));
+        inv.setItem(21,achievementItem(p,Material.POTATO,"farm_3","Grand fermier","farm-crops",5000,"75 LPC"));
+        inv.setItem(22,achievementItem(p,Material.BEETROOT,"farm_4","Empire agricole","farm-crops",25000,"150 LPC"));
+        inv.setItem(23,achievementItem(p,Material.SUGAR_CANE,"farm_5","Fermier industriel","farm-crops",100000,"250 LPC"));
+        inv.setItem(24,achievementItem(p,Material.MELON,"farm_6","Maître des récoltes","farm-crops",250000,"350 LPC"));
+        inv.setItem(25,achievementItem(p,Material.PUMPKIN,"farm_7","Dieu de l'agriculture","farm-crops",500000,"500 LPC"));
+        inv.setItem(28,achievementItem(p,Material.GOLDEN_CARROT,"farm_8","Production extrême","farm-crops",1000000,"750 LPC"));
+        inv.setItem(29,achievementItem(p,Material.GOLDEN_APPLE,"farm_9","Empire agricole mythique","farm-crops",5000000,"1 000 LPC"));
+        inv.setItem(49,item(Material.SUNFLOWER,"Actualiser","Mettre à jour ta progression."));
+        inv.setItem(53,item(Material.BARRIER,"Fermer"));
         LpcMenuTheme.frame(inv);
         p.openInventory(inv);
     }
@@ -880,6 +899,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(playerPlacedBlocks.remove(loc)) return;
         if(b.getBlockData() instanceof Ageable age && age.getAge()>=age.getMaximumAge()) {
             progressQuest(p,"crops");
+            addAchievementProgress(p,"farm-crops",1);
         } else if(!b.getType().isAir() && b.getType()!=Material.BEDROCK) {
             progressQuest(p,"blocks");
             addAchievementProgress(p,"blocks-mined",1);
@@ -1055,8 +1075,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(title.equals("Larry | Succès")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player viewer)) return;
-            if(e.getRawSlot()==26) { viewer.closeInventory(); return; }
-            if(e.getRawSlot()==22) { openAchievementMenu(viewer); return; }
+            if(e.getRawSlot()==53) { viewer.closeInventory(); return; }
+            if(e.getRawSlot()==49) { openAchievementMenu(viewer); return; }
             return;
         }
         if(title.equals("Larry | Classements")) {
