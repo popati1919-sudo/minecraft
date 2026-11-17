@@ -714,20 +714,26 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private boolean achievementClaimed(Player p,String key) {
         return db.getBoolean(achievementPath(p)+".claimed."+key,false);
     }
-    private void unlockAchievement(Player p,String key,String label,double money,Material rewardMaterial,int rewardAmount) {
+    private void unlockAchievement(Player p,String key,String label,String tier,double money,Material rewardMaterial,int rewardAmount) {
         if(achievementClaimed(p,key)) return;
         db.set(achievementPath(p)+".claimed."+key,true);
+        String rewardText="";
         if(money>0 && Double.isFinite(core.balance(p.getUniqueId())+money)) {
-            give(p,money);
-            core.recordTransaction("ACHIEVEMENT_"+key.toUpperCase(Locale.ROOT),new UUID(0L,0L),p.getUniqueId(),money);
-            msg(p,ChatColor.GOLD+"Succès débloqué: "+label+" — +"+money+" Larry!");
+            double safeMoney=Math.min(1000.0,money);
+            give(p,safeMoney);
+            core.recordTransaction("ACHIEVEMENT_"+key.toUpperCase(Locale.ROOT),new UUID(0L,0L),p.getUniqueId(),safeMoney);
+            rewardText=" — +"+safeMoney+" LPC";
         } else if(rewardMaterial!=null && rewardAmount>0) {
             ItemStack reward=new ItemStack(rewardMaterial,rewardAmount);
             Map<Integer,ItemStack> leftovers=p.getInventory().addItem(reward);
-            leftovers.values().forEach(item->p.getWorld().dropItemNaturally(p.getLocation(),item));
-            msg(p,ChatColor.GOLD+"Succès débloqué: "+label+" — récompense: "+rewardAmount+" "+rewardMaterial.name()+"!");
-        } else {
-            msg(p,ChatColor.GOLD+"Succès débloqué: "+label+"!");
+            leftovers.values().forEach(stack->p.getWorld().dropItemNaturally(p.getLocation(),stack));
+            rewardText=" — récompense: "+rewardAmount+" "+rewardMaterial.name();
+        }
+        msg(p,ChatColor.GOLD+"Succès débloqué: "+label+" ["+tier+"]"+rewardText+"!");
+        if(tier.equalsIgnoreCase("EXTRÊME") || tier.equalsIgnoreCase("MYTHIQUE")) {
+            Bukkit.broadcastMessage(ChatColor.DARK_PURPLE+"✦ "+ChatColor.LIGHT_PURPLE+p.getName()
+                +ChatColor.GOLD+" a débloqué le succès "+ChatColor.YELLOW+label
+                +ChatColor.LIGHT_PURPLE+" ["+tier+"]"+ChatColor.DARK_PURPLE+" ✦");
         }
         saveSoon();
     }
@@ -736,12 +742,12 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         long blocks=achievementStat(p,"blocks-mined");
         long fish=achievementStat(p,"fish-caught");
         long chunks=achievementStat(p,"chunks-cleared");
-        if(kills>=1000) unlockAchievement(p,"hunter_1","Chasseur",5000,null,0);
-        if(kills>=10000) unlockAchievement(p,"hunter_2","Chasseur légendaire",25000,null,0);
-        if(blocks>=10000) unlockAchievement(p,"miner_1","Mineur acharné",2500,null,0);
-        if(blocks>=100000) unlockAchievement(p,"miner_2","Maître mineur",0,Material.DIAMOND_BLOCK,1);
-        if(fish>=500) unlockAchievement(p,"fisher","Pêcheur expert",0,Material.DIAMOND,16);
-        if(chunks>=10) unlockAchievement(p,"chunk_master","Dévoreur de chunks",0,Material.NETHERITE_INGOT,5);
+        if(kills>=1000) unlockAchievement(p,"hunter_1","Chasseur","MOYEN",50,null,0);
+        if(kills>=10000) unlockAchievement(p,"hunter_2","Chasseur légendaire","LÉGENDAIRE",1000,null,0);
+        if(blocks>=10000) unlockAchievement(p,"miner_1","Mineur acharné","DIFFICILE",100,null,0);
+        if(blocks>=100000) unlockAchievement(p,"miner_2","Maître mineur","EXPERT",0,Material.DIAMOND_BLOCK,1);
+        if(fish>=500) unlockAchievement(p,"fisher","Pêcheur expert","DIFFICILE",0,Material.DIAMOND,16);
+        if(chunks>=10) unlockAchievement(p,"chunk_master","Dévoreur de chunks","MYTHIQUE",0,Material.NETHERITE_INGOT,5);
     }
     private boolean hasNoMineableBlocksBelow(org.bukkit.World world,int x,int y,int z) {
         for(int scan=world.getMinHeight()+1;scan<y;scan++) {
@@ -797,9 +803,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     private void openAchievementMenu(Player p) {
         Inventory inv=Bukkit.createInventory(null,27,"Larry | Succès");
-        inv.setItem(10,achievementItem(p,Material.ZOMBIE_HEAD,"hunter_1","Chasseur","monster-kills",1000,"5 000 Larry"));
-        inv.setItem(11,achievementItem(p,Material.WITHER_SKELETON_SKULL,"hunter_2","Chasseur légendaire","monster-kills",10000,"25 000 Larry"));
-        inv.setItem(12,achievementItem(p,Material.IRON_PICKAXE,"miner_1","Mineur acharné","blocks-mined",10000,"2 500 Larry"));
+        inv.setItem(10,achievementItem(p,Material.ZOMBIE_HEAD,"hunter_1","Chasseur","monster-kills",1000,"50 LPC"));
+        inv.setItem(11,achievementItem(p,Material.WITHER_SKELETON_SKULL,"hunter_2","Chasseur légendaire","monster-kills",10000,"1 000 LPC"));
+        inv.setItem(12,achievementItem(p,Material.IRON_PICKAXE,"miner_1","Mineur acharné","blocks-mined",10000,"100 LPC"));
         inv.setItem(14,achievementItem(p,Material.DIAMOND_PICKAXE,"miner_2","Maître mineur","blocks-mined",100000,"1 bloc de diamant"));
         inv.setItem(15,achievementItem(p,Material.FISHING_ROD,"fisher","Pêcheur expert","fish-caught",500,"16 diamants"));
         inv.setItem(16,achievementItem(p,Material.DIAMOND_ORE,"chunk_master","Dévoreur de chunks","chunks-cleared",10,"5 lingots de Netherite"));
