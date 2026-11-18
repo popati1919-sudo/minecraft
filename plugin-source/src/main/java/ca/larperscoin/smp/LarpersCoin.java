@@ -601,24 +601,42 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     public void onFloodgateJoin(PlayerJoinEvent event) {
         if (!getConfig().getBoolean("anticheat.education-no-setback", true)) return;
         Player player = event.getPlayer();
+        // EduFloodgate peut terminer l'enregistrement du joueur après PlayerJoinEvent.
+        // Réessayer pendant 5 secondes évite de rater la détection au premier tick.
+        applyEducationNoSetback(player, 0);
+    }
+
+    private void applyEducationNoSetback(Player player, int attempt) {
+        if (!player.isOnline()) return;
         UUID uuid = player.getUniqueId();
-        Bukkit.getScheduler().runTaskLater(this, () -> {
-            if (!player.isOnline() || !isFloodgatePlayer(uuid)) return;
-            try {
-                var attachment = player.addAttachment(this);
-                attachment.setPermission("grim.nosetback", true);
-                if (Bukkit.getPluginManager().isPluginEnabled("GrimAC")) {
-                    GrimAbstractAPI api = GrimAPIProvider.get();
-                    GrimUser grimUser = api.getGrimUser(uuid);
-                    if (grimUser != null) grimUser.updatePermissions();
-                }
-                getLogger().info("GrimAC: setback désactivé pour le joueur Floodgate/Education " + player.getName()
-                        + " (détections et alertes conservées).");
-            } catch (Throwable ex) {
-                getLogger().warning("Impossible d'appliquer l'exemption de setback Grim à " + player.getName()
-                        + ": " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+        if (!isFloodgatePlayer(uuid)) {
+            if (attempt < 50) {
+                Bukkit.getScheduler().runTaskLater(this, () -> applyEducationNoSetback(player, attempt + 1), 2L);
+            } else {
+                getLogger().warning("EduFloodgate: joueur " + player.getName()
+                        + " non reconnu après 5 secondes; exemption Grim non appliquée.");
             }
-        }, 2L);
+            return;
+        }
+        try {
+            var attachment = player.addAttachment(this);
+            attachment.setPermission("grim.nosetback", true);
+            if (Bukkit.getPluginManager().isPluginEnabled("GrimAC")) {
+                GrimAbstractAPI api = GrimAPIProvider.get();
+                GrimUser grimUser = api.getGrimUser(uuid);
+                if (grimUser != null) {
+                    grimUser.updatePermissions();
+                } else if (attempt < 50) {
+                    Bukkit.getScheduler().runTaskLater(this, () -> applyEducationNoSetback(player, attempt + 1), 2L);
+                    return;
+                }
+            }
+            getLogger().info("GrimAC: permission grim.nosetback appliquée à " + player.getName()
+                    + " (détections et alertes conservées).");
+        } catch (Throwable ex) {
+            getLogger().warning("Impossible d'appliquer l'exemption de setback Grim à " + player.getName()
+                    + ": " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+        }
     }
 
     private boolean isFloodgatePlayer(UUID uuid) {
