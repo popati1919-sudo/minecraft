@@ -593,17 +593,17 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         }
     }
     /**
-     * EduFloodgate doit rester détecté par Floodgate sur le backend.
-     * On désactive uniquement les téléportations correctives Grim pour ces joueurs:
-     * les vérifications et alertes Grim restent actives.
+     * Les joueurs dont le pseudo commence par "+" sont entièrement exemptés de GrimAC.
+     * Les autres joueurs Bedrock conservent seulement l'exemption de setback prévue.
      */
     @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
-    public void onFloodgateJoin(PlayerJoinEvent event) {
-        if (!getConfig().getBoolean("anticheat.education-no-setback", true)) return;
+    public void onAnticheatJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
-        // EduFloodgate peut terminer l'enregistrement du joueur après PlayerJoinEvent.
-        // Réessayer pendant 5 secondes évite de rater la détection au premier tick.
-        applyEducationNoSetback(player, 0);
+        if (player.getName().startsWith("+")) {
+            applyGrimPermission(player, "grim.exempt", 0, true);
+        } else if (getConfig().getBoolean("anticheat.education-no-setback", true)) {
+            applyEducationNoSetback(player, 0);
+        }
     }
 
     private void applyEducationNoSetback(Player player, int attempt) {
@@ -618,23 +618,46 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             }
             return;
         }
+        applyGrimPermission(player, "grim.nosetback", attempt, false);
+    }
+
+    private void applyGrimPermission(Player player, String permission, int attempt, boolean fullExemption) {
+        if (!player.isOnline()) return;
+        if (!Bukkit.getPluginManager().isPluginEnabled("GrimAC")) {
+            if (attempt < 50) {
+                Bukkit.getScheduler().runTaskLater(this,
+                        () -> applyGrimPermission(player, permission, attempt + 1, fullExemption), 2L);
+            } else {
+                getLogger().warning("GrimAC indisponible; permission " + permission
+                        + " non appliquée à " + player.getName() + ".");
+            }
+            return;
+        }
         try {
             var attachment = player.addAttachment(this);
-            attachment.setPermission("grim.nosetback", true);
-            if (Bukkit.getPluginManager().isPluginEnabled("GrimAC")) {
-                GrimAbstractAPI api = GrimAPIProvider.get();
-                GrimUser grimUser = api.getGrimUser(uuid);
-                if (grimUser != null) {
-                    grimUser.updatePermissions();
-                } else if (attempt < 50) {
-                    Bukkit.getScheduler().runTaskLater(this, () -> applyEducationNoSetback(player, attempt + 1), 2L);
-                    return;
+            attachment.setPermission(permission, true);
+            GrimAbstractAPI api = GrimAPIProvider.get();
+            GrimUser grimUser = api.getGrimUser(player.getUniqueId());
+            if (grimUser == null) {
+                if (attempt < 50) {
+                    Bukkit.getScheduler().runTaskLater(this,
+                            () -> applyGrimPermission(player, permission, attempt + 1, fullExemption), 2L);
+                } else {
+                    getLogger().warning("GrimAC: utilisateur non prêt; permission " + permission
+                            + " non confirmée pour " + player.getName() + ".");
                 }
+                return;
             }
-            getLogger().info("GrimAC: permission grim.nosetback appliquée à " + player.getName()
-                    + " (détections et alertes conservées).");
+            grimUser.updatePermissions();
+            if (fullExemption) {
+                getLogger().info("GrimAC: exemption complète (grim.exempt) appliquée à "
+                        + player.getName() + " car son pseudo commence par +.");
+            } else {
+                getLogger().info("GrimAC: permission grim.nosetback appliquée à " + player.getName()
+                        + " (détections et alertes conservées).");
+            }
         } catch (Throwable ex) {
-            getLogger().warning("Impossible d'appliquer l'exemption de setback Grim à " + player.getName()
+            getLogger().warning("Impossible d'appliquer " + permission + " à " + player.getName()
                     + ": " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
         }
     }
