@@ -389,6 +389,10 @@ final class LarpersAuth implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
+        // Le verrouillage de déplacement ne concerne que le Lobby d'authentification.
+        // Le SMP est derrière Velocity: les joueurs ne doivent jamais y être immobilisés
+        // par le système /login, même pendant les premiers ticks de connexion.
+        if (!plugin.getConfig().getBoolean("network.auth-only", false)) return;
         if (exempt(event.getPlayer()) || event.getTo() == null) return;
         Location from = event.getFrom(), to = event.getTo();
         if (from.getBlockX()!=to.getBlockX() || from.getBlockY()!=to.getBlockY() || from.getBlockZ()!=to.getBlockZ()) {
