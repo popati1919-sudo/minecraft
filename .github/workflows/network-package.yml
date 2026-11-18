@@ -65,16 +65,24 @@ jobs:
           cp "$plugin_jar" "$ROOT/SMP/plugins/LarpersCoin.jar"
           cp "$plugin_jar" "$ROOT/Lobby/plugins/LarpersCoin.jar"
 
-          curl -fL "https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/velocity" -o "$ROOT/Velocity/plugins/Geyser-Velocity.jar"
-          curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/velocity" -o "$ROOT/Velocity/plugins/floodgate-velocity.jar"
-          # Floodgate doit aussi etre present sur les backends Paper pour que
-          # l'API isFloodgatePlayer(UUID) reconnaisse les joueurs Bedrock au lobby.
-          curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/spigot" -o "$ROOT/Lobby/plugins/floodgate-paper.jar"
-          curl -fL "https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/spigot" -o "$ROOT/SMP/plugins/floodgate-paper.jar"
-          test -s "$ROOT/Velocity/plugins/Geyser-Velocity.jar"
-          test -s "$ROOT/Velocity/plugins/floodgate-velocity.jar"
-          test -s "$ROOT/Lobby/plugins/floodgate-paper.jar"
-          test -s "$ROOT/SMP/plugins/floodgate-paper.jar"
+          # EduGeyser + EduFloodgate: Minecraft Education et Bedrock via Velocity.
+          edugeyser_meta="$(curl -fsSL https://api.github.com/repos/EduGeyser/EduGeyser/releases/latest)"
+          edugeyser_url="$(echo "$edugeyser_meta" | jq -r '.assets[] | select(.name == "EduGeyser-Velocity.jar") | .browser_download_url' | head -n 1)"
+          test -n "$edugeyser_url"
+          curl -fL "$edugeyser_url" -o "$ROOT/Velocity/plugins/EduGeyser-Velocity.jar"
+          edufloodgate_meta="$(curl -fsSL https://api.github.com/repos/EduGeyser/EduFloodgate/releases/latest)"
+          edufloodgate_velocity_url="$(echo "$edufloodgate_meta" | jq -r '.assets[] | select(.name == "edufloodgate-velocity.jar") | .browser_download_url' | head -n 1)"
+          edufloodgate_paper_url="$(echo "$edufloodgate_meta" | jq -r '.assets[] | select(.name == "edufloodgate-spigot.jar") | .browser_download_url' | head -n 1)"
+          test -n "$edufloodgate_velocity_url"
+          test -n "$edufloodgate_paper_url"
+          curl -fL "$edufloodgate_velocity_url" -o "$ROOT/Velocity/plugins/edufloodgate-velocity.jar"
+          # EduFloodgate remplace Floodgate sur les deux backends Paper.
+          curl -fL "$edufloodgate_paper_url" -o "$ROOT/Lobby/plugins/edufloodgate-paper.jar"
+          curl -fL "$edufloodgate_paper_url" -o "$ROOT/SMP/plugins/edufloodgate-paper.jar"
+          test -s "$ROOT/Velocity/plugins/EduGeyser-Velocity.jar"
+          test -s "$ROOT/Velocity/plugins/edufloodgate-velocity.jar"
+          test -s "$ROOT/Lobby/plugins/edufloodgate-paper.jar"
+          test -s "$ROOT/SMP/plugins/edufloodgate-paper.jar"
 
           papi_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/placeholderapi/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
           papi_url="$(echo "$papi_meta" | jq -r '[.[] | .files[] | select(.primary == true) | .url][0] // empty')"
@@ -453,7 +461,7 @@ jobs:
           )
           powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='plugins\Geyser-Velocity\config.yml'; $s=Get-Content -Raw $p; $s=[regex]::Replace($s,'(?m)^(\s*auth-type\s*:\s*)[^\r\n]+','$1floodgate'); $s=[regex]::Replace($s,'(?m)^(\s*transport\s*:\s*)[^\r\n]+','$1nethernet'); Set-Content -Path $p -Value $s -Encoding utf8"
           if errorlevel 1 (echo Echec de configuration Geyser.& pause & exit /b 1)
-          echo Geyser configure: Floodgate + NetherNet. Ouvre TCP et UDP 19132.
+          echo EduGeyser configure: EduFloodgate + NetherNet. Ouvre TCP et UDP 19132.
           pause
           EOF
 
@@ -462,7 +470,7 @@ jobs:
           cd /d "%~dp0"
           set "FGKEY=%~dp0Velocity\plugins\floodgate\key.pem"
           if not exist "%FGKEY%" (
-            echo Cle Floodgate introuvable.
+            echo Cle EduFloodgate introuvable.
             echo Demarre Velocity une fois, puis ferme-le proprement.
             pause
             exit /b 1
@@ -472,7 +480,7 @@ jobs:
             copy /Y "%FGKEY%" "%%S\plugins\floodgate\key.pem" >nul
           )
           echo.
-          echo Cle Floodgate partagee avec Lobby et SMP.
+          echo Cle EduFloodgate partagee avec Lobby et SMP.
           echo L'authentification des joueurs est geree par LarpersCoin.
           echo Redemarre Lobby, SMP puis Velocity.
           pause
@@ -521,11 +529,11 @@ jobs:
           - Velocity proxy: port public Java 25565
           - Lobby Paper separe: 127.0.0.1:25566 (authentification uniquement: /register et /login)
           - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
-          - Geyser + Floodgate installes sur Velocity, Floodgate aussi sur Lobby et SMP pour reconnaitre les joueurs Bedrock
+          - EduGeyser + EduFloodgate sur Velocity, EduFloodgate sur Lobby et SMP
           - Authentification des joueurs geree par LarpersCoin; Floodgate identifie les joueurs Bedrock
           - Apres authentification, transfert automatique vers le SMP
           - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend
-          - Geyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login
+          - EduGeyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login
           - Backend Paper lie a Velocity avec forwarding moderne et secret prive
 
           INSTALLATION:
@@ -542,7 +550,7 @@ jobs:
 
           IMPORTANT:
           - Garde le forwarding moderne et le secret prive identiques sur les deux Paper. Le mode online-mode du proxy et celui de proxies.velocity.online-mode dans Paper doivent rester false pour ce mode mixte.
-          - Bedrock doit passer par Geyser auth-type floodgate + NetherNet; la meme cle Floodgate doit etre partagee avec les deux backends.
+          - Bedrock et Education passent par EduGeyser auth-type floodgate + NetherNet; la meme cle Floodgate doit etre partagee avec les deux backends.
           - La reconnexion IP est pratique mais moins sure: plusieurs personnes partageant la meme IP ne doivent pas partager le meme pseudo/compte.
           - Ne change pas online-mode du proxy et ne rends jamais les ports backend publics.
           - GrimAC est configure pour alerter et journaliser uniquement: aucun kick/ban automatique.
