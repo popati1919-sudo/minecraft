@@ -1,5 +1,9 @@
 package ca.larperscoin.smp;
 
+import ac.grim.grimac.api.GrimAbstractAPI;
+import ac.grim.grimac.api.GrimAPIProvider;
+import ac.grim.grimac.api.GrimUser;
+
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.OfflinePlayer;
@@ -588,6 +592,50 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             p.setPlayerListHeaderFooter(ChatColor.GOLD+serverName,status+ChatColor.DARK_GRAY+" | "+ChatColor.YELLOW+"IP: "+serverIp+ChatColor.DARK_GRAY+" | "+ChatColor.GREEN+"Ping: "+p.getPing()+" ms");
         }
     }
+    /**
+     * EduFloodgate doit rester détecté par Floodgate sur le backend.
+     * On désactive uniquement les téléportations correctives Grim pour ces joueurs:
+     * les vérifications et alertes Grim restent actives.
+     */
+    @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
+    public void onFloodgateJoin(PlayerJoinEvent event) {
+        if (!getConfig().getBoolean("anticheat.education-no-setback", true)) return;
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            if (!player.isOnline() || !isFloodgatePlayer(uuid)) return;
+            try {
+                var attachment = player.addAttachment(this);
+                attachment.setPermission("grim.nosetback", true);
+                if (Bukkit.getPluginManager().isPluginEnabled("GrimAC")) {
+                    GrimAbstractAPI api = GrimAPIProvider.get();
+                    GrimUser grimUser = api.getGrimUser(uuid);
+                    if (grimUser != null) grimUser.updatePermissions();
+                }
+                getLogger().info("GrimAC: setback désactivé pour le joueur Floodgate/Education " + player.getName()
+                        + " (détections et alertes conservées).");
+            } catch (Throwable ex) {
+                getLogger().warning("Impossible d'appliquer l'exemption de setback Grim à " + player.getName()
+                        + ": " + ex.getClass().getSimpleName() + ": " + ex.getMessage());
+            }
+        }, 2L);
+    }
+
+    private boolean isFloodgatePlayer(UUID uuid) {
+        org.bukkit.plugin.Plugin floodgate = Bukkit.getPluginManager().getPlugin("floodgate");
+        if (floodgate == null || !floodgate.isEnabled()) return false;
+        try {
+            Class<?> apiClass = Class.forName(
+                    "org.geysermc.floodgate.api.FloodgateApi", true, floodgate.getClass().getClassLoader());
+            Object api = apiClass.getMethod("getInstance").invoke(null);
+            Object result = apiClass.getMethod("isFloodgatePlayer", UUID.class).invoke(api, uuid);
+            return Boolean.TRUE.equals(result);
+        } catch (ReflectiveOperationException | LinkageError ex) {
+            getLogger().warning("API Floodgate inaccessible; exemption Grim non appliquée: " + ex.getMessage());
+            return false;
+        }
+    }
+
     @EventHandler public void onPlayerJoin(PlayerJoinEvent e) {
         Player player=e.getPlayer();
         if(getConfig().getBoolean("network.auth-only",false)) {
