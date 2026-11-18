@@ -71,6 +71,9 @@ commands:
   ah:
     description: Hôtel des ventes avec recherche
     usage: /ah <list|search|sell|buy>
+  shop:
+    description: Boutique Larry avec achats, ventes et marché dynamique
+    usage: /shop [search <objet>|buy <objet> [quantité]|sell [quantité]]
   ac:
     description: "Détection anti-triche Larry sans sanctions automatiques"
     usage: /ac <status|alerts|info|top|log|reset|reload>
