@@ -76,22 +76,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private static final Map<String, Double> SHOP_PRICES = new LinkedHashMap<>();
     private boolean saveQueued = false;
 
-    static {
-        SHOP.put("diamant", Material.DIAMOND); SHOP.put("fer", Material.IRON_INGOT);
-        SHOP.put("or", Material.GOLD_INGOT); SHOP.put("émeraude", Material.EMERALD);
-        SHOP.put("redstone", Material.REDSTONE); SHOP.put("lapis", Material.LAPIS_LAZULI);
-        SHOP.put("obsidienne", Material.OBSIDIAN); SHOP.put("pain", Material.BREAD);
-        SHOP.put("pomme", Material.APPLE); SHOP.put("bois", Material.OAK_LOG);
-        SHOP.put("pierre", Material.STONE); SHOP.put("terre", Material.DIRT);
-        SHOP.put("elytra", Material.ELYTRA); SHOP.put("netherite", Material.NETHERITE_INGOT);
-        SHOP_PRICES.put("diamant",250.0); SHOP_PRICES.put("fer",25.0);
-        SHOP_PRICES.put("or",40.0); SHOP_PRICES.put("émeraude",100.0);
-        SHOP_PRICES.put("redstone",10.0); SHOP_PRICES.put("lapis",12.0);
-        SHOP_PRICES.put("obsidienne",35.0); SHOP_PRICES.put("pain",5.0);
-        SHOP_PRICES.put("pomme",4.0); SHOP_PRICES.put("bois",8.0);
-        SHOP_PRICES.put("pierre",2.0); SHOP_PRICES.put("terre",1.0);
-        SHOP_PRICES.put("elytra",5000.0); SHOP_PRICES.put("netherite",1500.0);
-    }
+    private static final Set<Material> SHOP_BLOCKED=EnumSet.of(Material.ELYTRA,Material.NETHERITE_INGOT,Material.NETHERITE_BLOCK,Material.ANCIENT_DEBRIS,Material.BEACON);
+    private static final Set<String> SHOP_BLOCKED_NAMES=Set.of("COMMAND_BLOCK","CHAIN_COMMAND_BLOCK","REPEATING_COMMAND_BLOCK","STRUCTURE_BLOCK","STRUCTURE_VOID","JIGSAW","BARRIER","BEDROCK","END_PORTAL_FRAME","SPAWNER","TRIAL_SPAWNER","VAULT","LIGHT","DEBUG_STICK","KNOWLEDGE_BOOK");
+    private static final long MARKET_REFRESH_MILLIS=21600000L;
+    static {for(Material m:Material.values()){String n=m.name();if(!m.isItem()||m.isAir()||SHOP_BLOCKED.contains(m)||SHOP_BLOCKED_NAMES.contains(n)||n.endsWith("_SPAWN_EGG"))continue;String k=n.toLowerCase(Locale.ROOT);SHOP.put(k,m);SHOP_PRICES.put(k,baseShopPrice(m));}}
+    private static double baseShopPrice(Material m){String n=m.name();if(n.contains("DIAMOND"))return 2.50;if(n.contains("EMERALD"))return 1.80;if(n.contains("NETHER_STAR")||n.contains("DRAGON_EGG"))return 8;if(n.contains("TRIDENT")||n.contains("HEART_OF_THE_SEA")||n.contains("TOTEM"))return 2;if(n.contains("IRON_INGOT")||n.contains("IRON_NUGGET"))return .55;if(n.contains("GOLD_INGOT")||n.contains("GOLD_NUGGET"))return .45;if(n.contains("COPPER_INGOT"))return .18;if(n.contains("LAPIS"))return .12;if(n.contains("REDSTONE"))return .10;if(n.contains("COAL"))return .16;if(n.contains("OBSIDIAN"))return .25;if(n.contains("BREAD")||n.contains("COOKED"))return .18;if(n.contains("LOG")||n.contains("WOOD")||n.contains("PLANKS")||n.contains("STEM")||n.contains("HYPHAE"))return .08;if(n.contains("WHEAT")||n.contains("CARROT")||n.contains("POTATO")||n.contains("BEETROOT")||n.contains("PUMPKIN")||n.contains("MELON"))return .08;if(n.contains("STONE")||n.contains("COBBLESTONE")||n.contains("DEEPSLATE")||n.contains("TUFF")||n.contains("GRANITE")||n.contains("DIORITE")||n.contains("ANDESITE"))return .025;if(n.contains("DIRT")||n.contains("SAND")||n.contains("GRAVEL")||n.contains("CLAY")||n.contains("NETHERRACK"))return .015;if(n.contains("BOOK")||n.contains("POTION")||n.contains("ENCHANTED"))return .30;if(n.contains("SWORD")||n.contains("PICKAXE")||n.contains("AXE")||n.contains("HOE")||n.contains("SHOVEL")||n.contains("HELMET")||n.contains("CHESTPLATE")||n.contains("LEGGINGS")||n.contains("BOOTS"))return .35;return .05;}
 
     public LarpersFeatures(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -101,15 +90,15 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
         file = new File(plugin.getDataFolder(), "features.yml");
         db = YamlConfiguration.loadConfiguration(file);
-        for (var entry : SHOP_PRICES.entrySet()) {
-            String pricePath="shop.prices."+entry.getKey();
-            if (!db.contains(pricePath)) db.set(pricePath,entry.getValue());
-        }
+        for(var e:SHOP_PRICES.entrySet()){String k=e.getKey();if(!db.contains("shop.sell-prices."+k))db.set("shop.sell-prices."+k,e.getValue());if(!db.contains("shop.buy-prices."+k))db.set("shop.buy-prices."+k,Math.max(.02,e.getValue()*2.8));}
+        if(!db.contains("market.next-refresh"))db.set("market.next-refresh",System.currentTimeMillis()+MARKET_REFRESH_MILLIS);
+        long delay=Math.max(1,(db.getLong("market.next-refresh")-System.currentTimeMillis())/50L);
+        Bukkit.getScheduler().runTaskLater(plugin,()->{recalculateMarketPrices();Bukkit.getScheduler().runTaskTimer(plugin,this::recalculateMarketPrices,MARKET_REFRESH_MILLIS/50L,MARKET_REFRESH_MILLIS/50L);},delay);
         seedQuizQuestion("compass","Quel minerai permet de fabriquer une boussole?","fer",List.of("fer","cuivre","or"));
         seedQuizQuestion("faces","Combien de faces possède un bloc standard?","6",List.of("4","6","8"));
         seedQuizQuestion("creeper","Quel mob explose près du joueur?","creeper",List.of("creeper","zombie","squelette"));
         save();
-        for (String cmd : List.of("clan","quest","quests","succes","top","admin","vanish","invsee","freeze","staffchat","ah","trade","check")) {
+        for (String cmd : List.of("clan","quest","quests","succes","top","admin","vanish","invsee","freeze","staffchat","ah","trade","check","shop")) {
             PluginCommand c = plugin.getCommand(cmd);
             if (c != null) { c.setExecutor(this); c.setTabCompleter(this); }
         }
@@ -1305,63 +1294,16 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         return true;
     }
 
-    private String shopCategoryFor(String key) {
-        if(List.of("diamant","fer","or","émeraude","redstone","lapis","netherite").contains(key))return "Minerais";
-        if(List.of("obsidienne","bois","pierre","terre").contains(key))return "Construction";
-        if(List.of("pain","pomme").contains(key))return "Nourriture";
-        return "Rares";
-    }
-    private void openShop(Player p) { openShop(p,"Tous",0); }
-    private void openShop(Player p,String category,int page) {
-        List<String> categories=List.of("Tous","Minerais","Construction","Nourriture","Rares");
-        if(!categories.contains(category))category="Tous";
-        final String selectedCategory=category;
-        List<Map.Entry<String,Material>> entries=SHOP.entrySet().stream()
-            .filter(e->selectedCategory.equals("Tous")||shopCategoryFor(e.getKey()).equals(selectedCategory)).toList();
-        int pages=Math.max(1,(entries.size()+35)/36);
-        page=Math.max(0,Math.min(page,pages-1));
-        shopCategory.put(p.getUniqueId(),category);shopPage.put(p.getUniqueId(),page);
-        Inventory inv=Bukkit.createInventory(null,54,"Larry | Boutique");
-        int[] tabs={0,2,4,6,8};
-        for(int i=0;i<categories.size();i++)inv.setItem(tabs[i],item(Material.BOOK,categories.get(i),category.equals(categories.get(i))?"Catégorie sélectionnée":"Clique pour filtrer"));
-        int start=page*36;
-        for(int i=start;i<Math.min(entries.size(),start+36);i++) {
-            var entry=entries.get(i);double price=db.getDouble("shop.prices."+entry.getKey(),SHOP_PRICES.get(entry.getKey()));
-            inv.setItem(9+(i-start),item(entry.getValue(),entry.getKey(),"Prix: "+price+" Larry/unité","Clic gauche: 1","Clic droit: 16","Maj-clic: 64"));
-        }
-        inv.setItem(45,item(Material.ARROW,"Page précédente"));
-        inv.setItem(49,item(Material.PAPER,"Page "+(page+1)+"/"+pages,"Clic droit: 16 objets","Maj-clic: 64 objets"));
-        inv.setItem(53,item(Material.ARROW,"Page suivante"));
-        p.openInventory(inv);
-    }
-    private boolean buyShop(Player p,String key,int amount) {
-        if(!SHOP.containsKey(key)) { msg(p,"Objet inconnu. Utilise /shop search <objet>.");return true; }
-        if(amount<1||amount>64) { msg(p,"Quantité autorisée: 1 à 64.");return true; }
-        Material material=SHOP.get(key);
-        ItemStack purchase=new ItemStack(material,amount);
-        Inventory simulated=Bukkit.createInventory(null,36);
-        simulated.setStorageContents(p.getInventory().getStorageContents());
-        if(!simulated.addItem(purchase.clone()).isEmpty()) { msg(p,"Inventaire insuffisant; aucun Larry débité.");return true; }
-        double price=db.getDouble("shop.prices."+key,SHOP_PRICES.getOrDefault(key,0.0))*amount;
-        if(!Double.isFinite(price)||price<=0||!charge(p,price)) { msg(p,"Fonds Larry insuffisants. Prix: "+price+" Larry.");return true; }
-        p.getInventory().addItem(purchase);
-        core.recordTransaction("SHOP_BUY",p.getUniqueId(),new UUID(0L,0L),price);
-        msg(p,"Achat effectué: "+amount+" x "+material.name()+" pour "+price+" Larry.");
-        return true;
-    }
-    private boolean shop(CommandSender s,String[] a) {
-        if(a.length==0) { Player p=player(s);if(p!=null)openShop(p);return true; }
-        if(a.length>=2&&a[0].equalsIgnoreCase("buy")) {
-            Player p=player(s);if(p==null)return true;
-            int amount=1;
-            if(a.length>=3) try { amount=Integer.parseInt(a[2]); } catch(NumberFormatException ex) { amount=0; }
-            return buyShop(p,a[1].toLowerCase(Locale.ROOT),amount);
-        }
-        if(a.length<2||!a[0].equalsIgnoreCase("search")){msg(s,"Usage: /shop | /shop search <objet> | /shop buy <clé> [quantité]");return true;}
-        String query=String.join(" ",Arrays.copyOfRange(a,1,a.length)).toLowerCase(Locale.ROOT);
-        List<String> found=SHOP.entrySet().stream().filter(e->e.getKey().contains(query)||e.getValue().name().toLowerCase(Locale.ROOT).contains(query)).map(e->e.getKey()+" — "+e.getValue().name()+" ("+db.getDouble("shop.prices."+e.getKey(),SHOP_PRICES.get(e.getKey()))+" Larry/u)").toList();
-        msg(s,found.isEmpty()?"Aucun objet correspondant dans le catalogue.":"Résultats: "+String.join(" | ",found));return true;
-    }
+    private String shopCategoryFor(String k){String n=k.toUpperCase(Locale.ROOT);if(n.matches(".*(DIAMOND|EMERALD|IRON|GOLD|COPPER|COAL|REDSTONE|LAPIS|QUARTZ|AMETHYST).*"))return "Minerais";if(n.matches(".*(LOG|WOOD|PLANK|STONE|DIRT|SAND|BRICK|GLASS|WOOL|CONCRETE|TERRACOTTA).*"))return "Construction";if(n.matches(".*(BREAD|APPLE|CARROT|POTATO|WHEAT|COOKED|FISH|MEAT|BEEF|PORK|CHICKEN|MELON|BERRY|COOKIE|CAKE).*"))return "Nourriture";if(n.matches(".*(SWORD|PICKAXE|AXE|SHOVEL|HOE|ARMOR|HELMET|CHESTPLATE|LEGGINGS|BOOTS|BOW|CROSSBOW|SHIELD).*"))return "Équipement";return "Divers";}
+    private double shopSellPrice(String k){return Math.max(.01,db.getDouble("shop.sell-prices."+k,SHOP_PRICES.getOrDefault(k,.05)));}
+    private double shopBuyPrice(String k){return Math.max(shopSellPrice(k)*1.5,db.getDouble("shop.buy-prices."+k,shopSellPrice(k)*2.8));}
+    private void recalculateMarketPrices(){for(var e:SHOP.entrySet()){String k=e.getKey();double base=SHOP_PRICES.getOrDefault(k,.05);long sold=Math.max(0,db.getLong("market.window-sold."+k,0));double sell=Math.max(.01,base*(1-Math.min(.65,sold/512.0*.12)));db.set("shop.sell-prices."+k,Math.round(sell*100)/100.0);db.set("shop.buy-prices."+k,Math.round(sell*2.8*100)/100.0);db.set("market.window-sold."+k,0L);}long now=System.currentTimeMillis();db.set("market.last-refresh",now);db.set("market.next-refresh",now+MARKET_REFRESH_MILLIS);save();plugin.getLogger().info("Marché Larry recalculé; prochaine actualisation dans 6 heures.");}
+    private String marketTimeLeft(){long ms=Math.max(0,db.getLong("market.next-refresh",System.currentTimeMillis())-System.currentTimeMillis());return(ms/3600000)+" h "+((ms/60000)%60)+" min";}
+    private boolean sellShop(Player p,int amount){ItemStack hand=p.getInventory().getItemInMainHand();if(hand==null||hand.getType().isAir()||amount<1||amount>hand.getAmount()){msg(p,"Quantité invalide ou aucun objet vendable dans ta main.");return true;}String k=hand.getType().name().toLowerCase(Locale.ROOT);if(!SHOP.containsKey(k)||SHOP_BLOCKED.contains(hand.getType())){msg(p,"Cet objet ne peut pas être vendu.");return true;}if(hand.hasItemMeta()){msg(p,"Les objets renommés ou enchantés ne sont pas acceptés.");return true;}double total=Math.round(shopSellPrice(k)*amount*100)/100.0;if(total<=0||!Double.isFinite(core.balance(p.getUniqueId())+total)){msg(p,"Vente impossible.");return true;}int left=hand.getAmount()-amount;if(left<=0)p.getInventory().setItemInMainHand(null);else hand.setAmount(left);give(p,total);db.set("market.window-sold."+k,db.getLong("market.window-sold."+k,0L)+amount);db.set("market.sales-total",db.getLong("market.sales-total",0L)+amount);db.set("market.sales-count",db.getLong("market.sales-count",0L)+1);List<Map<String,Object>> h=new ArrayList<>();for(Map<?,?> old:db.getMapList("market.history")){Map<String,Object> r=new LinkedHashMap<>();for(var x:old.entrySet())r.put(String.valueOf(x.getKey()),x.getValue());h.add(r);}Map<String,Object> row=new LinkedHashMap<>();row.put("item",k);row.put("amount",amount);row.put("total",total);row.put("player",p.getName());row.put("time",System.currentTimeMillis());h.add(0,row);if(h.size()>100)h=new ArrayList<>(h.subList(0,100));db.set("market.history",h);save();core.recordTransaction("SHOP_SELL",new UUID(0L,0L),p.getUniqueId(),total);msg(p,"Vente: "+amount+" x "+k+" pour "+total+" Larry. Prix mis à jour dans "+marketTimeLeft()+".");return true;}
+    private void openShop(Player p){openShop(p,"Tous",0);}
+    private void openShop(Player p,String category,int page){List<String> cats=List.of("Tous","Minerais","Construction","Nourriture","Équipement","Divers");if(!cats.contains(category))category="Tous";final String selected=category;List<Map.Entry<String,Material>> entries=SHOP.entrySet().stream().filter(e->selected.equals("Tous")||shopCategoryFor(e.getKey()).equals(selected)).toList();int pages=Math.max(1,(entries.size()+35)/36);page=Math.max(0,Math.min(page,pages-1));shopCategory.put(p.getUniqueId(),category);shopPage.put(p.getUniqueId(),page);Inventory inv=Bukkit.createInventory(null,54,"Larry | Boutique");for(int i=0;i<cats.size();i++)inv.setItem(i,item(Material.BOOK,cats.get(i),category.equals(cats.get(i))?"Sélectionnée":"Filtrer"));int from=page*36;for(int i=from;i<Math.min(entries.size(),from+36);i++){String k=entries.get(i).getKey();inv.setItem(9+i-from,item(entries.get(i).getValue(),k,"Achat: "+shopBuyPrice(k)+" Larry/u","Revente: "+shopSellPrice(k)+" Larry/u","Clic gauche: acheter 1","Clic droit: acheter 16","Maj-clic: acheter 64"));}inv.setItem(45,item(Material.ARROW,"Page précédente"));inv.setItem(47,item(Material.GOLD_INGOT,"Vendre l'objet en main","Clique pour vendre la pile tenue"));inv.setItem(49,item(Material.PAPER,"Page "+(page+1)+"/"+pages,"Catalogue: "+SHOP.size()+" objets","Prix recalculés toutes les 6 heures","Prochaine mise à jour: "+marketTimeLeft()));inv.setItem(51,item(Material.BARRIER,"Fermer"));inv.setItem(53,item(Material.ARROW,"Page suivante"));p.openInventory(inv);}
+    private boolean buyShop(Player p,String key,int amount){if(!SHOP.containsKey(key)){msg(p,"Objet inconnu. Utilise /shop search <objet>.");return true;}if(amount<1||amount>64){msg(p,"Quantité autorisée: 1 à 64.");return true;}ItemStack purchase=new ItemStack(SHOP.get(key),amount);Inventory test=Bukkit.createInventory(null,36);test.setStorageContents(p.getInventory().getStorageContents());if(!test.addItem(purchase.clone()).isEmpty()){msg(p,"Inventaire insuffisant; aucun Larry débité.");return true;}double price=Math.round(shopBuyPrice(key)*amount*100)/100.0;if(!Double.isFinite(price)||price<=0||!charge(p,price)){msg(p,"Fonds Larry insuffisants. Prix: "+price+" Larry.");return true;}p.getInventory().addItem(purchase);core.recordTransaction("SHOP_BUY",p.getUniqueId(),new UUID(0L,0L),price);msg(p,"Achat effectué: "+amount+" x "+key+" pour "+price+" Larry.");return true;}
+    private boolean shop(CommandSender sender,String[] args){if(args.length==0){Player p=player(sender);if(p!=null)openShop(p);return true;}if(args[0].equalsIgnoreCase("sell")){Player p=player(sender);if(p==null)return true;int n=p.getInventory().getItemInMainHand().getAmount();if(args.length>1)try{n=Integer.parseInt(args[1]);}catch(NumberFormatException ex){n=0;}return sellShop(p,n);}if(args.length>=2&&args[0].equalsIgnoreCase("buy")){Player p=player(sender);if(p==null)return true;int n=1;if(args.length>2)try{n=Integer.parseInt(args[2]);}catch(NumberFormatException ex){n=0;}return buyShop(p,args[1].toLowerCase(Locale.ROOT),n);}if(args.length<2||!args[0].equalsIgnoreCase("search")){msg(sender,"Usage: /shop | /shop search <objet> | /shop buy <clé> [quantité] | /shop sell [quantité]");return true;}String q=String.join(" ",Arrays.copyOfRange(args,1,args.length)).toLowerCase(Locale.ROOT);List<String> found=SHOP.entrySet().stream().filter(e->e.getKey().contains(q)||e.getValue().name().toLowerCase(Locale.ROOT).contains(q)).limit(30).map(e->e.getKey()+" — Achat "+shopBuyPrice(e.getKey())+" / vente "+shopSellPrice(e.getKey())+" Larry/u").toList();msg(sender,found.isEmpty()?"Aucun objet correspondant.":"Résultats: "+String.join(" | ",found));return true;}
     private boolean auction(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
         if(a.length==0||a[0].equalsIgnoreCase("list")) { openAuction(p,0);return true; }
@@ -1595,11 +1537,10 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(e.getRawSlot()>=e.getView().getTopInventory().getSize()) return;
             if(!(e.getWhoClicked() instanceof Player buyer)||e.getCurrentItem()==null||!e.getCurrentItem().hasItemMeta()) return;
             int slot=e.getRawSlot();String category=shopCategory.getOrDefault(buyer.getUniqueId(),"Tous");int page=shopPage.getOrDefault(buyer.getUniqueId(),0);
-            if(slot==0||slot==2||slot==4||slot==6||slot==8) {
-                String next=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName());
-                openShop(buyer,next,0);return;
-            }
+            if(slot>=0&&slot<=5){String next=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName());if(List.of("Tous","Minerais","Construction","Nourriture","Équipement","Divers").contains(next))openShop(buyer,next,0);return;}
             if(slot==45){openShop(buyer,category,page-1);return;}
+            if(slot==47){sellShop(buyer,buyer.getInventory().getItemInMainHand().getAmount());openShop(buyer,category,page);return;}
+            if(slot==51){buyer.closeInventory();return;}
             if(slot==53){openShop(buyer,category,page+1);return;}
             if(slot<9||slot>44)return;
             String key=ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
