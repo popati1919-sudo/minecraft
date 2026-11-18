@@ -3,6 +3,13 @@ package ca.larperscoin.smp;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.event.block.Action;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -46,6 +53,7 @@ final class LarpersAuth implements Listener {
     private static final int MAX_ATTEMPTS = 5;
     private static final long LOCK_MILLIS = 15 * 60_000L;
     private final JavaPlugin plugin;
+    private final NamespacedKey lobbyCompassKey;
     private final File file;
     private YamlConfiguration accounts;
     private final SecureRandom random = new SecureRandom();
@@ -57,6 +65,7 @@ final class LarpersAuth implements Listener {
 
     LarpersAuth(JavaPlugin plugin) {
         this.plugin = plugin;
+        this.lobbyCompassKey = new NamespacedKey(plugin, "lobby_return_compass");
         File siblingLobbyData = new File(plugin.getServer().getWorldContainer(),
                 "../Lobby/plugins/LarpersCoin");
         boolean networkBackend = !plugin.getConfig().getBoolean("network.auth-only", false)
@@ -260,6 +269,9 @@ final class LarpersAuth implements Listener {
         authenticated.put(player.getUniqueId(), true);
         joinLocations.remove(player.getUniqueId());
         attempts.remove(player.getUniqueId());
+        if (plugin.getConfig().getBoolean("lobby-return-compass.enabled", false)) {
+            Bukkit.getScheduler().runTask(plugin, () -> giveLobbyCompass(player));
+        }
         if (plugin.getConfig().getBoolean("auth.connect-to-smp", false)) {
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (!player.isOnline()) return;
@@ -273,6 +285,41 @@ final class LarpersAuth implements Listener {
                     plugin.getLogger().warning("Impossible de transférer " + player.getName() + " vers le SMP: " + ex.getMessage());
                 }
             });
+        }
+    }
+
+    private void giveLobbyCompass(Player player) {
+        if (!player.isOnline()) return;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (isLobbyCompass(item)) return;
+        }
+        ItemStack compass = new ItemStack(Material.COMPASS);
+        ItemMeta meta = compass.getItemMeta();
+        if (meta == null) return;
+        meta.setDisplayName(ChatColor.GOLD + "Retour au lobby");
+        meta.setLore(java.util.List.of(ChatColor.GRAY + "Clic droit pour retourner au lobby."));
+        meta.getPersistentDataContainer().set(lobbyCompassKey, PersistentDataType.BYTE, (byte) 1);
+        compass.setItemMeta(meta);
+        player.getInventory().addItem(compass);
+    }
+
+    private boolean isLobbyCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        return item.getItemMeta().getPersistentDataContainer().has(lobbyCompassKey, PersistentDataType.BYTE);
+    }
+
+    private void returnToLobby(Player player) {
+        String target = plugin.getConfig().getString("lobby-return-compass.server", "lobby");
+        try {
+            java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+            java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
+            out.writeUTF("Connect");
+            out.writeUTF(target);
+            player.sendPluginMessage(plugin, "BungeeCord", bytes.toByteArray());
+            player.sendMessage(ChatColor.GREEN + "Téléportation vers le lobby...");
+        } catch (IOException ex) {
+            plugin.getLogger().warning("Impossible de transférer " + player.getName() + " vers le lobby: " + ex.getMessage());
+            player.sendMessage(ChatColor.RED + "Impossible de rejoindre le lobby pour le moment.");
         }
     }
 
@@ -367,7 +414,19 @@ final class LarpersAuth implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent e) { if (!exempt(e.getPlayer())) e.setCancelled(true); }
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onInteract(PlayerInteractEvent e) { if (!exempt(e.getPlayer())) e.setCancelled(true); }
+    public void onInteract(PlayerInteractEvent e) {
+        Player player = e.getPlayer();
+        if (!exempt(player)) {
+            e.setCancelled(true);
+            return;
+        }
+        if (!plugin.getConfig().getBoolean("lobby-return-compass.enabled", false)
+                || e.getHand() != EquipmentSlot.HAND
+                || (e.getAction() != Action.RIGHT_CLICK_AIR && e.getAction() != Action.RIGHT_CLICK_BLOCK)
+                || !isLobbyCompass(e.getItem())) return;
+        e.setCancelled(true);
+        returnToLobby(player);
+    }
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDrop(PlayerDropItemEvent e) { if (!exempt(e.getPlayer())) e.setCancelled(true); }
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
