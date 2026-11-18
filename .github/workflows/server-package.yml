@@ -53,12 +53,16 @@ jobs:
           curl -fL "$LP_URL" -o package/LarrySMP-Server-Ready/plugins/LuckPerms.jar
           test -s package/LarrySMP-Server-Ready/plugins/LuckPerms.jar
 
-          GEYSER_URL="https://download.geysermc.org/v2/projects/geyser/versions/latest/builds/latest/downloads/spigot"
-          FLOODGATE_URL="https://download.geysermc.org/v2/projects/floodgate/versions/latest/builds/latest/downloads/spigot"
-          curl -fL "$GEYSER_URL" -o package/LarrySMP-Server-Ready/plugins/Geyser-Spigot.jar
-          curl -fL "$FLOODGATE_URL" -o package/LarrySMP-Server-Ready/plugins/floodgate-spigot.jar
-          test -s package/LarrySMP-Server-Ready/plugins/Geyser-Spigot.jar
-          test -s package/LarrySMP-Server-Ready/plugins/floodgate-spigot.jar
+          EDUGEYSER_META="$(curl -fsSL https://api.github.com/repos/EduGeyser/EduGeyser/releases/latest)"
+          EDUGEYSER_URL="$(echo "$EDUGEYSER_META" | jq -r '.assets[] | select(.name == "EduGeyser-Spigot.jar") | .browser_download_url' | head -n 1)"
+          EDUFLOODGATE_META="$(curl -fsSL https://api.github.com/repos/EduGeyser/EduFloodgate/releases/latest)"
+          EDUFLOODGATE_URL="$(echo "$EDUFLOODGATE_META" | jq -r '.assets[] | select(.name == "edufloodgate-spigot.jar") | .browser_download_url' | head -n 1)"
+          test -n "$EDUGEYSER_URL"
+          test -n "$EDUFLOODGATE_URL"
+          curl -fL "$EDUGEYSER_URL" -o package/LarrySMP-Server-Ready/plugins/EduGeyser-Spigot.jar
+          curl -fL "$EDUFLOODGATE_URL" -o package/LarrySMP-Server-Ready/plugins/edufloodgate-spigot.jar
+          test -s package/LarrySMP-Server-Ready/plugins/EduGeyser-Spigot.jar
+          test -s package/LarrySMP-Server-Ready/plugins/edufloodgate-spigot.jar
 
           curl -fL "https://github.com/ViaVersion/ViaVersion/releases/download/5.12.2/ViaVersion-5.12.2.jar" -o package/LarrySMP-Server-Ready/plugins/ViaVersion.jar
           curl -fL "https://github.com/ViaVersion/ViaBackwards/releases/download/5.12.2/ViaBackwards-5.12.2.jar" -o package/LarrySMP-Server-Ready/plugins/ViaBackwards.jar
@@ -264,7 +268,7 @@ jobs:
           set "CFG=plugins\Geyser-Spigot\config.yml"
           if not exist "%CFG%" (
             echo Lance le serveur une premiere fois, puis arrete-le avec stop.
-            echo Geyser doit generer son fichier config.yml avant cette etape.
+            echo EduGeyser doit generer son fichier config.yml avant cette etape.
             pause
             exit /b 1
           )
@@ -274,7 +278,7 @@ jobs:
             pause
             exit /b 1
           )
-          echo Geyser configure pour Floodgate.
+          echo EduGeyser configure pour EduFloodgate.
           echo Redemarre le serveur. Ouvre le port 19132 en TCP et UDP.
           pause
           EOF
@@ -324,11 +328,11 @@ jobs:
           - Java 25 requis
           - Plugin LarpersCoin compile depuis le depot
           - LuckPerms (gestion Admin/Moderateur)
-          - Geyser + Floodgate (accès Bedrock)
+          - EduGeyser + EduFloodgate (accès Education et Bedrock)
           - ViaVersion + ViaBackwards (compatibilité Java multi-version)
           - GrimAC (anticheat; vérifications manuelles, aucune sanction automatique)
           - Authentification Java par /register et /login LarpersCoin
-          - Authentification Bedrock via Floodgate
+          - Authentification Bedrock et Education via EduFloodgate
           - Comptes Java crack via /register et /login (mots de passe PBKDF2)
           - Configuration de base et scripts Windows
           - Dashboard web avec console temps reel et execution de commandes admin
@@ -340,14 +344,14 @@ jobs:
           2. Lis https://aka.ms/MinecraftEULA.
           3. Si tu acceptes, ouvre eula.txt et change eula=false en eula=true.
           4. Lance START-SERVER.bat.
-          5. Au premier demarrage, Geyser et Floodgate generent leur configuration; arrete avec stop.
-          6. Lance CONFIGURER-BEDROCK.bat pour régler Geyser sur Floodgate, puis redemarre.
+          5. Au premier demarrage, EduGeyser et EduFloodgate generent leur configuration; arrete avec stop.
+          6. Lance CONFIGURER-BEDROCK.bat pour régler EduGeyser sur EduFloodgate, puis redemarre.
           7. Lance OUVRIR-PORTS-WINDOWS.bat en administrateur; redirige aussi les ports sur le routeur.
           8. Configure les groupes avec CONFIGURER-LES-GROUPES.bat.
           9. Dashboard: http://127.0.0.1 (si le port 80 est occupé, http://127.0.0.1:8765); jeton dans plugins/LarpersCoin/web-admin.yml.
           10. La console du site execute les commandes avec les droits console: garde le jeton secret.
           11. Tous les joueurs Java utilisent /register <motdepasse> puis /login <motdepasse>.
-          12. Bedrock passe par Floodgate et est exempté du mot de passe Larry.
+          12. Bedrock et Education passent par EduFloodgate et est exempté du mot de passe Larry.
 
           RESEAU:
           - Java: TCP 25565.
