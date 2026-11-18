@@ -333,7 +333,7 @@ jobs:
           auth:
             proxy-authenticated: false
             remember-ip: true
-            connect-to-smp: false
+            connect-to-smp: true
             storage-file: plugins/LarpersCoin/auth.yml
           lobby-return-compass:
             enabled: true
