@@ -388,20 +388,20 @@ final class LarpersWebDashboard {
             out.append("\"").append(json(line)).append("\"");
         }
         YamlConfiguration market=YamlConfiguration.loadConfiguration(new File(plugin.getDataFolder(),"features.yml"));
-        out.append("],\\"market\\":{\\"catalogueSize\\":").append(market.getConfigurationSection("shop.sell-prices")==null?0:market.getConfigurationSection("shop.sell-prices").getKeys(false).size())
-                .append(",\\"salesTotal\\":").append(market.getLong("market.sales-total",0))
-                .append(",\\"salesCount\\":").append(market.getLong("market.sales-count",0))
-                .append(",\\"lastRefresh\\":").append(market.getLong("market.last-refresh",0))
-                .append(",\\"nextRefresh\\":").append(market.getLong("market.next-refresh",0))
-                .append(",\\"history\\":[");
+        out.append("],\"market\":{\"catalogueSize\":").append(market.getConfigurationSection("shop.sell-prices")==null?0:market.getConfigurationSection("shop.sell-prices").getKeys(false).size())
+                .append(",\"salesTotal\":").append(market.getLong("market.sales-total",0))
+                .append(",\"salesCount\":").append(market.getLong("market.sales-count",0))
+                .append(",\"lastRefresh\":").append(market.getLong("market.last-refresh",0))
+                .append(",\"nextRefresh\":").append(market.getLong("market.next-refresh",0))
+                .append(",\"history\":[");
         boolean firstSale=true;
         for(Map<?,?> sale:market.getMapList("market.history")){
             if(!firstSale)out.append(',');firstSale=false;
-            out.append("{\\"item\\":\\"").append(json(String.valueOf(sale.get("item"))))
-                    .append("\\",\\"player\\":\\"").append(json(String.valueOf(sale.get("player"))))
-                    .append("\\",\\"amount\\":").append(sale.get("amount") instanceof Number n?n.longValue():0)
-                    .append(",\\"total\\":").append(sale.get("total") instanceof Number n?n.doubleValue():0)
-                    .append(",\\"time\\":").append(sale.get("time") instanceof Number n?n.longValue():0).append('}');
+            out.append("{\"item\":\"").append(json(String.valueOf(sale.get("item"))))
+                    .append("\",\"player\":\"").append(json(String.valueOf(sale.get("player"))))
+                    .append("\",\"amount\":").append(sale.get("amount") instanceof Number n?n.longValue():0)
+                    .append(",\"total\":").append(sale.get("total") instanceof Number n?n.doubleValue():0)
+                    .append(",\"time\":").append(sale.get("time") instanceof Number n?n.longValue():0).append('}');
         }
         out.append("]}}");
         return out.toString();
@@ -464,7 +464,7 @@ final class LarpersWebDashboard {
 
     private String json(String value) {
         if (value == null) return "";
-        return value.replace("\\", "\\\\").replace("\"", "\\\"")
+        return value.replace("\", "\\\").replace("\"", "\\"")
                 .replace("\n", "\\n").replace("\r", "\\r");
     }
 
