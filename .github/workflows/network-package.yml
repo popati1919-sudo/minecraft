@@ -343,6 +343,8 @@ jobs:
             ip: Non configurée
           EOF
           cat > "$ROOT/SMP/plugins/LarpersCoin/config.yml" <<'EOF'
+          network:
+            auth-only: false
           auth:
             proxy-authenticated: true
             remember-ip: false
