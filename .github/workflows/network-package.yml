@@ -348,6 +348,7 @@ jobs:
             ip: Non configurée
           anticheat:
             enabled: true
+            education-no-setback: true
             auto-punish:
               enabled: false
           web-admin:
