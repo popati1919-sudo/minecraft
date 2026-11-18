@@ -333,8 +333,11 @@ jobs:
           auth:
             proxy-authenticated: false
             remember-ip: true
-            connect-to-smp: true
+            connect-to-smp: false
             storage-file: plugins/LarpersCoin/auth.yml
+          lobby-return-compass:
+            enabled: true
+            server: smp
           server-display:
             name: Larry SMP
             ip: Non configurée
@@ -343,10 +346,10 @@ jobs:
           auth:
             proxy-authenticated: true
             remember-ip: false
+            connect-to-smp: false
             storage-file: ../Lobby/plugins/LarpersCoin/auth.yml
           lobby-return-compass:
-            enabled: true
-            server: lobby
+            enabled: false
           server-display:
             name: Larry SMP
             ip: Non configurée
@@ -535,13 +538,13 @@ jobs:
           =============================
           Contenu:
           - Velocity proxy: port public Java 25565
-          - Lobby Paper separe: 127.0.0.1:25566 (authentification uniquement: /register et /login)
+          - Lobby Paper separe: 127.0.0.1:25566 (authentification /register et /login + boussole pour rejoindre le SMP)
           - SMP Paper separe: 127.0.0.1:25567 (plugin LarpersCoin + LuckPerms)
           - EduGeyser + EduFloodgate sur Velocity, EduFloodgate sur Lobby et SMP
           - Authentification des joueurs geree par LarpersCoin; Floodgate identifie les joueurs Bedrock
-          - Apres authentification, transfert automatique vers le SMP
-          - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend
-          - EduGeyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login
+          - Apres authentification, le joueur reste dans le Lobby et utilise la boussole pour rejoindre le SMP
+          - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend. Aucune boussole de transfert n'est donnee dans le SMP
+          - EduGeyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login. Avant authentification, seul le deplacement est bloque: la camera reste libre
           - Backend Paper lie a Velocity avec forwarding moderne et secret prive
 
           INSTALLATION:
