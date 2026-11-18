@@ -296,8 +296,8 @@ final class LarpersAuth implements Listener {
         ItemStack compass = new ItemStack(Material.COMPASS);
         ItemMeta meta = compass.getItemMeta();
         if (meta == null) return;
-        meta.setDisplayName(ChatColor.GOLD + "Retour au lobby");
-        meta.setLore(java.util.List.of(ChatColor.GRAY + "Clic droit pour retourner au lobby."));
+        meta.setDisplayName(ChatColor.GOLD + "Rejoindre le SMP");
+        meta.setLore(java.util.List.of(ChatColor.GRAY + "Clic droit pour rejoindre le SMP."));
         meta.getPersistentDataContainer().set(lobbyCompassKey, PersistentDataType.BYTE, (byte) 1);
         compass.setItemMeta(meta);
         player.getInventory().addItem(compass);
@@ -316,10 +316,10 @@ final class LarpersAuth implements Listener {
             out.writeUTF("Connect");
             out.writeUTF(target);
             player.sendPluginMessage(plugin, "BungeeCord", bytes.toByteArray());
-            player.sendMessage(ChatColor.GREEN + "Téléportation vers le lobby...");
+            player.sendMessage(ChatColor.GREEN + "Téléportation vers le SMP...");
         } catch (IOException ex) {
-            plugin.getLogger().warning("Impossible de transférer " + player.getName() + " vers le lobby: " + ex.getMessage());
-            player.sendMessage(ChatColor.RED + "Impossible de rejoindre le lobby pour le moment.");
+            plugin.getLogger().warning("Impossible de transférer " + player.getName() + " vers le serveur configuré: " + ex.getMessage());
+            player.sendMessage(ChatColor.RED + "Impossible de rejoindre le serveur pour le moment.");
         }
     }
 
