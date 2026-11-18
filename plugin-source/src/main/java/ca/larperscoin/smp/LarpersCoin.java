@@ -10,6 +10,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.entity.Projectile;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -122,6 +124,16 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     @EventHandler
     public void onWorldLoad(org.bukkit.event.world.WorldLoadEvent event) {
         disablePlayerLocatorBar(event.getWorld());
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onLobbyPvp(EntityDamageByEntityEvent event) {
+        if (!getConfig().getBoolean("network.auth-only", false)) return;
+        if (!(event.getEntity() instanceof Player)) return;
+        org.bukkit.entity.Entity damager = event.getDamager();
+        boolean playerAttack = damager instanceof Player
+                || (damager instanceof Projectile projectile && projectile.getShooter() instanceof Player);
+        if (playerAttack) event.setCancelled(true);
     }
 
     @Override
