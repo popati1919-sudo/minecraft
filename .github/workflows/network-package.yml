@@ -340,6 +340,9 @@ jobs:
             proxy-authenticated: true
             remember-ip: false
             storage-file: ../Lobby/plugins/LarpersCoin/auth.yml
+          lobby-return-compass:
+            enabled: true
+            server: lobby
           server-display:
             name: Larry SMP
             ip: Non configurée
