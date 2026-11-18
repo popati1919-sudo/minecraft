@@ -231,6 +231,7 @@ jobs:
             ip: Non configurée
           anticheat:
             enabled: true
+            education-no-setback: true
           web-admin:
             enabled: true
             bind: 127.0.0.1
