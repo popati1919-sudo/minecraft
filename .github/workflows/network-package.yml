@@ -230,7 +230,11 @@ jobs:
 
           for SERVER in Lobby SMP; do
             PORT=25566
-            if [ "$SERVER" = "SMP" ]; then PORT=25567; fi
+            PVP=false
+            if [ "$SERVER" = "SMP" ]; then
+              PORT=25567
+              PVP=true
+            fi
             cat > "$ROOT/$SERVER/eula.txt" <<'EOF'
           # EULA acceptee a la demande de l'administrateur. Conditions: https://aka.ms/MinecraftEULA
           eula=true
@@ -246,7 +250,7 @@ jobs:
           max-players=100
           online-mode=false
           enforce-secure-profile=false
-          pvp=false
+          pvp=$PVP
           server-port=$PORT
           server-ip=127.0.0.1
           motd=Larry SMP $SERVER
@@ -571,9 +575,21 @@ jobs:
           zip -qr ../LarrySMP-Network.zip LarrySMP-Network
 
       - name: Publier le ZIP
+        id: upload
         uses: actions/upload-artifact@v4
         with:
           name: LarrySMP-Network
           path: LarrySMP-Network.zip
           if-no-files-found: error
           retention-days: 90
+
+      - name: Afficher le bouton de téléchargement
+        if: success()
+        env:
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          {
+            echo "## 📦 LarrySMP Network"
+            echo
+            echo "[⬇️ Télécharger LarrySMP-Network.zip]($ARTIFACT_URL)"
+          } >> "$GITHUB_STEP_SUMMARY"
