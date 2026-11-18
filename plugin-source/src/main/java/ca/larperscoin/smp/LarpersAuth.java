@@ -393,7 +393,14 @@ final class LarpersAuth implements Listener {
         Location from = event.getFrom(), to = event.getTo();
         if (from.getBlockX()!=to.getBlockX() || from.getBlockY()!=to.getBlockY() || from.getBlockZ()!=to.getBlockZ()) {
             Location safe = joinLocations.get(event.getPlayer().getUniqueId());
-            if (safe != null) event.setTo(safe);
+            if (safe != null) {
+                // Bloque uniquement le déplacement avant connexion, jamais la caméra.
+                // Education/Bedrock doit pouvoir tourner même si sa position reste verrouillée.
+                Location blocked = safe.clone();
+                blocked.setYaw(to.getYaw());
+                blocked.setPitch(to.getPitch());
+                event.setTo(blocked);
+            }
         }
     }
 
