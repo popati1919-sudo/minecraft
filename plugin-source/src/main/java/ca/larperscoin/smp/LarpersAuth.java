@@ -376,7 +376,9 @@ final class LarpersAuth implements Listener {
     }
 
     private boolean exempt(Player player) {
-        return isAuthenticated(player);
+        // Le systeme d'authentification et ses blocages sont reserves au Lobby.
+        // Sur le SMP, tout joueur est libre: ne jamais appliquer les restrictions /login.
+        return !plugin.getConfig().getBoolean("network.auth-only", false) || isAuthenticated(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
