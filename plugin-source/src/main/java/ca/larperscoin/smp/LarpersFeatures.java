@@ -443,6 +443,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     plugin.getLogger().info("[STAFF] "+sender.getName()+": "+text); return true;
                 }
                 case "ah" -> { return auction(sender,a); }
+                case "shop" -> { return shop(sender,a); }
                 case "trade" -> { return tradeManager.handle(sender,a); }
                 default -> { return false; }
             }
