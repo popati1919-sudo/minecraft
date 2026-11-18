@@ -464,7 +464,7 @@ final class LarpersWebDashboard {
 
     private String json(String value) {
         if (value == null) return "";
-        return value.replace("\", "\\\").replace("\"", "\\"")
+        return value.replace("\\", "\\\\").replace("\"", "\\\"")
                 .replace("\n", "\\n").replace("\r", "\\r");
     }
 
