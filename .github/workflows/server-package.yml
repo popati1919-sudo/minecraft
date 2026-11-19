@@ -349,8 +349,9 @@ jobs:
           6. Lance CONFIGURER-BEDROCK.bat pour régler EduGeyser sur EduFloodgate, puis redemarre.
           7. Lance OUVRIR-PORTS-WINDOWS.bat en administrateur; redirige aussi les ports sur le routeur.
           8. Configure les groupes avec CONFIGURER-LES-GROUPES.bat.
-          9. Dashboard: http://127.0.0.1 (si le port 80 est occupé, http://127.0.0.1:8765); jeton dans plugins/LarpersCoin/web-admin.yml.
-          10. La console du site execute les commandes avec les droits console: garde le jeton secret.
+          9. Dashboard local: http://127.0.0.1:8765; jeton dans plugins/LarpersCoin/web-admin.yml.
+          10. Pour un accès public HTTPS, lance DEMARRER-DASHBOARD-HTTPS.bat et ouvre l'URL trycloudflare.com affichee.
+          11. Le tunnel ne publie pas le port 8765; garde l'URL et le jeton secrets. La console du site execute les commandes avec les droits console.
           11. Tous les joueurs Java utilisent /register <motdepasse> puis /login <motdepasse>.
           12. Bedrock et Education passent par EduFloodgate et est exempté du mot de passe Larry.
 
