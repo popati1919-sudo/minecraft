@@ -114,7 +114,7 @@ Le SMP démarre un dashboard intégré sur `127.0.0.1:8765` (HTTP local uniqueme
 
 Le dashboard affiche les joueurs connectés, leur ping, les alertes anti-triche et permet à un administrateur de réinitialiser un compte. La réinitialisation révoque le compte, expulse le joueur connecté et l'oblige à refaire `/register`. La commande en jeu `/admin reset <pseudo>` reste réservée à `larpers.admin` ou OP.
 
-Pour accéder au dashboard depuis Internet, configure `web-admin.bind: 0.0.0.0` dans `plugins/LarpersCoin/config.yml`, puis place-le derrière un reverse proxy HTTPS avec authentification réseau et limite l'accès au port du dashboard. **N'expose pas directement le port HTTP 8765 sur Internet** : l'application intégrée ne fournit pas elle-même TLS. Garde le jeton secret.
+Pour accéder au dashboard depuis Internet en HTTPS, démarre le serveur puis lance `DEMARRER-DASHBOARD-HTTPS.bat`. Le script ouvre un tunnel Cloudflare et affiche une URL publique `https://...trycloudflare.com`. Il utilise le dashboard local `127.0.0.1:8765`, sans exposer ce port sur le routeur ni modifier `web-admin.bind`. Garde l’URL et le jeton secrets; le tunnel reste actif tant que la fenêtre est ouverte.
 
 ## Anti-triche sans bannissement automatique
 
@@ -132,7 +132,7 @@ Les ZIP générés installent automatiquement:
 
 Le dashboard du SMP (ou du serveur autonome) affiche les dernières lignes du journal et actualise les données toutes les 2 secondes. Il permet aussi d'envoyer une commande comme si elle était saisie dans la console serveur. Toutes les commandes sont exécutées avec les droits console: garde donc le jeton privé.
 
-Par défaut, le site écoute uniquement sur `http://127.0.0.1:8765`. Pour y accéder depuis l'extérieur, utilise un reverse proxy HTTPS authentifié et configure `web-admin.bind: 0.0.0.0` dans `plugins/LarpersCoin/config.yml`; ne publie jamais directement le port 8765 en HTTP. Le jeton est dans `plugins/LarpersCoin/web-admin.yml`.
+Le dashboard écoute sur `http://127.0.0.1:8765` en local. Pour l’accès extérieur HTTPS, utilise `DEMARRER-DASHBOARD-HTTPS.bat`; ne publie jamais directement le port 8765 en HTTP. Le jeton est dans `plugins/LarpersCoin/web-admin.yml`.
 
 
 ## Minecraft Education Edition
