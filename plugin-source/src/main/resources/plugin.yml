@@ -74,6 +74,9 @@ commands:
   shop:
     description: Boutique Larry avec achats, ventes et marché dynamique
     usage: /shop [search <objet>|buy <objet> [quantité]|sell [quantité]]
+  sell:
+    description: Interface de vente et vente totale avec confirmation
+    usage: /sell [all]
   ac:
     description: "Détection anti-triche Larry sans sanctions automatiques"
     usage: /ac <status|alerts|info|top|log|reset|reload>
