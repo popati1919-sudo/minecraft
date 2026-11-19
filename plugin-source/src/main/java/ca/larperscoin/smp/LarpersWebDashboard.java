@@ -95,7 +95,7 @@ final class LarpersWebDashboard {
                         + file.getAbsolutePath() + " — ne le partage jamais.");
             }
             String bind = plugin.getConfig().getString("web-admin.bind", "127.0.0.1");
-            int port = Math.max(1, Math.min(65535, plugin.getConfig().getInt("web-admin.port", 80)));
+            int port = Math.max(1, Math.min(65535, plugin.getConfig().getInt("web-admin.port", 8765)));
             try {
                 server = HttpServer.create(new InetSocketAddress(bind, port), 32);
             } catch (IOException bindError) {
