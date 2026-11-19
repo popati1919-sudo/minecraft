@@ -368,6 +368,9 @@ jobs:
           Fais une sauvegarde du dossier world et des fichiers plugins avant chaque mise a jour.
           EOF
 
+      - name: Ajouter le lanceur HTTPS du dashboard
+        run: cp DEMARRER-DASHBOARD-HTTPS.bat package/LarrySMP-Server-Ready/DEMARRER-DASHBOARD-HTTPS.bat
+
       - name: Creer le ZIP du serveur
         run: |
           cd package
