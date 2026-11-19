@@ -63,6 +63,8 @@ Onglet **Actions** → workflow **Build Larry SMP**. L'artefact s'appelle `Larry
 - `/ah` ou `/ah list` — hôtel des ventes graphique persistant avec barre de recherche (clic sur la boussole, puis saisie dans le chat), filtre vendeur/objet et bouton pour effacer la recherche.
 - `/ah search <objet|vendeur>` et `/ah search clear` — recherche directe; `/ah sell <prix>`, `/ah buy <id>` — gestion des annonces.
 - `/trade <joueur>`, `/trade accept`, `/trade item`, `/trade money <montant>`, `/trade confirm`, `/trade cancel` — échange avec double confirmation.
+- `/shop` — boutique avec catégories, recherche intégrée depuis le menu des catégories et du catalogue, achats et prix de revente.
+- `/sell` — ouvre le menu des piles vendables; cliquer sur une pile la vend. `/sell all` demande une confirmation avant de vendre tout l’inventaire admissible.
 
 ### Anti-triche et modération
 - `/ac alerts` — activer/désactiver les alertes anti-triche pour le staff.
