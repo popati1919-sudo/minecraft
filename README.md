@@ -134,7 +134,7 @@ Les ZIP générés installent automatiquement:
 
 Le dashboard du SMP (ou du serveur autonome) affiche les dernières lignes du journal et actualise les données toutes les 2 secondes. Il permet aussi d'envoyer une commande comme si elle était saisie dans la console serveur. Toutes les commandes sont exécutées avec les droits console: garde donc le jeton privé.
 
-Le dashboard écoute sur `http://127.0.0.1:8765` en local. Pour l’accès extérieur HTTPS, utilise `DEMARRER-DASHBOARD-HTTPS.bat`; ne publie jamais directement le port 8765 en HTTP. Le jeton est dans `plugins/LarpersCoin/web-admin.yml`.
+Le dashboard écoute sur `http://127.0.0.1:8765` en local. Pour le publier sur `https://dashboard.larry-smp.ca`, utilise un tunnel Cloudflare nommé avec le hostname configuré vers `http://localhost:8765`, puis lance `DEMARRER-DASHBOARD-HTTPS.bat`. Le script envoie le lien sur Discord après le démarrage. Ne publie jamais directement le port 8765 en HTTP. Le webhook et le token Cloudflare sont saisis à chaque démarrage et ne sont pas enregistrés dans le dépôt.
 
 
 ## Minecraft Education Edition
