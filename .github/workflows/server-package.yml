@@ -370,7 +370,7 @@ jobs:
           EOF
 
       - name: Ajouter le lanceur HTTPS du dashboard
-        run: cp DEMARRER-DASHBOARD-HTTPS.bat package/LarrySMP-Server-Ready/DEMARRER-DASHBOARD-HTTPS.bat
+        run: cp DEMARRER-DASHBOARD-HTTPS.bat DEMARRER-DASHBOARD-HTTPS.ps1 package/LarrySMP-Server-Ready/
 
       - name: Creer le ZIP du serveur
         run: |
