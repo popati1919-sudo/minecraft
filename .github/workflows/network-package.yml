@@ -574,6 +574,9 @@ jobs:
           - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
           EOF
 
+      - name: Ajouter le lanceur HTTPS du dashboard
+        run: cp DEMARRER-DASHBOARD-HTTPS.bat package/LarrySMP-Network/SMP/DEMARRER-DASHBOARD-HTTPS.bat
+
       - name: Creer le ZIP reseau
         run: |
           cd package
