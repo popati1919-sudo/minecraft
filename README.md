@@ -110,7 +110,7 @@ Cette fonctionnalité doit encore réussir la compilation CI et être testée en
 
 ## Dashboard web administrateur (1.0.7)
 
-Le SMP démarre un petit dashboard intégré sur le port **8765** (par défaut lié à `127.0.0.1`). Ouvre `http://127.0.0.1:8765` depuis la machine serveur. Le jeton administrateur est généré au premier démarrage dans `plugins/LarpersCoin/web-admin.yml`; ne le publie jamais et ne l'envoie pas dans un salon public.
+Le SMP démarre un dashboard intégré sur `127.0.0.1:8765` (HTTP local uniquement). Pour un accès public HTTPS, démarre le serveur puis lance `DEMARRER-DASHBOARD-HTTPS.bat` dans le dossier SMP/serveur: le script lance un tunnel Cloudflare et affiche une URL `https://...trycloudflare.com`. Garde cette URL et le jeton admin secrets; le tunnel reste actif tant que la fenêtre est ouverte. Le script télécharge `cloudflared.exe` depuis les publications officielles Cloudflare. Le jeton administrateur est généré au premier démarrage dans `plugins/LarpersCoin/web-admin.yml`; ne le publie jamais et ne l'envoie pas dans un salon public.
 
 Le dashboard affiche les joueurs connectés, leur ping, les alertes anti-triche et permet à un administrateur de réinitialiser un compte. La réinitialisation révoque le compte, expulse le joueur connecté et l'oblige à refaire `/register`. La commande en jeu `/admin reset <pseudo>` reste réservée à `larpers.admin` ou OP.
 
