@@ -568,8 +568,9 @@ jobs:
           - Ne change pas online-mode du proxy et ne rends jamais les ports backend publics.
           - GrimAC est configure pour alerter et journaliser uniquement: aucun kick/ban automatique.
           - Les permissions grim.alerts sont proposees aux groupes admin et moderator.
-          - Dashboard web: http://127.0.0.1 sur la machine SMP (port 8765 si le port 80 est occupé); jeton dans SMP/plugins/LarpersCoin/web-admin.yml.
-          - La console web execute des commandes avec les droits console: protege le jeton et passe par HTTPS si tu l'exposes via un reverse proxy.
+          - Dashboard local: http://127.0.0.1:8765; jeton dans SMP/plugins/LarpersCoin/web-admin.yml.
+          - Pour l'accès public HTTPS, lance SMP/DEMARRER-DASHBOARD-HTTPS.bat et utilise l'URL trycloudflare.com affichee.
+          - Le tunnel ne publie pas le port 8765; garde l'URL et le jeton secrets. La console execute des commandes avec les droits console.
           - Les mondes et donnees existants ne sont pas inclus: ce ZIP est un paquet serveur propre.
           - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
           EOF
