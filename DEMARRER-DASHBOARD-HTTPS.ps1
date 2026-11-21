@@ -53,13 +53,33 @@ $payload = @{
   })
   allowed_mentions = @{ parse = @() }
 } | ConvertTo-Json -Depth 8
-try {
-  Invoke-RestMethod -Uri $webhook -Method Post -ContentType "application/json" -Body $payload | Out-Null
-  Write-Host "Adresse HTTPS envoyee sur Discord: $dashboardUrl" -ForegroundColor Green
-} catch {
-  Write-Host "Tunnel actif, mais l'envoi Discord a echoue: $($_.Exception.Message)" -ForegroundColor Red
+$discordSent = $false
+$discordError = $null
+for ($attempt = 1; $attempt -le 3 -and -not $discordSent; $attempt++) {
+  try {
+    # wait=true force Discord a renvoyer le message cree (HTTP 200 + identifiant).
+    $discordResponse = Invoke-RestMethod -Uri ($webhook + "?wait=true") -Method Post -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($payload))
+    if ($null -eq $discordResponse -or [string]::IsNullOrWhiteSpace([string]$discordResponse.id)) {
+      throw "Discord n'a pas confirme la creation du message."
+    }
+    $discordSent = $true
+    Write-Host "Message Discord confirme (ID: $($discordResponse.id))." -ForegroundColor Green
+    Write-Host "Lien du dashboard: $dashboardUrl" -ForegroundColor Cyan
+  } catch {
+    $discordError = $_.Exception.Message
+    if ($attempt -lt 3) {
+      Write-Host "Envoi Discord echoue (essai $attempt/3): $discordError" -ForegroundColor Yellow
+      Start-Sleep -Seconds 3
+    }
+  }
+}
+if (-not $discordSent) {
+  Write-Host "Le tunnel tourne, mais Discord n'a pas accepte le message apres 3 essais." -ForegroundColor Red
+  Write-Host "Erreur Discord: $discordError" -ForegroundColor Red
+  Write-Host "Verifie le nouveau webhook et les droits du salon." -ForegroundColor Yellow
 }
 $webhook = $null
+$payload = $null
 Write-Host ""
 Write-Host "Le tunnel reste actif. CTRL+C pour l'arreter." -ForegroundColor Yellow
 while (!$proc.HasExited) { Start-Sleep -Seconds 2 }
