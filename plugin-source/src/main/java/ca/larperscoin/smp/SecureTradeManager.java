@@ -238,6 +238,7 @@ public final class SecureTradeManager implements Listener {
     private void startCountdown(Session s) {
         if(s.countdown)return;
         s.countdown=true;
+        refresh(s);
         countdown(s,5);
     }
     private void countdown(Session s,int seconds) {
