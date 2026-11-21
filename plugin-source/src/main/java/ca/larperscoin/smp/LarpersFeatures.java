@@ -530,7 +530,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
 
     private boolean clan(CommandSender s,String[] a) {
         Player p=player(s); if(p==null)return true;
-        if(a.length==0){openClanMenu(p);return true;}
+        if(a.length==0){if(own==null){msg(p,"Tu n’as pas encore de clan. Utilise /clan create <nom> pour en créer un, /clan join <nom> pour rejoindre une invitation ou /clan top pour voir le classement.");return true;}openClanMenu(p);return true;}
         String sub=a[0].toLowerCase(Locale.ROOT), own=clanOf(p.getUniqueId());
         switch(sub) {
             case "create" -> {
