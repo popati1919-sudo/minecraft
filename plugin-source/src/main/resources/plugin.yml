@@ -82,7 +82,7 @@ commands:
     usage: /ac <status|alerts|info|top|log|reset|reload>
   trade:
     description: Échange sécurisé avec double confirmation
-    usage: /trade <joueur> | /trade accept | /trade cancel
+    usage: /trade <joueur> | /trade accept | /trade money <montant> | /trade cancel
 permissions:
   larpers.staff:
     description: Accès aux outils du staff Larry
