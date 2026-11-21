@@ -36,10 +36,12 @@ public final class SecureTradeManager implements Listener {
     private static final class Offer {
         final List<ItemStack> items = new ArrayList<>();
         boolean confirmed;
+        double money;
     }
     private static final class Session {
         final UUID first, second;
         final Offer a = new Offer(), b = new Offer();
+        boolean countdown;
         Session(UUID first, UUID second) { this.first=first; this.second=second; }
         Offer offer(UUID id) { return first.equals(id) ? a : b; }
         UUID other(UUID id) { return first.equals(id) ? second : first; }
@@ -86,6 +88,18 @@ public final class SecureTradeManager implements Listener {
     }
     public boolean handle(CommandSender sender,String[] args) {
         if(!(sender instanceof Player p)){msg(sender,"Cette commande doit être utilisée en jeu.");return true;}
+        if(args.length==2 && args[0].equalsIgnoreCase("money")) {
+            Session active=session(p.getUniqueId());
+            if(active==null){msg(p,"Tu dois être dans un échange pour ajouter de l'argent.");return true;}
+            double amount;
+            try{amount=Double.parseDouble(args[1].replace(',','.'));}catch(NumberFormatException ex){msg(p,"Montant invalide. Utilise /trade money <montant>.");return true;}
+            if(!Double.isFinite(amount)||amount<0||amount>economy.balance(p.getUniqueId())){msg(p,"Montant invalide ou solde Larry insuffisant.");return true;}
+            Offer own=active.offer(p.getUniqueId());own.money=amount;changed(active);
+            msg(p,amount==0?"Argent retiré de ton offre.":"Tu offres "+amount+" Larry.");
+            Player other=Bukkit.getPlayer(active.other(p.getUniqueId()));
+            if(other!=null)msg(other,p.getName()+" a modifié son offre d'argent : "+amount+" Larry.");
+            return true;
+        }
         if(args.length==1 && args[0].equalsIgnoreCase("accept")) {
             UUID from=invitations.get(p.getUniqueId());
             if(from==null){msg(p,"Tu n'as aucune invitation. Demande à un joueur : /trade "+p.getName()+".");return true;}
@@ -140,7 +154,7 @@ public final class SecureTradeManager implements Listener {
             msg(target,p.getName()+" veut échanger avec toi. Fais /trade accept pour accepter ou /trade cancel pour refuser.");
             return true;
         }
-        msg(p,"Commandes : /trade <joueur> pour inviter, /trade accept pour accepter, /trade cancel pour annuler.");
+        msg(p,"Commandes : /trade <joueur>, /trade accept, /trade money <montant>, /trade cancel.");
         return true;
     }
 
@@ -153,7 +167,9 @@ public final class SecureTradeManager implements Listener {
         Inventory inv=Bukkit.createInventory(null,54,TITLE);
         for(int i=0;i<own.items.size()&&i<OWN_SLOTS.length;i++) inv.setItem(OWN_SLOTS[i],own.items.get(i).clone());
         for(int i=0;i<theirs.items.size()&&i<OTHER_SLOTS.length;i++) inv.setItem(OTHER_SLOTS[i],theirs.items.get(i).clone());
-        inv.setItem(22,named(Material.BOOK,"TES OBJETS","Dépose ici les objets que tu offres","Zone du haut : 21 emplacements"));
+        inv.setItem(21,named(Material.GOLD_INGOT,"TON ARGENT : "+own.money+" Larry","Pour modifier : /trade money <montant>","0 pour retirer l'argent"));
+        inv.setItem(22,named(Material.BOOK,"TES OBJETS","Clique un objet de ton inventaire pour l'ajouter","Zone du haut : 21 emplacements"));
+        inv.setItem(25,named(Material.GOLD_INGOT,"ARGENT DE "+otherName.toUpperCase(Locale.ROOT)+": "+theirs.money+" Larry","Offre de l'autre joueur"));
         inv.setItem(23,named(Material.NAME_TAG,"OFFRE DE "+otherName.toUpperCase(Locale.ROOT),"Objets proposés par l'autre joueur","Cette zone est en lecture seule"));
         inv.setItem(49,named(own.confirmed?Material.LIME_CONCRETE:Material.EMERALD,
             own.confirmed?"OFFRE CONFIRMÉE":"CONFIRMER L'ÉCHANGE",
@@ -169,7 +185,7 @@ public final class SecureTradeManager implements Listener {
         return -1;
     }
     private void changed(Session s) {
-        s.a.confirmed=false;s.b.confirmed=false;refresh(s);
+        s.a.confirmed=false;s.b.confirmed=false;s.countdown=false;refresh(s);
     }
     @EventHandler public void onClick(InventoryClickEvent e) {
         if(!e.getView().getTitle().equals(TITLE))return;
@@ -183,7 +199,7 @@ public final class SecureTradeManager implements Listener {
         if(raw==49) {
             Offer own=s.offer(p.getUniqueId()); own.confirmed=true;
             if(other!=null)msg(other,p.getName()+" a confirmé son offre.");
-            if(s.a.confirmed&&s.b.confirmed)complete(s);else refresh(s);
+            if(s.a.confirmed&&s.b.confirmed)startCountdown(s);else refresh(s);
             return;
         }
         int index=ownIndex(raw);
@@ -200,7 +216,7 @@ public final class SecureTradeManager implements Listener {
             }
             return;
         }
-        if(raw>=e.getView().getTopInventory().getSize() && e.isShiftClick()) {
+        if(raw>=e.getView().getTopInventory().getSize()) {
             ItemStack clicked=e.getCurrentItem();
             if(clicked==null||clicked.getType().isAir())return;
             Offer own=s.offer(p.getUniqueId());
@@ -219,6 +235,20 @@ public final class SecureTradeManager implements Listener {
         Player other=Bukkit.getPlayer(s.other(e.getPlayer().getUniqueId()));
         if(!withinRange(e.getPlayer(),other))cancel(s,"un joueur est sorti de la zone de 10 blocs");
     }
+    private void startCountdown(Session s) {
+        if(s.countdown)return;
+        s.countdown=true;
+        countdown(s,5);
+    }
+    private void countdown(Session s,int seconds) {
+        if(session(s.first)!=s||session(s.second)!=s||!s.a.confirmed||!s.b.confirmed||!s.countdown)return;
+        Player a=Bukkit.getPlayer(s.first),b=Bukkit.getPlayer(s.second);
+        if(a==null||b==null){cancel(s,"un joueur s'est déconnecté");return;}
+        if(seconds<=0){s.countdown=false;complete(s);return;}
+        msg(a,"Échange validé dans "+seconds+" seconde(s)...");
+        msg(b,"Échange validé dans "+seconds+" seconde(s)...");
+        Bukkit.getScheduler().runTaskLater(plugin,()->countdown(s,seconds-1),20L);
+    }
     private boolean canReceive(Player receiver,Offer incoming) {
         Inventory test=Bukkit.createInventory(null,36);
         test.setStorageContents(receiver.getInventory().getStorageContents());
@@ -229,13 +259,27 @@ public final class SecureTradeManager implements Listener {
         if(a==null||b==null){cancel(s,"un joueur s'est déconnecté");return;}
         if(!withinRange(a,b)){cancel(s,"les joueurs sont trop éloignés");return;}
         if(!canReceive(a,s.b)||!canReceive(b,s.a)){cancel(s,"inventaire plein; objets rendus sans échange");return;}
+        if(!Double.isFinite(s.a.money)||!Double.isFinite(s.b.money)||s.a.money<0||s.b.money<0
+            ||economy.balance(a.getUniqueId())<s.a.money||economy.balance(b.getUniqueId())<s.b.money) {
+            cancel(s,"solde Larry insuffisant; aucun échange effectué");return;
+        }
+        if(s.a.money>0&&!economy.debit(a.getUniqueId(),s.a.money)){cancel(s,"paiement Larry impossible");return;}
+        if(s.b.money>0&&!economy.debit(b.getUniqueId(),s.b.money)){
+            if(s.a.money>0)economy.credit(a.getUniqueId(),s.a.money);
+            cancel(s,"paiement Larry impossible");return;
+        }
+        if(s.a.money>0)economy.credit(b.getUniqueId(),s.a.money);
+        if(s.b.money>0)economy.credit(a.getUniqueId(),s.b.money);
+        economy.saveData();
+        if(s.a.money>0)economy.recordTransaction("TRADE",a.getUniqueId(),b.getUniqueId(),s.a.money);
+        if(s.b.money>0)economy.recordTransaction("TRADE",b.getUniqueId(),a.getUniqueId(),s.b.money);
         clear(s);
         for(ItemStack item:s.a.items)b.getInventory().addItem(item.clone());
         for(ItemStack item:s.b.items)a.getInventory().addItem(item.clone());
         s.a.items.clear();s.b.items.clear();
         closeViews(s);
-        msg(a,"Échange terminé avec "+b.getName()+".");
-        msg(b,"Échange terminé avec "+a.getName()+".");
+        msg(a,"Échange terminé avec "+b.getName()+". Argent reçu : "+s.b.money+" Larry, envoyé : "+s.a.money+" Larry.");
+        msg(b,"Échange terminé avec "+a.getName()+". Argent reçu : "+s.a.money+" Larry, envoyé : "+s.b.money+" Larry.");
         completedTrade.accept(a.getUniqueId());
         completedTrade.accept(b.getUniqueId());
     }
