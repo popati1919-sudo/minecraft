@@ -13,6 +13,8 @@ import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryView;
+import org.bukkit.inventory.view.AnvilView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -23,6 +25,7 @@ import java.util.function.Consumer;
 public final class SecureTradeManager implements Listener {
     private static final String PREFIX = ChatColor.GOLD + "[Larry] " + ChatColor.RESET;
     private static final String TITLE = ChatColor.DARK_AQUA + "Larry | Échange";
+    private static final String MONEY_TITLE = ChatColor.DARK_AQUA + "Larry | Montant";
     private static final int MAX_DISTANCE_SQUARED = 100;
     private static final int[] OWN_SLOTS = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20};
     private static final int[] OTHER_SLOTS = {27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47};
@@ -32,6 +35,7 @@ public final class SecureTradeManager implements Listener {
     private final Map<UUID, UUID> invitations = new HashMap<>();
     private final Map<UUID, Session> sessions = new HashMap<>();
     private final Set<UUID> opening = new HashSet<>();
+    private final Set<UUID> moneyInput = new HashSet<>();
 
     private static final class Offer {
         final List<ItemStack> items = new ArrayList<>();
@@ -88,18 +92,6 @@ public final class SecureTradeManager implements Listener {
     }
     public boolean handle(CommandSender sender,String[] args) {
         if(!(sender instanceof Player p)){msg(sender,"Cette commande doit être utilisée en jeu.");return true;}
-        if(args.length==2 && args[0].equalsIgnoreCase("money")) {
-            Session active=session(p.getUniqueId());
-            if(active==null){msg(p,"Tu dois être dans un échange pour ajouter de l'argent.");return true;}
-            double amount;
-            try{amount=Double.parseDouble(args[1].replace(',','.'));}catch(NumberFormatException ex){msg(p,"Montant invalide. Utilise /trade money <montant>.");return true;}
-            if(!Double.isFinite(amount)||amount<0||amount>economy.balance(p.getUniqueId())){msg(p,"Montant invalide ou solde Larry insuffisant.");return true;}
-            Offer own=active.offer(p.getUniqueId());own.money=amount;changed(active);
-            msg(p,amount==0?"Argent retiré de ton offre.":"Tu offres "+amount+" Larry.");
-            Player other=Bukkit.getPlayer(active.other(p.getUniqueId()));
-            if(other!=null)msg(other,p.getName()+" a modifié son offre d'argent : "+amount+" Larry.");
-            return true;
-        }
         if(args.length==1 && args[0].equalsIgnoreCase("accept")) {
             UUID from=invitations.get(p.getUniqueId());
             if(from==null){msg(p,"Tu n'as aucune invitation. Demande à un joueur : /trade "+p.getName()+".");return true;}
@@ -154,7 +146,7 @@ public final class SecureTradeManager implements Listener {
             msg(target,p.getName()+" veut échanger avec toi. Fais /trade accept pour accepter ou /trade cancel pour refuser.");
             return true;
         }
-        msg(p,"Commandes : /trade <joueur>, /trade accept, /trade money <montant>, /trade cancel.");
+        msg(p,"Commandes : /trade <joueur>, /trade accept, /trade cancel.");
         return true;
     }
 
@@ -167,7 +159,7 @@ public final class SecureTradeManager implements Listener {
         Inventory inv=Bukkit.createInventory(null,54,TITLE);
         for(int i=0;i<own.items.size()&&i<OWN_SLOTS.length;i++) inv.setItem(OWN_SLOTS[i],own.items.get(i).clone());
         for(int i=0;i<theirs.items.size()&&i<OTHER_SLOTS.length;i++) inv.setItem(OTHER_SLOTS[i],theirs.items.get(i).clone());
-        inv.setItem(21,named(Material.GOLD_INGOT,"TON ARGENT : "+own.money+" Larry","Pour modifier : /trade money <montant>","0 pour retirer l'argent"));
+        inv.setItem(21,named(Material.GOLD_INGOT,"ARGENT : "+own.money+" Larry","Clique ici pour saisir un montant dans l'enclume","Entre 0 pour retirer ton argent de l'offre"));
         inv.setItem(22,named(Material.BOOK,"TES OBJETS","Clique un objet de ton inventaire pour l'ajouter","Zone du haut : 21 emplacements"));
         inv.setItem(25,named(Material.GOLD_INGOT,"ARGENT DE "+otherName.toUpperCase(Locale.ROOT)+": "+theirs.money+" Larry","Offre de l'autre joueur"));
         inv.setItem(23,named(Material.NAME_TAG,"OFFRE DE "+otherName.toUpperCase(Locale.ROOT),"Objets proposés par l'autre joueur","Cette zone est en lecture seule"));
@@ -180,6 +172,18 @@ public final class SecureTradeManager implements Listener {
         p.openInventory(inv);
         opening.remove(p.getUniqueId());
     }
+    private void openMoneyInput(Player p) {
+        UUID id=p.getUniqueId();
+        opening.add(id);
+        InventoryView view=p.openAnvil(null,true);
+        opening.remove(id);
+        if(view==null){msg(p,"Impossible d'ouvrir la saisie du montant.");return;}
+        view.setTitle(MONEY_TITLE);
+        view.setItem(0,named(Material.PAPER,"0","Remplace ce texte par le montant Larry"));
+        if(view instanceof AnvilView anvil)anvil.setRepairCost(0);
+        moneyInput.add(id);
+        msg(p,"Écris le montant Larry dans l'enclume puis clique sur le résultat pour valider. Entre 0 pour retirer l'argent.");
+    }
     private int ownIndex(int slot) {
         for(int i=0;i<OWN_SLOTS.length;i++) if(OWN_SLOTS[i]==slot)return i;
         return -1;
@@ -188,6 +192,33 @@ public final class SecureTradeManager implements Listener {
         s.a.confirmed=false;s.b.confirmed=false;s.countdown=false;refresh(s);
     }
     @EventHandler public void onClick(InventoryClickEvent e) {
+        if(e.getView().getTitle().equals(MONEY_TITLE)) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player player))return;
+            if(e.getRawSlot()!=2)return;
+            Session active=session(player.getUniqueId());
+            if(active==null){moneyInput.remove(player.getUniqueId());player.closeInventory();return;}
+            String typed=((AnvilView)e.getView()).getRenameText();
+            double amount;
+            try {
+                if(typed==null||typed.isBlank())throw new NumberFormatException();
+                amount=Double.parseDouble(typed.trim().replace(',','.'));
+            } catch(NumberFormatException ex) {
+                msg(player,"Montant invalide. Entre un nombre, par exemple 250 ou 12.5.");
+                return;
+            }
+            if(!Double.isFinite(amount)||amount<0||amount>economy.balance(player.getUniqueId())) {
+                msg(player,"Montant invalide ou solde Larry insuffisant.");
+                return;
+            }
+            moneyInput.remove(player.getUniqueId());
+            player.closeInventory();
+            active.offer(player.getUniqueId()).money=amount;
+            changed(active);
+            Player other=Bukkit.getPlayer(active.other(player.getUniqueId()));
+            if(other!=null)msg(other,player.getName()+" a modifié son offre : "+amount+" Larry.");
+            return;
+        }
         if(!e.getView().getTitle().equals(TITLE))return;
         e.setCancelled(true);
         if(!(e.getWhoClicked() instanceof Player p))return;
@@ -196,6 +227,7 @@ public final class SecureTradeManager implements Listener {
         if(!withinRange(p,other)){cancel(s,"les joueurs doivent rester à 10 blocs maximum");return;}
         int raw=e.getRawSlot();
         if(raw==53){cancel(s,p.getName()+" a annulé");return;}
+        if(raw==21){openMoneyInput(p);return;}
         if(raw==49) {
             Offer own=s.offer(p.getUniqueId()); own.confirmed=true;
             if(other!=null)msg(other,p.getName()+" a confirmé son offre.");
@@ -285,7 +317,16 @@ public final class SecureTradeManager implements Listener {
         completedTrade.accept(b.getUniqueId());
     }
     @EventHandler public void onClose(InventoryCloseEvent e) {
-        if(!e.getView().getTitle().equals(TITLE)||opening.contains(e.getPlayer().getUniqueId()))return;
+        UUID closedId=e.getPlayer().getUniqueId();
+        if(e.getView().getTitle().equals(MONEY_TITLE) && moneyInput.remove(closedId)) {
+            Bukkit.getScheduler().runTask(plugin,()->{
+                Session active=session(closedId);
+                Player player=Bukkit.getPlayer(closedId);
+                if(active!=null&&player!=null)refresh(active);
+            });
+            return;
+        }
+        if(!e.getView().getTitle().equals(TITLE)||opening.contains(closedId))return;
         Session s=session(e.getPlayer().getUniqueId());
         if(s!=null)cancel(s,"interface fermée");
     }
