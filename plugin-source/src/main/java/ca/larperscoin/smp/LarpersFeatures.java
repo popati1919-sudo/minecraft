@@ -468,6 +468,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(p!=null){if(!core.isLpcAdmin(p))msg(p,"Le menu /admin est réservé aux administrateurs.");else openAdmin(p);}
             return true;
         }
+        if(args[0].equalsIgnoreCase("start") || args[0].equalsIgnoreCase("stop")) {
+            if(!sender.isOp() && !sender.hasPermission("larpers.admin")) msg(sender,"Commande réservée aux administrateurs.");
+            else MineAccess.control(sender,args);
+            return true;
+        }
         if(args[0].equalsIgnoreCase("reset")) {
             if(!sender.isOp()&&!sender.hasPermission("larpers.admin")){msg(sender,"Cette action est réservée aux administrateurs.");return true;}
             if(args.length!=2){msg(sender,"Usage: /admin reset <joueur>");return true;}
@@ -1771,8 +1776,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             Bukkit.getOnlinePlayers().stream().filter(p->!p.equals(s)).map(Player::getName).forEach(options::add);
             return options.stream().filter(v->v.toLowerCase(Locale.ROOT).startsWith(a[0].toLowerCase(Locale.ROOT))).toList();
         }
-        if(c.getName().equalsIgnoreCase("admin")&&a.length==1)return List.of("reset","ip","event");
+        if(c.getName().equalsIgnoreCase("admin")&&a.length==1)return List.of("reset","ip","event","start","stop");
         if(c.getName().equalsIgnoreCase("admin")&&a.length==2&&a[0].equalsIgnoreCase("event"))return List.of("list","start","stop","status");
+        if(c.getName().equalsIgnoreCase("admin")&&a.length==2&&a[0].equalsIgnoreCase("start"))return List.of("mine");
         if(c.getName().equalsIgnoreCase("admin")&&a.length==3&&a[0].equalsIgnoreCase("event")&&a[1].equalsIgnoreCase("start"))return List.of("melange","quiz","calcul","reaction");
         if(c.getName().equalsIgnoreCase("admin")&&a.length==2&&a[0].equalsIgnoreCase("reset"))
             return Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();

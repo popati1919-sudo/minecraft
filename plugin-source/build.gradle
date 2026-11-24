@@ -24,3 +24,10 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 jar { archiveBaseName = 'LarpersCoin'; archiveVersion = project.version }
+
+tasks.register('eventJar', Jar) {
+    archiveFileName = 'LarryEvent.jar'
+    from(sourceSets.main.output) { include '**/FloodMine*.class', '**/MineAccess*.class' }
+    from 'src/event'
+}
+assemble.dependsOn eventJar

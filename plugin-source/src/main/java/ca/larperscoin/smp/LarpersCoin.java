@@ -93,6 +93,12 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         // Désactive la barre de localisation des joueurs dans tous les mondes chargés.
         Bukkit.getWorlds().forEach(this::disablePlayerLocatorBar);
         auth = new LarpersAuth(this);
+        getCommand("serveur").setExecutor((sender, command, label, args) -> {
+            if (sender instanceof Player player && auth.isAuthenticated(player) && args.length == 1 && args[0].equalsIgnoreCase("event"))
+                MineAccess.join(this, player);
+            else sender.sendMessage("Connecte-toi puis utilise /serveur event.");
+            return true;
+        });
         features = new LarpersFeatures(this);
         antiCheat = new LarpersAntiCheat(this);
         webDashboard = new LarpersWebDashboard(this, this);
