@@ -767,8 +767,64 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         saveSoon();
     }
     private record AchievementTier(String key,String name,String stat,long goal,double reward,Material icon) { }
+    private static final List<Integer> GENERAL_REWARDS=List.of(10,25,100,250,400,600,800,1000);
+    private static List<AchievementTier> series(String stat,String name,Material icon,int... goals) {
+        List<AchievementTier> tiers=new ArrayList<>();
+        for(int i=0;i<goals.length;i++)
+            tiers.add(new AchievementTier(stat+"_"+(i+1),name+" "+(i+1),stat,goals[i],GENERAL_REWARDS.get(i),icon));
+        return List.copyOf(tiers);
+    }
+    private static final List<List<AchievementTier>> GENERAL_SERIES=List.of(
+        series("sheep-shorn","Tondeur",Material.SHEARS,100,1000,10000,100000,150000,250000,500000,1000000),
+        series("logs-chopped","Bûcheron",Material.IRON_AXE,500,2500,10000,50000,100000,250000,500000,1000000),
+        series("animals-bred","Éleveur",Material.WHEAT,25,100,500,2500,5000,10000,25000,50000),
+        series("honey-bottled","Apiculteur",Material.HONEY_BOTTLE,50,250,1000,5000,10000,25000,50000,100000),
+        series("bow-kills","Archer",Material.BOW,100,500,2500,10000,25000,50000,100000,250000),
+        series("table-enchants","Bibliothécaire",Material.ENCHANTING_TABLE,25,100,500,2000,5000,10000,20000,50000));
+
+    private void generalProgress(Player player,String stat) {
+        if(player.getGameMode()==org.bukkit.GameMode.SURVIVAL && !plugin.getConfig().getBoolean("network.auth-only",false))
+            addAchievementProgress(player,stat,1);
+    }
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
+    public void onShear(PlayerShearEntityEvent e) {
+        if(e.getEntity() instanceof org.bukkit.entity.Sheep) generalProgress(e.getPlayer(),"sheep-shorn");
+    }
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
+    public void onBreed(org.bukkit.event.entity.EntityBreedEvent e) {
+        if(e.getBreeder() instanceof Player p && e.getEntity() instanceof org.bukkit.entity.Animals)
+            generalProgress(p,"animals-bred");
+    }
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
+    public void onEnchant(org.bukkit.event.enchantment.EnchantItemEvent e) {
+        generalProgress(e.getEnchanter(),"table-enchants");
+    }
+    @EventHandler(priority=EventPriority.MONITOR)
+    public void onArrowKill(EntityDeathEvent e) {
+        var source=e.getDamageSource();
+        if(e.getEntity() instanceof org.bukkit.entity.Monster && source.getCausingEntity() instanceof Player p
+            && (source.getDirectEntity() instanceof org.bukkit.entity.Arrow ||
+                source.getDirectEntity() instanceof org.bukkit.entity.SpectralArrow ||
+                source.getDirectEntity() instanceof org.bukkit.entity.Firework))
+            generalProgress(p,"bow-kills");
+    }
+    private final Set<org.bukkit.Location> pendingHives=new HashSet<>();
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true)
+    public void onBottleHoney(PlayerInteractEvent e) {
+        var block=e.getClickedBlock();
+        if(e.getAction()!=org.bukkit.event.block.Action.RIGHT_CLICK_BLOCK || block==null || e.getItem()==null ||
+            e.getItem().getType()!=Material.GLASS_BOTTLE || e.useInteractedBlock()==Event.Result.DENY ||
+            e.useItemInHand()==Event.Result.DENY || !(block.getBlockData() instanceof org.bukkit.block.data.type.Beehive hive) ||
+            hive.getHoneyLevel()!=hive.getMaximumHoneyLevel() || !pendingHives.add(block.getLocation())) return;
+        Bukkit.getScheduler().runTask(plugin,()->{
+            pendingHives.remove(block.getLocation());
+            if(block.getBlockData() instanceof org.bukkit.block.data.type.Beehive after && after.getHoneyLevel()==0)
+                generalProgress(e.getPlayer(),"honey-bottled");
+        });
+    }
     private List<List<AchievementTier>> achievementLanes(String category) {
         return switch(category) {
+            case "Général" -> GENERAL_SERIES;
             case "Mineur" -> List.of(
                 List.of(
                     new AchievementTier("miner_blocks_1","Débutant de la pioche","blocks-mined",10,10,Material.WOODEN_PICKAXE),
@@ -922,7 +978,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             default -> List.of();
         };
     }
-    private List<String> achievementCategories() { return List.of("Mineur","Fermier","PvP","Chasseur","Divers","Constructeur","Alchimiste","Aventurier","Collectionneur","Marchand"); }
+    private List<String> achievementCategories() { return List.of("Mineur","Fermier","PvP","Chasseur","Divers","Constructeur","Alchimiste","Aventurier","Collectionneur","Marchand","Général"); }
     private void checkAchievements(Player p) {
         for(String category:achievementCategories()) for(List<AchievementTier> lane:achievementLanes(category))
             for(AchievementTier tier:lane) if(achievementStat(p,tier.stat())>=tier.goal()) {
@@ -995,11 +1051,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     private void openAchievementMenu(Player p) {
         Inventory inv=Bukkit.createInventory(null,54,"Larry | Succès");
-        String[] categories={"Mineur","Fermier","PvP","Chasseur","Divers","Constructeur","Alchimiste","Aventurier","Collectionneur","Marchand"};
+        List<String> categories=achievementCategories();
         Material[] icons={Material.IRON_PICKAXE,Material.WHEAT,Material.DIAMOND_SWORD,Material.ZOMBIE_HEAD,Material.NETHER_STAR,
-            Material.BRICKS,Material.BREWING_STAND,Material.COMPASS,Material.CHEST,Material.EMERALD};
-        int[] slots={10,12,14,16,28,30,32,34,20,24};
-        for(int i=0;i<categories.length;i++) inv.setItem(slots[i],item(icons[i],categories[i],"Voir les 7 paliers de cette catégorie"));
+            Material.BRICKS,Material.BREWING_STAND,Material.COMPASS,Material.CHEST,Material.EMERALD,Material.BOOK};
+        int[] slots={10,12,14,16,28,30,32,34,20,24,22};
+        for(int i=0;i<categories.size();i++) inv.setItem(slots[i],item(icons[i],categories.get(i),"Voir les prochains objectifs"));
         inv.setItem(49,item(Material.BARRIER,"Fermer"));
         LpcMenuTheme.frame(inv);
         p.openInventory(inv);
@@ -1007,7 +1063,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private void openAchievementCategory(Player p,String category) {
         List<List<AchievementTier>> lanes=achievementLanes(category);
         Inventory inv=Bukkit.createInventory(null,27,"Larry | "+category);
-        int[] slots={10,12,14,16,22};
+        int[] slots={10,12,14,16,21,23};
         for(int i=0;i<lanes.size()&&i<slots.length;i++) inv.setItem(slots[i],achievementLaneItem(p,lanes.get(i)));
         inv.setItem(18,item(Material.ARROW,"Retour","Revenir aux catégories"));
         inv.setItem(26,item(Material.BARRIER,"Fermer"));
@@ -1131,14 +1187,17 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         saveSoon();
     }
 
-    @EventHandler public void onQuestBlockBreak(BlockBreakEvent e) {
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void onQuestBlockBreak(BlockBreakEvent e) {
         Player p=e.getPlayer();
         if(p.getGameMode()==org.bukkit.GameMode.CREATIVE) return;
         var b=e.getBlock();
         String loc=b.getWorld().getUID()+":"+b.getX()+":"+b.getY()+":"+b.getZ();
         if(playerPlacedBlocks.remove(loc) || db.getBoolean("player-placed-blocks."+loc,false)) {
             db.set("player-placed-blocks."+loc,null);
-            // Un bloc posé est un bloc supplémentaire à casser: on poursuit son comptage.
+            // Les autres compteurs conservent leur traitement des blocs posés.
+        } else if(b.getType().name().endsWith("_LOG") && !b.getType().name().startsWith("STRIPPED_") &&
+            p.getInventory().getItemInMainHand().getType().name().endsWith("_AXE")) {
+            generalProgress(p,"logs-chopped");
         }
         if(b.getBlockData() instanceof Ageable age && age.getAge()>=age.getMaximumAge()) {
             progressQuest(p,"crops");
@@ -1528,7 +1587,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(title.equals("Larry | Succès")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player viewer)) return;
-            int[] slots={10,12,14,16,28,30,32,34,20,24};
+            int[] slots={10,12,14,16,28,30,32,34,20,24,22};
             List<String> categories=achievementCategories();
             String category=null;
             for(int i=0;i<slots.length;i++) if(e.getRawSlot()==slots[i]) category=categories.get(i);
