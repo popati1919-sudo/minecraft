@@ -7,8 +7,6 @@ author: Larry SMP
 description: "Plugin Larry SMP: économie, clans, quêtes, hôtel des ventes, modération et anti-triche."
 softdepend: [floodgate, GrimAC]
 commands:
-  serveur:
-    usage: /serveur event
   register:
     description: Crée un compte joueur
     usage: /register <motdepasse>

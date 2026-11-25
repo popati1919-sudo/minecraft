@@ -39,16 +39,13 @@ jobs:
         run: |
           set -euo pipefail
           ROOT="package/LarrySMP-Network"
-          mkdir -p "$ROOT/Event/plugins" "$ROOT/Velocity/plugins" "$ROOT/Lobby/plugins" "$ROOT/SMP/plugins"
+          mkdir -p "$ROOT/Velocity/plugins" "$ROOT/Lobby/plugins" "$ROOT/SMP/plugins"
 
           paper_meta="$(curl -fsSL -H 'User-Agent: LarrySMP-Packager/1.0' "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds?channel=STABLE&limit=1")"
           paper_url="$(echo "$paper_meta" | jq -r '.[0].downloads["server:default"].url // empty')"
           test -n "$paper_url"
           curl -fL "$paper_url" -o "$ROOT/Lobby/paper.jar"
           cp "$ROOT/Lobby/paper.jar" "$ROOT/SMP/paper.jar"
-
-          cp "$ROOT/Lobby/paper.jar" "$ROOT/Event/paper.jar"
-          cp plugin-source/build/libs/LarryEvent.jar "$ROOT/Event/plugins/"
 
           velocity_versions="$(curl -fsSL -H 'User-Agent: LarrySMP-Packager/1.0' "https://fill.papermc.io/v3/projects/velocity")"
           velocity_version="$(echo "$velocity_versions" | jq -r '[.versions[][] | select(type == "string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))] | first // empty')"
@@ -104,8 +101,6 @@ jobs:
             test -s "$ROOT/$SERVER/plugins/ViaVersion.jar"
             test -s "$ROOT/$SERVER/plugins/ViaBackwards.jar"
           done
-
-          cp "$ROOT/Lobby/plugins/"{edufloodgate-paper,ViaVersion,ViaBackwards}.jar "$ROOT/Event/plugins/"
 
           # GrimAC sur le SMP uniquement; build Paper stable correspondant a Paper 26.3.
           grim_meta="$(curl -fsSL 'https://api.modrinth.com/v2/project/grimac/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%5D')"
@@ -204,7 +199,6 @@ jobs:
 
           [servers]
           lobby = "127.0.0.1:25566"
-          event = "127.0.0.1:25568"
           smp = "127.0.0.1:25567"
           try = ["lobby"]
 
@@ -234,9 +228,8 @@ jobs:
           show-plugins = false
           EOF
 
-          for SERVER in Lobby SMP Event; do
+          for SERVER in Lobby SMP; do
             PORT=25566
-            if [ "$SERVER" = "Event" ]; then PORT=25568; fi
             PVP=false
             if [ "$SERVER" = "SMP" ]; then
               PORT=25567
@@ -378,7 +371,7 @@ jobs:
           cd /d "%~dp0"
           where java >nul 2>nul
           if errorlevel 1 (echo Java 25 est requis.& pause & exit /b 1)
-          for %%S in (Lobby SMP Event) do (
+          for %%S in (Lobby SMP) do (
             findstr /i /c:"eula=true" "%%S\eula.txt" >nul
             if errorlevel 1 (
               echo Accepte l'EULA dans %%S\eula.txt avant le demarrage.
@@ -390,7 +383,6 @@ jobs:
           timeout /t 8 /nobreak >nul
           start "Larry SMP" cmd /k "cd /d ""%~dp0SMP"" && java -Dlarpers.server=SMP -Xms1G -Xmx4G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
           timeout /t 8 /nobreak >nul
-          start "Larry Event" cmd /k "cd /d ""%~dp0Event"" && java -Xms256M -Xmx1G -jar paper.jar --nogui"
           start "Larry Velocity" cmd /k "cd /d ""%~dp0Velocity"" && java -Xms512M -Xmx1G -jar velocity.jar"
           echo Reseau demarre. Les joueurs se connectent sur le port Java 25565.
           echo Bedrock: port UDP 19132 apres configuration Geyser.
@@ -496,7 +488,7 @@ jobs:
             pause
             exit /b 1
           )
-          for %%S in (Lobby SMP Event) do (
+          for %%S in (Lobby SMP) do (
             if not exist "%%S\plugins\floodgate" mkdir "%%S\plugins\floodgate"
             copy /Y "%FGKEY%" "%%S\plugins\floodgate\key.pem" >nul
           )
@@ -556,9 +548,6 @@ jobs:
           - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend. Aucune boussole de transfert n'est donnee dans le SMP
           - EduGeyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login. Avant authentification, seul le deplacement est bloque: la camera reste libre
           - Backend Paper lie a Velocity avec forwarding moderne et secret prive
-
-          Event Paper local: 127.0.0.1:25568. Depuis le SMP: /admin start mine puis /serveur event.
-          /admin stop ferme la mine. Event fonctionne en veille entre deux manches.
 
           INSTALLATION:
           1. Installer Java 25.
