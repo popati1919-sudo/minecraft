@@ -766,7 +766,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
         saveSoon();
     }
-    private record AchievementTier(String key,String name,String stat,long goal,double reward,Material icon) { }
+    private record AchievementTier(String key,String name,String stat,long goal,double baseReward,Material icon) {
+        double reward() {
+            return baseReward * 10;
+        }
+    }
     private static final List<Integer> GENERAL_REWARDS=List.of(10,25,100,250,400,600,800,1000);
     private static List<AchievementTier> series(String stat,String name,Material icon,int... goals) {
         List<AchievementTier> tiers=new ArrayList<>();
