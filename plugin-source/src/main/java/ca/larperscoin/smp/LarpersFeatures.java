@@ -749,10 +749,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         db.set(achievementPath(p)+".claimed."+key,true);
         String rewardText="";
         if(money>0 && Double.isFinite(core.balance(p.getUniqueId())+money)) {
-            double safeMoney=Math.min(1000.0,money);
-            give(p,safeMoney);
-            core.recordTransaction("ACHIEVEMENT_"+key.toUpperCase(Locale.ROOT),new UUID(0L,0L),p.getUniqueId(),safeMoney);
-            rewardText=" — +"+safeMoney+" LPC";
+            give(p,money);
+            core.recordTransaction("ACHIEVEMENT_"+key.toUpperCase(Locale.ROOT),new UUID(0L,0L),p.getUniqueId(),money);
+            rewardText=" — +"+formatShopPrice(money)+" Larry";
         } else if(rewardMaterial!=null && rewardAmount>0) {
             ItemStack reward=new ItemStack(rewardMaterial,rewardAmount);
             Map<Integer,ItemStack> leftovers=p.getInventory().addItem(reward);
@@ -990,7 +989,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         long progress=achievementStat(p,next.stat());
         return item(next.icon(),next.name(),
             "Progression: "+Math.min(progress,next.goal())+"/"+next.goal(),
-            "Récompense: "+next.reward()+" LPC",
+            "Récompense: "+formatShopPrice(next.reward())+" Larry",
             progress>=next.goal()?"Succès atteint — récompense en cours de validation.":"Continue pour débloquer le prochain palier.",
             "Après validation, ce succès sera remplacé ici par le suivant.");
     }
@@ -1394,14 +1393,82 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         p.openInventory(inv);
     }
 
-    private double shopSellPrice(String k){return Math.max(.01,db.getDouble("shop.sell-prices."+k,SHOP_PRICES.getOrDefault(k,.05)));}
-    private double shopBuyPrice(String k){return Math.max(shopSellPrice(k)*1.5,db.getDouble("shop.buy-prices."+k,shopSellPrice(k)*2.8));}
-    private void recalculateMarketPrices(){for(var e:SHOP.entrySet()){String k=e.getKey();double base=SHOP_PRICES.getOrDefault(k,.05);long sold=Math.max(0,db.getLong("market.window-sold."+k,0));double sell=Math.max(.01,base*(1-Math.min(.65,sold/512.0*.12)));db.set("shop.sell-prices."+k,Math.round(sell*100)/100.0);db.set("shop.buy-prices."+k,Math.round(sell*2.8*100)/100.0);List<Double> trend=db.getDoubleList("market.price-history."+k);trend.add(Math.round(sell*100)/100.0);if(trend.size()>24)trend=new ArrayList<>(trend.subList(trend.size()-24,trend.size()));db.set("market.price-history."+k,trend);db.set("market.window-sold."+k,0L);}long now=System.currentTimeMillis();db.set("market.last-refresh",now);db.set("market.next-refresh",now+MARKET_REFRESH_MILLIS);save();plugin.getLogger().info("Marché Larry recalculé; prochaine actualisation dans 6 heures.");}
+    private record MarketUnit(String key, double quantity) {}
+    private static final Map<String,MarketUnit> MARKET_UNITS = marketUnits();
+
+    private static Map<String,MarketUnit> marketUnits() {
+        Map<String,MarketUnit> units = new HashMap<>();
+        for (String metal : List.of("iron","gold","copper")) {
+            String ingot = metal+"_ingot";
+            units.put(metal+"_block",new MarketUnit(ingot,9));
+            units.put(metal+"_nugget",new MarketUnit(ingot,1.0/9));
+            units.put("raw_"+metal,new MarketUnit(ingot,1));
+            units.put("raw_"+metal+"_block",new MarketUnit(ingot,9));
+        }
+        for (String mineral : List.of("diamond","emerald","coal","redstone","lapis")) {
+            String unit = mineral.equals("lapis") ? "lapis_lazuli" : mineral;
+            units.put(mineral+"_block",new MarketUnit(unit,9));
+        }
+        units.put("hay_block",new MarketUnit("wheat",9));
+        units.put("bone_block",new MarketUnit("bone_meal",9));
+        units.put("slime_block",new MarketUnit("slime_ball",9));
+        units.put("honeycomb_block",new MarketUnit("honeycomb",4));
+        units.put("dried_kelp_block",new MarketUnit("dried_kelp",9));
+        return Map.copyOf(units);
+    }
+
+    private double shopSellPrice(String key) {
+        MarketUnit unit=MARKET_UNITS.get(key);
+        if(unit!=null) return shopSellPrice(unit.key())*unit.quantity();
+        return Math.max(.01,db.getDouble("shop.sell-prices."+key,SHOP_PRICES.getOrDefault(key,.05)));
+    }
+
+    private double shopBuyPrice(String key) {
+        MarketUnit unit=MARKET_UNITS.get(key);
+        if(unit!=null) return shopBuyPrice(unit.key())*unit.quantity();
+        double sell=shopSellPrice(key);
+        return Math.max(sell*1.5,db.getDouble("shop.buy-prices."+key,sell*2.8));
+    }
+
+    private void recalculateMarketPrices() {
+        Map<String,Double> sales=new HashMap<>();
+        for(String key:SHOP.keySet()) {
+            long count=Math.max(0,db.getLong("market.window-sold."+key,0));
+            MarketUnit unit=MARKET_UNITS.get(key);
+            sales.merge(unit==null ? key : unit.key(),unit==null ? (double)count : count*unit.quantity(),Double::sum);
+        }
+        for(var entry:SHOP_PRICES.entrySet()) {
+            String key=entry.getKey();
+            if(MARKET_UNITS.containsKey(key)) continue;
+            double sold=sales.getOrDefault(key,0.0);
+            double sell=Math.max(.01,entry.getValue()*(1-Math.min(.60,sold/512.0*.12)));
+            db.set("shop.sell-prices."+key,Math.round(sell*10000)/10000.0);
+            db.set("shop.buy-prices."+key,Math.round(sell*2.8*10000)/10000.0);
+        }
+        for(String key:SHOP.keySet()) {
+            List<Double> trend=db.getDoubleList("market.price-history."+key);
+            trend.add(shopSellPrice(key));
+            if(trend.size()>24) trend=new ArrayList<>(trend.subList(trend.size()-24,trend.size()));
+            db.set("market.price-history."+key,trend);
+            db.set("market.window-sold."+key,0L);
+        }
+        long now=System.currentTimeMillis();
+        db.set("market.last-refresh",now);
+        db.set("market.next-refresh",now+MARKET_REFRESH_MILLIS);
+        save();
+        plugin.getLogger().info("Marché Larry recalculé; prochaine actualisation dans 6 heures.");
+    }
     private String marketTimeLeft(){long ms=Math.max(0,db.getLong("market.next-refresh",System.currentTimeMillis())-System.currentTimeMillis());return(ms/3600000)+" h "+((ms/60000)%60)+" min";}
     private boolean sellStack(Player p,int inventorySlot,int amount){ItemStack stack=p.getInventory().getItem(inventorySlot);if(stack==null||stack.getType().isAir()||amount<1||amount>stack.getAmount()){msg(p,"Quantité invalide ou aucun objet vendable.");return false;}String k=stack.getType().name().toLowerCase(Locale.ROOT);if(!SHOP.containsKey(k)||SHOP_BLOCKED.contains(stack.getType())||SHOP_BLOCKED_NAMES.contains(stack.getType().name())||k.contains("netherite")){msg(p,"Cet objet ne peut pas être vendu.");return false;}if(stack.hasItemMeta()){msg(p,"Les objets renommés ou enchantés ne sont pas acceptés.");return false;}double total=Math.round(shopSellPrice(k)*amount*100)/100.0;if(total<=0||!Double.isFinite(core.balance(p.getUniqueId())+total)){msg(p,"Vente impossible.");return false;}int left=stack.getAmount()-amount;if(left<=0)p.getInventory().setItem(inventorySlot,null);else stack.setAmount(left);give(p,total);db.set("market.window-sold."+k,db.getLong("market.window-sold."+k,0L)+amount);db.set("market.total-sold."+k,db.getLong("market.total-sold."+k,0L)+amount);db.set("market.sales-total",db.getLong("market.sales-total",0L)+amount);db.set("market.sales-count",db.getLong("market.sales-count",0L)+1);List<Map<String,Object>> h=new ArrayList<>();for(Map<?,?> old:db.getMapList("market.history")){Map<String,Object> r=new LinkedHashMap<>();for(var x:old.entrySet())r.put(String.valueOf(x.getKey()),x.getValue());h.add(r);}Map<String,Object> row=new LinkedHashMap<>();row.put("type","VENTE");row.put("item",k);row.put("amount",amount);row.put("total",total);row.put("player",p.getName());row.put("time",System.currentTimeMillis());h.add(0,row);if(h.size()>100)h=new ArrayList<>(h.subList(h.size()-100,h.size()));db.set("market.history",h);save();core.recordTransaction("SHOP_SELL",new UUID(0L,0L),p.getUniqueId(),total);msg(p,"Vente: "+amount+" x "+k+" pour "+formatShopPrice(total)+" Larry. Prix mis à jour dans "+marketTimeLeft()+".");return true;}
     private boolean sellShop(Player p,int amount){return sellStack(p,p.getInventory().getHeldItemSlot(),amount);}
     private boolean isSellable(ItemStack stack){if(stack==null||stack.getType().isAir())return false;String k=stack.getType().name().toLowerCase(Locale.ROOT);return SHOP.containsKey(k)&&!SHOP_BLOCKED.contains(stack.getType())&&!SHOP_BLOCKED_NAMES.contains(stack.getType().name())&&!k.contains("netherite")&&!stack.hasItemMeta();}
-    private double sellAllValue(Player p){double total=0;for(ItemStack stack:p.getInventory().getStorageContents())if(isSellable(stack))total+=shopSellPrice(stack.getType().name().toLowerCase(Locale.ROOT))*stack.getAmount();return Math.round(total*100)/100.0;}
+    private double sellAllValue(Player p) {
+        long cents=0;
+        for(ItemStack stack:p.getInventory().getStorageContents()) {
+            if(isSellable(stack)) cents+=Math.round(shopSellPrice(stack.getType().name().toLowerCase(Locale.ROOT))*stack.getAmount()*100);
+        }
+        return cents/100.0;
+    }
     private void openSellMenu(Player p){Inventory inv=Bukkit.createInventory(null,54,"Larry | Vendre");int shown=0;for(int slot=0;slot<36;slot++){ItemStack stack=p.getInventory().getItem(slot);if(!isSellable(stack))continue;ItemStack display=stack.clone();ItemMeta meta=display.getItemMeta();if(meta!=null){List<String> lore=meta.hasLore()?new ArrayList<>(meta.getLore()):new ArrayList<>();String k=stack.getType().name().toLowerCase(Locale.ROOT);lore.add(ChatColor.GRAY+"Quantité: "+stack.getAmount());lore.add(ChatColor.GOLD+"Prix total: "+formatShopPrice(Math.round(shopSellPrice(k)*stack.getAmount()*100)/100.0)+" Larry");lore.add(ChatColor.YELLOW+"Clique pour vendre cette pile");meta.setLore(lore);display.setItemMeta(meta);}inv.setItem(slot,display);shown++;}inv.setItem(45,item(Material.GOLD_INGOT,"Vendre tout","Valeur estimée: "+formatShopPrice(sellAllValue(p))+" Larry","Une confirmation sera demandée"));inv.setItem(49,item(Material.BARRIER,"Fermer"));inv.setItem(53,item(Material.SUNFLOWER,"Actualiser",shown+" pile(s) vendable(s)"));p.openInventory(inv);}
     private void openSellAllConfirmation(Player p){double total=sellAllValue(p);Inventory inv=Bukkit.createInventory(null,27,"Larry | Confirmer vente totale");inv.setItem(11,item(Material.LIME_CONCRETE,"CONFIRMER","Vendre tous les objets admissibles","Valeur estimée: "+total+" Larry","Cette action est irréversible"));inv.setItem(15,item(Material.RED_CONCRETE,"ANNULER","Ne rien vendre"));inv.setItem(13,item(Material.GOLD_INGOT,"Résumé","Valeur estimée: "+total+" Larry","Les objets renommés/enchantés et interdits sont ignorés"));p.openInventory(inv);}
     private void executeSellAll(Player p){int sold=0;double total=0;for(int slot=0;slot<36;slot++){ItemStack stack=p.getInventory().getItem(slot);if(!isSellable(stack))continue;int amount=stack.getAmount();String key=stack.getType().name().toLowerCase(Locale.ROOT);double value=Math.round(shopSellPrice(key)*amount*100)/100.0;if(value<=0||!Double.isFinite(core.balance(p.getUniqueId())+total+value))continue;if(sellStack(p,slot,amount)){sold+=amount;total+=value;}}msg(p,"Vente totale terminée: "+sold+" objet(s) pour "+formatShopPrice(Math.round(total*100)/100.0)+" Larry.");openSellMenu(p);}
