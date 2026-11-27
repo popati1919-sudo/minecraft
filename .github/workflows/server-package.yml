@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - "assets/server-icon.png"
       - ".github/workflows/server-package.yml"
       - "plugin-source/**"
       - "README.md"
@@ -153,6 +154,7 @@ jobs:
           eula=false
           EOF
           mkdir -p "$ROOT/config"
+          cp assets/server-icon.png "$ROOT/server-icon.png"
           cat > "$ROOT/config/paper-world-defaults.yml" <<'EOF'
           _version: 31
           anticheat:

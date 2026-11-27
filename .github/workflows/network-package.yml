@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - "assets/server-icon.png"
       - ".github/workflows/network-package.yml"
       - "plugin-source/**"
   workflow_dispatch:
@@ -40,6 +41,7 @@ jobs:
           set -euo pipefail
           ROOT="package/LarrySMP-Network"
           mkdir -p "$ROOT/Velocity/plugins" "$ROOT/Lobby/plugins" "$ROOT/SMP/plugins"
+          for SERVER in Velocity Lobby SMP; do cp assets/server-icon.png "$ROOT/$SERVER/server-icon.png"; done
 
           paper_meta="$(curl -fsSL -H 'User-Agent: LarrySMP-Packager/1.0' "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds?channel=STABLE&limit=1")"
           paper_url="$(echo "$paper_meta" | jq -r '.[0].downloads["server:default"].url // empty')"
