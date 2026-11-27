@@ -7,6 +7,10 @@ author: Larry SMP
 description: "Plugin Larry SMP: économie, clans, quêtes, hôtel des ventes, modération et anti-triche."
 softdepend: [floodgate, GrimAC, LuckPerms]
 commands:
+  modo:
+    description: Entrer ou sortir de la surveillance du SMP
+  tp:
+    description: Rejoindre un joueur en surveillance
   mute:
     usage: /mute <joueur connecté> [raison]
     permission: larpers.moderate

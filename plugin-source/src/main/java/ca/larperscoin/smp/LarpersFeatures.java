@@ -84,8 +84,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     static {for(Material m:Material.values()){String n=m.name();if(!m.isItem()||m.isAir()||SHOP_BLOCKED.contains(m)||SHOP_BLOCKED_NAMES.contains(n)||n.contains("NETHERITE")||n.endsWith("_SPAWN_EGG"))continue;String k=n.toLowerCase(Locale.ROOT);SHOP.put(k,m);SHOP_PRICES.put(k,baseShopPrice(m));}}
     private static double baseShopPrice(Material m){String n=m.name();if(n.contains("DIAMOND"))return 2.50;if(n.contains("EMERALD"))return 1.80;if(n.contains("NETHER_STAR")||n.contains("DRAGON_EGG"))return 8;if(n.contains("TRIDENT")||n.contains("HEART_OF_THE_SEA")||n.contains("TOTEM"))return 2;if(n.contains("IRON_INGOT")||n.contains("IRON_NUGGET"))return .55;if(n.contains("GOLD_INGOT")||n.contains("GOLD_NUGGET"))return .45;if(n.contains("COPPER_INGOT"))return .18;if(n.contains("LAPIS"))return .12;if(n.contains("REDSTONE"))return .10;if(n.contains("COAL"))return .16;if(n.contains("OBSIDIAN"))return .25;if(n.contains("BREAD")||n.contains("COOKED"))return .18;if(n.contains("LOG")||n.contains("WOOD")||n.contains("PLANKS")||n.contains("STEM")||n.contains("HYPHAE"))return .08;if(n.contains("WHEAT")||n.contains("CARROT")||n.contains("POTATO")||n.contains("BEETROOT")||n.contains("PUMPKIN")||n.contains("MELON"))return .08;if(n.contains("STONE")||n.contains("COBBLESTONE")||n.contains("DEEPSLATE")||n.contains("TUFF")||n.contains("GRANITE")||n.contains("DIORITE")||n.contains("ANDESITE"))return .025;if(n.contains("DIRT")||n.contains("SAND")||n.contains("GRAVEL")||n.contains("CLAY")||n.contains("NETHERRACK"))return .015;if(n.contains("BOOK")||n.contains("POTION")||n.contains("ENCHANTED"))return .30;if(n.contains("SWORD")||n.contains("PICKAXE")||n.contains("AXE")||n.contains("HOE")||n.contains("SHOVEL")||n.contains("HELMET")||n.contains("CHESTPLATE")||n.contains("LEGGINGS")||n.contains("BOOTS"))return .35;return .05;}
 
+    private final StaffWatch watch;
+
     public LarpersFeatures(JavaPlugin plugin) {
         this.plugin = plugin;
+        watch=new StaffWatch(plugin,this);
         this.core = (LarpersCoin) plugin;
         this.tradeManager = new SecureTradeManager(plugin, core, this::recordTradeCompleted);
         this.chatEvents = new ChatEvents(plugin, core);
@@ -134,7 +137,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             db.set(path+".choices",choices);
         }
     }
-    public void shutdown() { chatEvents.shutdown(); save(); }
+    public void shutdown() { watch.shutdown(); chatEvents.shutdown(); save(); }
     private void msg(CommandSender s, String m) { s.sendMessage(PREFIX + m); }
     private boolean staff(CommandSender s) { return s.isOp() || s.hasPermission("larpers.staff") || s.hasPermission("larpers.admin"); }
     private Player player(CommandSender s) { if (s instanceof Player p) return p; msg(s,"Commande réservée aux joueurs."); return null; }
@@ -420,12 +423,14 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 case "admin" -> { return adminCommand(sender,a); }
                 case "vanish" -> {
                     Player p=player(sender); if(p==null)return true; if(!staff(p)){msg(p,"Permission insuffisante.");return true;}
-                    if(vanished.remove(p.getUniqueId())) { for(Player x:Bukkit.getOnlinePlayers())x.showPlayer(plugin,p); msg(p,"Vanish désactivé."); }
-                    else { vanished.add(p.getUniqueId()); for(Player x:Bukkit.getOnlinePlayers())if(!staff(x))x.hidePlayer(plugin,p); msg(p,"Vanish activé."); }
+                    if(!watch.active(p) && !p.isOp() && !p.hasPermission("larpers.admin")) { msg(p,"Active /modo sur le SMP.");return true; }
+                    setVanished(p,!isVanished(p));
+                    msg(p,isVanished(p)?"Vanish activé.":"Vanish désactivé.");
                     return true;
                 }
                 case "freeze" -> {
                     if(!staff(sender)){msg(sender,"Permission insuffisante.");return true;}
+                    if(sender instanceof Player p && !watch.active(p) && !p.isOp() && !p.hasPermission("larpers.admin")) { msg(p,"Active /modo sur le SMP.");return true; }
                     if(a.length!=1){msg(sender,"Usage : /freeze <joueur>");return true;}
                     Player t=Bukkit.getPlayerExact(a[0]); if(t==null){msg(sender,"Joueur introuvable.");return true;}
                     if(!frozen.add(t.getUniqueId()))frozen.remove(t.getUniqueId());
@@ -1249,6 +1254,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler(ignoreCancelled=true)
     public void onExploreBiome(PlayerMoveEvent e) {
+        if(watch.active(e.getPlayer())) return;
         if(e.getTo()==null || e.getFrom().getBlockX()==e.getTo().getBlockX()
                 && e.getFrom().getBlockY()==e.getTo().getBlockY()
                 && e.getFrom().getBlockZ()==e.getTo().getBlockZ()) return;
@@ -1591,6 +1597,14 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onMove(PlayerMoveEvent e) {
         if(frozen.contains(e.getPlayer().getUniqueId())&&e.getTo()!=null&&(e.getFrom().getX()!=e.getTo().getX()||e.getFrom().getY()!=e.getTo().getY()||e.getFrom().getZ()!=e.getTo().getZ()))e.setTo(e.getFrom());
+    }
+    boolean isVanished(Player p) { return vanished.contains(p.getUniqueId()); }
+    void setVanished(Player p,boolean hidden) {
+        if(hidden) vanished.add(p.getUniqueId()); else vanished.remove(p.getUniqueId());
+        for(Player viewer:Bukkit.getOnlinePlayers()) {
+            if(hidden && !staff(viewer)) viewer.hidePlayer(plugin,p);
+            else viewer.showPlayer(plugin,p);
+        }
     }
     @EventHandler public void onJoin(PlayerJoinEvent e) {
         for(UUID id:vanished){Player v=Bukkit.getPlayer(id);if(v!=null&&!staff(e.getPlayer()))e.getPlayer().hidePlayer(plugin,v);}
