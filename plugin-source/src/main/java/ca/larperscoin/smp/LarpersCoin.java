@@ -576,6 +576,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         drawLottery();
     }
     private String rankPrefix(Player p) {
+        if(p.hasPermission("group.owner"))return ChatColor.DARK_RED+"[OWNER] ";
         if(isLpcAdmin(p))return ChatColor.RED+"[ADMIN] ";
         if(p.hasPermission("larpers.staff")||p.hasPermission("larpers.anticheat.mod"))return ChatColor.GOLD+"[MOD] ";
         if(p.hasPermission("larpers.vip"))return ChatColor.AQUA+"[VIP] ";

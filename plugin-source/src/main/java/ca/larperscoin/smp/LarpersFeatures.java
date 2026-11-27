@@ -103,7 +103,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         seedQuizQuestion("faces","Combien de faces possède un bloc standard?","6",List.of("4","6","8"));
         seedQuizQuestion("creeper","Quel mob explose près du joueur?","creeper",List.of("creeper","zombie","squelette"));
         save();
-        for (String cmd : List.of("clan","quest","quests","succes","top","admin","vanish","invsee","freeze","staffchat","ah","trade","check","shop","sell")) {
+        for (String cmd : List.of("clan","quest","quests","succes","top","admin","rank","vanish","invsee","freeze","staffchat","ah","trade","check","shop","sell")) {
             PluginCommand c = plugin.getCommand(cmd);
             if (c != null) { c.setExecutor(this); c.setTabCompleter(this); }
         }
@@ -222,6 +222,37 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         LpcMenuTheme.frame(inv);
         p.openInventory(inv);
     }
+    private final Map<UUID,UUID> rankTargets=new HashMap<>();
+    private void openRank(Player admin,Player target) {
+        if(!core.isLpcAdmin(admin)) return;
+        if(!Bukkit.getPluginManager().isPluginEnabled("LuckPerms")) {msg(admin,"LuckPerms est requis sur le SMP.");return;}
+        Inventory inv=Bukkit.createInventory(null,27,"Larry | Grades");
+        inv.setItem(4,item(Material.PLAYER_HEAD,target.getName(),"Choisis son nouveau grade"));
+        inv.setItem(10,item(Material.GRASS_BLOCK,"Joueur"));
+        inv.setItem(12,item(Material.SHIELD,"Modo"));
+        inv.setItem(14,item(Material.DIAMOND,"Admin"));
+        if(admin.isOp()) inv.setItem(16,item(Material.NETHER_STAR,"Owner"));
+        inv.setItem(22,item(Material.BARRIER,"Annuler"));
+        admin.openInventory(inv);
+        rankTargets.put(admin.getUniqueId(),target.getUniqueId());
+    }
+
+    private void openModerator(Player p) {
+        Inventory inv=Bukkit.createInventory(null,27,"Larry | Modération");
+        boolean active=watch.active(p);
+        inv.setItem(4,item(Material.SPYGLASS,active?"Quitter la surveillance":"Activer la surveillance"));
+        if(active) {
+            inv.setItem(10,item(Material.ENDER_PEARL,"Observer un joueur"));
+            inv.setItem(11,item(Material.ICE,"Immobiliser ou libérer"));
+            inv.setItem(12,item(Material.ENDER_EYE,"Vanish"));
+        }
+        inv.setItem(14,item(Material.PAPER,"Mute du chat"));
+        inv.setItem(15,item(Material.FEATHER,"Retirer un mute"));
+        inv.setItem(16,item(Material.COMPARATOR,"Alertes anti-triche","Afficher le journal récent"));
+        inv.setItem(22,item(Material.BARRIER,"Fermer"));
+        p.openInventory(inv);
+    }
+
     private void openAdmin(Player p) {
         Inventory inv=Bukkit.createInventory(null,54,"Larry | Administration");
         inv.setItem(10,item(Material.BOOK,"Voir inventaire","Choisir un joueur"));
@@ -235,6 +266,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         inv.setItem(28,item(Material.COMMAND_BLOCK,"Gestion OP","Choisir un joueur","Confirmation obligatoire"));
         inv.setItem(30,item(Material.COMPASS,"Adresse du serveur","IP actuelle: "+serverDisplay("ip","Non configurée"),"Clique puis saisis: IP nom"));
         inv.setItem(32,item(Material.SHIELD,"Anti-triche","/ac status"));
+        inv.setItem(40,item(Material.NAME_TAG,"Grades des joueurs","Ouvrir /rank"));
         inv.setItem(34,item(Material.SUNFLOWER,"Actualiser le menu"));
         inv.setItem(49,item(Material.BARRIER,"Fermer"));
         LpcMenuTheme.frame(inv);
@@ -420,6 +452,14 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 case "succes" -> { Player p=player(sender); if(p!=null)openAchievementMenu(p); return true; }
                 case "check" -> { Player p=player(sender); return p!=null && checkCurrentChunk(p); }
                 case "top" -> { Player p=player(sender); if(p!=null)openTopMenu(p); return true; }
+                case "rank" -> {
+                    Player p=player(sender);
+                    if(p==null || !core.isLpcAdmin(p)) return true;
+                    if(a.length==0) openPlayerSelector(p,"rank");
+                    else if(a.length==1 && Bukkit.getPlayerExact(a[0])!=null) openRank(p,Bukkit.getPlayerExact(a[0]));
+                    else msg(p,"Utilise /rank ou /rank <joueur connecté>.");
+                    return true;
+                }
                 case "admin" -> { return adminCommand(sender,a); }
                 case "vanish" -> {
                     Player p=player(sender); if(p==null)return true; if(!staff(p)){msg(p,"Permission insuffisante.");return true;}
@@ -470,9 +510,10 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private boolean adminCommand(CommandSender sender,String[] args) {
         if(args.length==0) {
             Player p=player(sender);
-            if(p!=null){if(!core.isLpcAdmin(p))msg(p,"Le menu /admin est réservé aux administrateurs.");else openAdmin(p);}
+            if(p!=null){if(core.isLpcAdmin(p))openAdmin(p);else if(staff(p))openModerator(p);else msg(p,"Menu réservé au staff.");}
             return true;
         }
+        if(!sender.isOp() && !sender.hasPermission("larpers.admin")) {msg(sender,"Sous-commande réservée aux administrateurs.");return true;}
         if(args[0].equalsIgnoreCase("reset")) {
             if(!sender.isOp()&&!sender.hasPermission("larpers.admin")){msg(sender,"Cette action est réservée aux administrateurs.");return true;}
             if(args.length!=2){msg(sender,"Usage: /admin reset <joueur>");return true;}
@@ -1669,9 +1710,36 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             }
             return;
         }
+        if(title.equals("Larry | Grades")) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player p) || !core.isLpcAdmin(p))return;
+            String grade=switch(e.getRawSlot()){case 10->"default";case 12->"modo";case 14->"admin";case 16->"owner";default->null;};
+            if(e.getRawSlot()==22){p.closeInventory();return;}
+            if(grade==null)return;
+            UUID id=rankTargets.remove(p.getUniqueId());
+            Player target=id==null?null:Bukkit.getPlayer(id);
+            p.closeInventory();
+            if(target==null){msg(p,"Joueur indisponible.");return;}
+            ModoGroup.assign(core,p,target,grade);
+            return;
+        }
+        if(title.equals("Larry | Modération")) {
+            e.setCancelled(true);
+            if(!(e.getWhoClicked() instanceof Player p) || !staff(p))return;
+            switch(e.getRawSlot()){
+                case 4 -> {p.closeInventory();p.performCommand("modo");}
+                case 10,11 -> {if(watch.active(p))openPlayerSelector(p,e.getRawSlot()==10?"tp":"freeze");}
+                case 12 -> {if(watch.active(p)){p.closeInventory();p.performCommand("vanish");}}
+                case 14,15 -> openPlayerSelector(p,e.getRawSlot()==14?"mute":"unmute");
+                case 16 -> {p.closeInventory();p.performCommand("ac log");}
+                case 22 -> p.closeInventory();
+                default -> { }
+            }
+            return;
+        }
         if(title.equals("Larry | Administration")) {
             e.setCancelled(true);
-            if(!(e.getWhoClicked() instanceof Player p)) return;
+            if(!(e.getWhoClicked() instanceof Player p) || !core.isLpcAdmin(p)) return;
             int slot=e.getRawSlot();
             if(slot==49){p.closeInventory();return;}
             switch(slot) {
@@ -1691,6 +1759,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 }
                 case 32 -> {p.closeInventory();p.performCommand("ac status");}
                 case 34 -> openAdmin(p);
+                case 40 -> openPlayerSelector(p,"rank");
                 default -> { }
             }
             return;
@@ -1699,7 +1768,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player viewer))return;
             int slot=e.getRawSlot();
-            String action=selectorAction.getOrDefault(viewer.getUniqueId(),title.substring("Larry | Sélection ".length()));
+            String action=selectorAction.get(viewer.getUniqueId());
+            if(!staff(viewer) || action==null || !title.equals("Larry | Sélection "+action))return;
             if(slot==45){awaitingSelectorSearch.add(viewer.getUniqueId());viewer.closeInventory();msg(viewer,"Écris le pseudo à rechercher dans le chat (ou 'annuler').");return;}
             if(slot==47){selectorSearch.remove(viewer.getUniqueId());openPlayerSelector(viewer,action);return;}
             if(slot==49){viewer.closeInventory();return;}
@@ -1709,7 +1779,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             Player target=Bukkit.getPlayerExact(targetName);
             if(target==null) { msg(viewer,"Ce joueur n'est plus en ligne.");viewer.closeInventory();return; }
             if(title.endsWith("invsee")) viewer.openInventory(target.getInventory());
-            else if(title.endsWith("op/deop")) openOpConfirm(viewer,target);
+            else if(action.equals("rank")) openRank(viewer,target);
+            else if(action.equals("op/deop")) {if(core.isLpcAdmin(viewer))openOpConfirm(viewer,target);}
+            else if(Set.of("tp","mute","unmute").contains(action)) {viewer.closeInventory();viewer.performCommand(action+" "+target.getName());}
             else if(title.endsWith("reset")) {
                 if(!core.isLpcAdmin(viewer)){msg(viewer,"Réinitialisation réservée aux administrateurs.");return;}
                 viewer.closeInventory();
@@ -1722,7 +1794,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(!(e.getWhoClicked() instanceof Player staffPlayer))return;
             if(e.getRawSlot()==15){pendingOpTarget.remove(staffPlayer.getUniqueId());staffPlayer.closeInventory();return;}
             if(e.getRawSlot()!=11)return;
-            if(!staff(staffPlayer)){pendingOpTarget.remove(staffPlayer.getUniqueId());staffPlayer.closeInventory();msg(staffPlayer,"Permission insuffisante.");return;}
+            if(!core.isLpcAdmin(staffPlayer)){pendingOpTarget.remove(staffPlayer.getUniqueId());staffPlayer.closeInventory();msg(staffPlayer,"Permission insuffisante.");return;}
             UUID targetId=pendingOpTarget.remove(staffPlayer.getUniqueId());
             Player target=targetId==null?null:Bukkit.getPlayer(targetId);
             if(target==null){staffPlayer.closeInventory();msg(staffPlayer,"Le joueur n'est plus en ligne.");return;}
@@ -1913,6 +1985,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
     }
     @EventHandler public void onChestClose(org.bukkit.event.inventory.InventoryCloseEvent e) {
+        if(e.getView().getTitle().equals("Larry | Grades"))rankTargets.remove(e.getPlayer().getUniqueId());
         String title=e.getView().getTitle();
         if(!title.startsWith("Coffre clan:"))return;
         String clan=title.substring("Coffre clan:".length());
@@ -1933,7 +2006,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) {
         UUID id=e.getPlayer().getUniqueId();
-        frozen.remove(id);awaitingAhSearch.remove(id);awaitingShopSearch.remove(id);pendingBountyTarget.remove(id);
+        rankTargets.remove(id);frozen.remove(id);awaitingAhSearch.remove(id);awaitingShopSearch.remove(id);pendingBountyTarget.remove(id);
         awaitingSelectorSearch.remove(id);awaitingBountySearch.remove(id);
         awaitingLotteryAmount.remove(id);awaitingAdminIp.remove(id);awaitingBountyListSearch.remove(id);
         selectorAction.remove(id);selectorSearch.remove(id);bountySearch.remove(id);
@@ -2036,6 +2109,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             Bukkit.getOnlinePlayers().stream().filter(p->!p.equals(s)).map(Player::getName).forEach(options::add);
             return options.stream().filter(v->v.toLowerCase(Locale.ROOT).startsWith(a[0].toLowerCase(Locale.ROOT))).toList();
         }
+        if(c.getName().equalsIgnoreCase("admin") && !s.isOp() && !s.hasPermission("larpers.admin"))return List.of();
         if(c.getName().equalsIgnoreCase("admin")&&a.length==1)return List.of("reset","ip","event");
         if(c.getName().equalsIgnoreCase("admin")&&a.length==2&&a[0].equalsIgnoreCase("event"))return List.of("list","start","stop","status");
         if(c.getName().equalsIgnoreCase("admin")&&a.length==3&&a[0].equalsIgnoreCase("event")&&a[1].equalsIgnoreCase("start"))return List.of("melange","quiz","calcul","reaction");

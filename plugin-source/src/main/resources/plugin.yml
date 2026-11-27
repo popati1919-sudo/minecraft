@@ -70,7 +70,10 @@ commands:
     description: Affiche la progression du chunk Overworld actuel
     usage: /check
   admin:
-    description: Menu graphique d'administration
+    description: Menu adapté au rôle du staff
+    permission: larpers.staff
+  rank:
+    description: Choisir le grade d’un joueur connecté
     permission: larpers.admin
   vanish:
     description: Invisibilité du staff

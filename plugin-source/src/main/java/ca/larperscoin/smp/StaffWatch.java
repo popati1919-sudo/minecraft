@@ -15,7 +15,7 @@ final class StaffWatch implements Listener, CommandExecutor {
     private final NamespacedKey key;
     private final JavaPlugin plugin;
     private final LarpersFeatures features;
-    private static final Set<String> WATCH_COMMANDS=Set.of("modo","tp","freeze","vanish","staffchat","ac","mute","unmute","ban","banip","ban-ip","kick","listban","banlist","pardon","pardon-ip");
+    private static final Set<String> WATCH_COMMANDS=Set.of("admin","rank","modo","tp","freeze","vanish","staffchat","ac","mute","unmute","ban","banip","ban-ip","kick","listban","banlist","pardon","pardon-ip");
 
     StaffWatch(JavaPlugin plugin,LarpersFeatures features) {
         this.plugin=plugin;
