@@ -499,6 +499,7 @@ jobs:
           pause
           EOF
 
+          cp plugin-source/tools/MAJ-PLUGIN.ps1 "$ROOT/"
           cat > "$ROOT/CONFIGURER-LES-GROUPES.bat" <<'EOF'
           @echo off
           echo Entre ces commandes dans la console du SMP, sans slash:
@@ -518,7 +519,7 @@ jobs:
           echo lp group moderator permission set grim.alerts true
           echo.
           echo lp user PSEUDO parent set admin
-          echo lp user PSEUDO parent set moderator
+          echo lp user PSEUDO parent add modo
           echo Remplace PSEUDO par le pseudo exact. Ne donne admin qu'aux personnes de confiance.
           pause
           EOF
@@ -548,6 +549,13 @@ jobs:
           - Le SMP fait confiance au proxy prive; ne jamais exposer ses ports backend. Aucune boussole de transfert n'est donnee dans le SMP
           - EduGeyser doit etre configure avec auth-type: floodgate; les joueurs Bedrock Floodgate sont exemptes de /register et /login. Avant authentification, seul le deplacement est bloque: la camera reste libre
           - Backend Paper lie a Velocity avec forwarding moderne et secret prive
+
+          MISE A JOUR D UN RESEAU EXISTANT:
+          Extraire le nouveau ZIP ailleurs et arreter Lobby et SMP avec stop.
+          Depuis le nouveau dossier, lancer dans PowerShell:
+          .\MAJ-PLUGIN.ps1 -ReseauExistant "F:\LarrySMP-Network"
+          Utiliser le chemin du reseau installe. Relancer START-NETWORK.bat de ce reseau.
+          Les donnees, mondes, bans Paper et groupes LuckPerms restent dans leur dossier existant.
 
           INSTALLATION:
           1. Installer Java 25.

@@ -5,8 +5,20 @@ load: STARTUP
 api-version: '26.3'
 author: Larry SMP
 description: "Plugin Larry SMP: économie, clans, quêtes, hôtel des ventes, modération et anti-triche."
-softdepend: [floodgate, GrimAC]
+softdepend: [floodgate, GrimAC, LuckPerms]
 commands:
+  mute:
+    usage: /mute <joueur connecté> [raison]
+    permission: larpers.moderate
+  unmute:
+    usage: /unmute <pseudo>
+    permission: larpers.moderate
+  banip:
+    usage: /banip <joueur ou IP> [raison]
+    permission: minecraft.command.ban-ip
+  listban:
+    usage: /listban [players|ips]
+    permission: minecraft.command.banlist
   register:
     description: Crée un compte joueur
     usage: /register <motdepasse>
@@ -84,6 +96,23 @@ commands:
     description: Échange sécurisé avec double confirmation
     usage: /trade <joueur> | /trade accept | /trade cancel
 permissions:
+  larpers.moderate:
+    default: op
+  larpers.modo:
+    default: false
+    children:
+      larpers.staff: true
+      larpers.moderate: true
+      larpers.anticheat.mod: true
+      larpers.anticheat.use: true
+      larpers.anticheat.alerts: true
+      grim.alerts: true
+      minecraft.command.ban: true
+      minecraft.command.ban-ip: true
+      minecraft.command.banlist: true
+      minecraft.command.pardon: true
+      minecraft.command.pardon-ip: true
+      minecraft.command.kick: true
   larpers.staff:
     description: Accès aux outils du staff Larry
     default: op
@@ -100,5 +129,7 @@ permissions:
     description: Accès modérateur aux commandes de consultation anti-triche
     default: false
   larpers.admin:
+    children:
+      larpers.modo: true
     description: Administration complète Larry
     default: op
