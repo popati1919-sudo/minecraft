@@ -466,7 +466,8 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         reply(sender, "Fonds insuffisants.");
                         return true;
                     }
-                    credit(target.getUniqueId(), amount);
+                    double receiverNext;try{receiverNext=AntiDuplication.add(beforeTarget,amount);}catch(ArithmeticException|IllegalArgumentException ex){data.set("balances."+key(player.getUniqueId()),beforeSender);reply(sender,"Solde du destinataire hors limites.");return true;}
+                    data.set("balances."+key(target.getUniqueId()),receiverNext);
                     appendTransaction("PAY",player.getUniqueId(),target.getUniqueId(),amount);
                     if(!saveData()){
                         data.set("balances."+key(player.getUniqueId()),beforeSender);
@@ -713,6 +714,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     public long lotteryEndsAt(){return data.getLong("lottery.ends-at",0L);}
     private boolean isLpcAdminSender(CommandSender sender){return sender.isOp()||sender.hasPermission("larpers.admin");}
     public boolean isLpcAdmin(Player player){return isLpcAdminSender(player);}
+    boolean isEconomyPlayer(Player player){return player.isOnline()&&!player.isDead()&&auth!=null&&auth.isAuthenticated(player)&&!getConfig().getBoolean("network.auth-only",false)&&player.getGameMode()==org.bukkit.GameMode.SURVIVAL;}
 
     private org.bukkit.scheduler.BukkitTask lotteryTimer;
 
@@ -873,7 +875,8 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         }
         double beforeBalance=balance(winnerUuid);long beforeEnd=lotteryEndsAt();
         List<String> beforeTickets=data.getStringList("lottery.tickets"),beforeRecords=data.getStringList("transactions");
-        credit(winnerUuid, jackpot);
+        double winnerBalance;try{winnerBalance=AntiDuplication.add(beforeBalance,jackpot);}catch(ArithmeticException|IllegalArgumentException ex){getLogger().severe("Jackpot hors limite : tirage suspendu.");return;}
+        data.set("balances."+key(winnerUuid),winnerBalance);
         data.set("lottery.tickets", new ArrayList<String>());
         data.set("lottery.pot", 0.0);
         data.set("lottery.active",false);data.set("lottery.ends-at",0L);
@@ -886,7 +889,13 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player killer = event.getEntity().getKiller();
-        if (killer == null || killer.getUniqueId().equals(event.getEntity().getUniqueId())) return;
+        if (killer == null || killer.getUniqueId().equals(event.getEntity().getUniqueId())||!isEconomyPlayer(killer)) return;
+        UUID victim=event.getEntity().getUniqueId();
+        String first=killer.getUniqueId().toString(),second=victim.toString();
+        String pair=first.compareTo(second)<0?first+"_"+second:second+"_"+first;
+        String cooldown="bounty-pairs."+pair;
+        long previousKill=data.getLong(cooldown,0L),now=System.currentTimeMillis();
+        if(now-previousKill<86400000L)return;
         String victimId = key(event.getEntity().getUniqueId());
         double bounty = data.getDouble("bounties." + victimId, 0.0);
         if (!Double.isFinite(bounty) || bounty <= 0.0) return;
@@ -895,10 +904,11 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             return;
         }
         double previous=balance(killer.getUniqueId());var history=data.getStringList("transactions");
-        data.set("bounties." + victimId, 0.0);
-        credit(killer.getUniqueId(), bounty);
+        double after;try{after=AntiDuplication.add(previous,bounty);}catch(ArithmeticException|IllegalArgumentException ex){return;}
+        data.set("bounties." + victimId, 0.0);data.set(cooldown,now);
+        data.set("balances."+key(killer.getUniqueId()),after);
         appendTransaction("BOUNTY_WIN",new UUID(0L,0L),killer.getUniqueId(),bounty);
-        if(!saveData()){data.set("bounties."+victimId,bounty);data.set("balances."+key(killer.getUniqueId()),previous);data.set("transactions",history);getLogger().warning("Prime non versée : sauvegarde impossible.");return;}
+        if(!saveData()){data.set(cooldown,previousKill);data.set("bounties."+victimId,bounty);data.set("balances."+key(killer.getUniqueId()),previous);data.set("transactions",history);getLogger().warning("Prime non versée : sauvegarde impossible.");return;}
         Bukkit.broadcastMessage(ChatColor.GOLD + "[Larry] " + killer.getName() + " a récupéré la prime de " + format(bounty) + " sur " + event.getEntity().getName() + " !");
     }
 
