@@ -36,6 +36,12 @@ public final class SecureTradeManager implements Listener {
     private final Map<UUID, Session> sessions = new HashMap<>();
     private final Set<UUID> opening = new HashSet<>();
     private final Set<UUID> moneyInput = new HashSet<>();
+    private final Map<UUID,UUID> invitationTokens=new HashMap<>();
+    private static final class TradeHolder implements org.bukkit.inventory.InventoryHolder {
+        Inventory inventory;
+        @Override public Inventory getInventory(){return inventory;}
+    }
+    private boolean tradeView(InventoryView view){return view.getTopInventory().getHolder() instanceof TradeHolder;}
 
     private static final class Offer {
         final List<ItemStack> items = new ArrayList<>();
@@ -46,6 +52,7 @@ public final class SecureTradeManager implements Listener {
         final UUID first, second;
         final Offer a = new Offer(), b = new Offer();
         boolean countdown;
+        long generation;
         Session(UUID first, UUID second) { this.first=first; this.second=second; }
         Offer offer(UUID id) { return first.equals(id) ? a : b; }
         UUID other(UUID id) { return first.equals(id) ? second : first; }
@@ -78,7 +85,7 @@ public final class SecureTradeManager implements Listener {
     private void closeViews(Session s) {
         for(UUID id:List.of(s.first,s.second)) {
             Player p=Bukkit.getPlayer(id);
-            if(p!=null && p.getOpenInventory().getTitle().equals(TITLE)) p.closeInventory();
+            if(p!=null && (tradeView(p.getOpenInventory()) || moneyInput.contains(id))) p.closeInventory();
         }
     }
     private void cancel(Session s,String reason) {
@@ -129,13 +136,15 @@ public final class SecureTradeManager implements Listener {
             if(target==null || target.equals(p)){msg(p,"Joueur invalide ou hors ligne.");return true;}
             if(!withinRange(p,target)){msg(p,"Tu dois être dans le même monde que "+target.getName()+" et à 10 blocs maximum.");return true;}
             if(session(p.getUniqueId())!=null || session(target.getUniqueId())!=null
-                || invitations.containsKey(target.getUniqueId()) || invitations.containsValue(p.getUniqueId())) {
+                || invitations.containsKey(target.getUniqueId()) || invitations.containsValue(p.getUniqueId()) || invitations.containsKey(p.getUniqueId()) || invitations.containsValue(target.getUniqueId())) {
                 msg(p,"Un des joueurs participe déjà à un échange ou a une invitation en attente.");return true;
             }
             invitations.put(target.getUniqueId(),p.getUniqueId());
-            UUID targetId=target.getUniqueId(), requesterId=p.getUniqueId();
+            UUID targetId=target.getUniqueId(), requesterId=p.getUniqueId(), inviteToken=UUID.randomUUID();
+            invitationTokens.put(targetId,inviteToken);
             Bukkit.getScheduler().runTaskLater(plugin,()->{
-                if(requesterId.equals(invitations.get(targetId))) {
+                if(inviteToken.equals(invitationTokens.get(targetId)) && requesterId.equals(invitations.get(targetId))) {
+                    invitationTokens.remove(targetId);
                     invitations.remove(targetId);
                     Player receiver=Bukkit.getPlayer(targetId),requester=Bukkit.getPlayer(requesterId);
                     if(receiver!=null)msg(receiver,"Invitation expirée. Aucun échange n'a été effectué.");
@@ -156,7 +165,9 @@ public final class SecureTradeManager implements Listener {
         if(b!=null)open(b,s,s.b,s.a,a==null?"Joueur":a.getName());
     }
     private void open(Player p,Session s,Offer own,Offer theirs,String otherName) {
-        Inventory inv=Bukkit.createInventory(null,54,TITLE);
+        if(moneyInput.contains(p.getUniqueId()))return;
+        TradeHolder holder=new TradeHolder();
+        Inventory inv=Bukkit.createInventory(holder,54,TITLE);holder.inventory=inv;
         for(int i=0;i<own.items.size()&&i<OWN_SLOTS.length;i++) inv.setItem(OWN_SLOTS[i],own.items.get(i).clone());
         for(int i=0;i<theirs.items.size()&&i<OTHER_SLOTS.length;i++) inv.setItem(OTHER_SLOTS[i],theirs.items.get(i).clone());
         inv.setItem(21,named(Material.GOLD_INGOT,"ARGENT : "+own.money+" Larry","Clique ici pour saisir un montant dans l'enclume","Entre 0 pour retirer ton argent de l'offre"));
@@ -189,16 +200,16 @@ public final class SecureTradeManager implements Listener {
         return -1;
     }
     private void changed(Session s) {
-        s.a.confirmed=false;s.b.confirmed=false;s.countdown=false;refresh(s);
+        s.a.confirmed=false;s.b.confirmed=false;s.countdown=false;s.generation++;refresh(s);
     }
     @EventHandler public void onClick(InventoryClickEvent e) {
-        if(e.getView().getTitle().equals(MONEY_TITLE)) {
+        if(moneyInput.contains(e.getWhoClicked().getUniqueId()) && e.getView() instanceof AnvilView anvil) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player player))return;
             if(e.getRawSlot()!=2)return;
             Session active=session(player.getUniqueId());
             if(active==null){moneyInput.remove(player.getUniqueId());player.closeInventory();return;}
-            String typed=((AnvilView)e.getView()).getRenameText();
+            String typed=anvil.getRenameText();
             double amount;
             try {
                 if(typed==null||typed.isBlank())throw new NumberFormatException();
@@ -207,19 +218,21 @@ public final class SecureTradeManager implements Listener {
                 msg(player,"Montant invalide. Entre un nombre, par exemple 250 ou 12.5.");
                 return;
             }
-            if(!Double.isFinite(amount)||amount<0||amount>economy.balance(player.getUniqueId())) {
+            if(!Double.isFinite(amount)||amount<0||amount>economy.balance(player.getUniqueId())||java.math.BigDecimal.valueOf(amount).stripTrailingZeros().scale()>4) {
                 msg(player,"Montant invalide ou solde Larry insuffisant.");
                 return;
             }
             moneyInput.remove(player.getUniqueId());
+            opening.add(player.getUniqueId());
             player.closeInventory();
+            opening.remove(player.getUniqueId());
             active.offer(player.getUniqueId()).money=amount;
             changed(active);
             Player other=Bukkit.getPlayer(active.other(player.getUniqueId()));
             if(other!=null)msg(other,player.getName()+" a modifié son offre : "+amount+" Larry.");
             return;
         }
-        if(!e.getView().getTitle().equals(TITLE))return;
+        if(!tradeView(e.getView()))return;
         e.setCancelled(true);
         if(!(e.getWhoClicked() instanceof Player p))return;
         Session s=session(p.getUniqueId()); if(s==null)return;
@@ -259,28 +272,29 @@ public final class SecureTradeManager implements Listener {
         }
     }
     @EventHandler public void onDrag(InventoryDragEvent e) {
-        if(e.getView().getTitle().equals(TITLE))e.setCancelled(true);
+        if(tradeView(e.getView()) || moneyInput.contains(e.getWhoClicked().getUniqueId()))e.setCancelled(true);
     }
     @EventHandler public void onMove(PlayerMoveEvent e) {
         Session s=session(e.getPlayer().getUniqueId());
         if(s==null||e.getTo()==null)return;
         Player other=Bukkit.getPlayer(s.other(e.getPlayer().getUniqueId()));
-        if(!withinRange(e.getPlayer(),other))cancel(s,"un joueur est sorti de la zone de 10 blocs");
+        if(other==null || !Objects.equals(e.getTo().getWorld(),other.getWorld()) || e.getTo().distanceSquared(other.getLocation())>MAX_DISTANCE_SQUARED)cancel(s,"un joueur est sorti de la zone de 10 blocs");
     }
     private void startCountdown(Session s) {
         if(s.countdown)return;
         s.countdown=true;
         refresh(s);
-        countdown(s,5);
+        countdown(s,5,++s.generation);
     }
-    private void countdown(Session s,int seconds) {
+    private void countdown(Session s,int seconds,long generation) {
+        if(generation!=s.generation)return;
         if(session(s.first)!=s||session(s.second)!=s||!s.a.confirmed||!s.b.confirmed||!s.countdown)return;
         Player a=Bukkit.getPlayer(s.first),b=Bukkit.getPlayer(s.second);
         if(a==null||b==null){cancel(s,"un joueur s'est déconnecté");return;}
         if(seconds<=0){s.countdown=false;complete(s);return;}
         msg(a,"Échange validé dans "+seconds+" seconde(s)...");
         msg(b,"Échange validé dans "+seconds+" seconde(s)...");
-        Bukkit.getScheduler().runTaskLater(plugin,()->countdown(s,seconds-1),20L);
+        Bukkit.getScheduler().runTaskLater(plugin,()->countdown(s,seconds-1,generation),20L);
     }
     private boolean canReceive(Player receiver,Offer incoming) {
         Inventory test=Bukkit.createInventory(null,36);
@@ -291,6 +305,7 @@ public final class SecureTradeManager implements Listener {
         Player a=Bukkit.getPlayer(s.first),b=Bukkit.getPlayer(s.second);
         if(a==null||b==null){cancel(s,"un joueur s'est déconnecté");return;}
         if(!withinRange(a,b)){cancel(s,"les joueurs sont trop éloignés");return;}
+        if(s.a.items.isEmpty() && s.b.items.isEmpty() && s.a.money==0 && s.b.money==0){cancel(s,"offres vides");return;}
         if(!canReceive(a,s.b)||!canReceive(b,s.a)){cancel(s,"inventaire plein; objets rendus sans échange");return;}
         if(!Double.isFinite(s.a.money)||!Double.isFinite(s.b.money)||s.a.money<0||s.b.money<0
             ||economy.balance(a.getUniqueId())<s.a.money||economy.balance(b.getUniqueId())<s.b.money) {
@@ -326,15 +341,17 @@ public final class SecureTradeManager implements Listener {
             });
             return;
         }
-        if(!e.getView().getTitle().equals(TITLE)||opening.contains(closedId))return;
+        if(!tradeView(e.getView())||opening.contains(closedId))return;
         Session s=session(e.getPlayer().getUniqueId());
         if(s!=null)cancel(s,"interface fermée");
     }
+    void shutdown(){for(Session s:new HashSet<>(sessions.values()))cancel(s,"arrêt du serveur");}
     @EventHandler public void onQuit(PlayerQuitEvent e) {
         UUID id=e.getPlayer().getUniqueId();
         invitations.remove(id);
         Session s=session(id);
         if(s!=null)cancel(s,"un joueur s'est déconnecté");
         invitations.values().removeIf(id::equals);
+        invitationTokens.keySet().retainAll(invitations.keySet());
     }
 }
