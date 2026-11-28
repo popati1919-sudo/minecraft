@@ -166,6 +166,8 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         return p.isDead() || p.isInsideVehicle() || p.isFlying() || p.getAllowFlight()
                 || p.isGliding() || p.isSwimming() || p.isRiptiding()
                 || p.isInWater() || p.isClimbing() || p.isSleeping()
+                || p.getLocation().getBlock().getType()==Material.BUBBLE_COLUMN
+                || p.getLocation().subtract(0,0.2,0).getBlock().getType()==Material.SLIME_BLOCK
                 || p.hasPotionEffect(PotionEffectType.LEVITATION)
                 || p.hasPotionEffect(PotionEffectType.SLOW_FALLING)
                 || bypass(p) || inGrace(p);
@@ -223,6 +225,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         int currentTick = player.getTicksLived();
         Integer previousTick = lastMovementTick.put(id, currentTick);
         if (previousTick == null || previousTick != currentTick) horizontalDistanceThisTick.put(id, 0.0D);
+        if(previousTick!=null && currentTick-previousTick>2){upwardTicks.remove(id);airTicks.remove(id);}
 
         if (plugin.getConfig().getBoolean("anticheat.checks.speed.enabled", true)
                 && player.isOnGround()) {
@@ -232,6 +235,9 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
             double horizontal = horizontalDistanceThisTick.merge(id, segment, Double::sum);
             double limit = plugin.getConfig().getDouble("anticheat.checks.speed.max-ground-blocks-per-tick", 0.65D);
             if (player.isSprinting()) limit += 0.12D;
+            Material floor=from.clone().subtract(0,0.2,0).getBlock().getType();
+            if(floor==Material.ICE||floor==Material.PACKED_ICE||floor==Material.BLUE_ICE||floor==Material.FROSTED_ICE)limit*=1.8;
+            limit+=Math.min(0.25,Math.max(0,player.getPing()-100)*0.0005);
             PotionEffect speed = player.getPotionEffect(PotionEffectType.SPEED);
             if (speed != null) limit += 0.18D * (speed.getAmplifier() + 1);
             if (horizontal > limit) {
