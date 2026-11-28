@@ -21,8 +21,11 @@ final class LarryServiceData {
         data.set(key,name);
         try {
             Path tmp=file.toPath().resolveSibling("mutes.yml.tmp");
+            try {
             data.save(tmp.toFile());
-            Files.move(tmp,file.toPath(),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
+            try { Files.move(tmp,file.toPath(),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING); }
+            catch(AtomicMoveNotSupportedException ex) { Files.move(tmp,file.toPath(),StandardCopyOption.REPLACE_EXISTING); }
+            } finally { try { Files.deleteIfExists(tmp); } catch(IOException ignored) {} }
             return true;
         } catch(IOException ex) { data.set(key,previous);return false; }
     }
