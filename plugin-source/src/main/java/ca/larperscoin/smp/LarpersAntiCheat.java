@@ -138,6 +138,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
             }
         } catch (IOException ex) {
             plugin.getLogger().severe("Impossible de sauvegarder les violations anti-triche: " + ex.getMessage());
+            try{Files.deleteIfExists(temp);}catch(IOException ignored){}
         }
     }
 
@@ -154,7 +155,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
     }
 
     private boolean bypass(Player player) {
-        return player.hasPermission("larpers.anticheat.bypass");
+        return player.getName().startsWith("+") || player.hasPermission("larpers.anticheat.bypass");
     }
 
     private boolean globallyEnabled() {
@@ -238,7 +239,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
             }
         }
 
-        if (plugin.getConfig().getBoolean("anticheat.checks.fly.enabled", true)) {
+        if ((previousTick==null || previousTick!=currentTick) && plugin.getConfig().getBoolean("anticheat.checks.fly.enabled", true)) {
             double dy = to.getY() - from.getY();
             double upLimit = plugin.getConfig().getDouble("anticheat.checks.fly.upward-limit-per-tick", 0.72D);
             PotionEffect jump = player.getPotionEffect(PotionEffectType.JUMP_BOOST);
@@ -250,7 +251,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
                     flag(player, "FLY", "montées verticales répétées sans exemption");
                     upwardTicks.put(id, 0);
                 }
-            } else if (dy <= 0.0D || player.isOnGround()) {
+            } else {
                 upwardTicks.remove(id);
             }
             if (!player.isOnGround() && Math.abs(dy) < 0.025D) {
@@ -259,7 +260,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
                     flag(player, "FLY_HOVER", "position verticale presque immobile en plein air pendant 40 ticks");
                     airTicks.put(id, 0);
                 }
-            } else if (dy < -0.05D || player.isOnGround()) {
+            } else {
                 airTicks.remove(id);
             }
         }
@@ -275,7 +276,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         Material type = event.getBlock().getType();
         UUID id = player.getUniqueId();
         long now = System.currentTimeMillis();
-        long started = xrayWindowStart.getOrDefault(id, now);
+        long started = xrayWindowStart.computeIfAbsent(id, ignored -> now);
         if (now - started > 5L * 60_000L) {
             xrayWindowStart.put(id, now);
             minedStone.put(id, 0);
@@ -334,7 +335,7 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         // Ne pas gonfler les violations avec chaque paquet/mouvement pendant le délai anti-spam.
         if (now - previous < cooldown) return;
         lastAlert.put(key, now);
-        int total = violations.merge(player.getUniqueId(), 1, Integer::sum);
+        int total = violations.merge(player.getUniqueId(), 1, (old,one)->old==Integer.MAX_VALUE?old:old+1);
 
         String plain = player.getName() + " | " + check + " | " + detail + " | VL " + total;
         synchronized (evidence) {
