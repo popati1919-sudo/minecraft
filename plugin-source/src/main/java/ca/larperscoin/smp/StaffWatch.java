@@ -27,6 +27,7 @@ final class StaffWatch implements Listener, CommandExecutor {
                 ? List.of("help") : List.of());
         Bukkit.getPluginManager().registerEvents(this,plugin);
         for(Player p:Bukkit.getOnlinePlayers()) if(active(p)) restore(p);
+        Bukkit.getScheduler().runTaskTimer(plugin,()-> { for(Player p:Bukkit.getOnlinePlayers()) if(active(p) && !p.hasPermission("larpers.staff")) restore(p); },20L,20L);
     }
     boolean active(Player p) { return p.getPersistentDataContainer().has(key,PersistentDataType.STRING); }
 
@@ -64,6 +65,7 @@ final class StaffWatch implements Listener, CommandExecutor {
         state.set("food",p.getFoodLevel());
         state.set("saturation",p.getSaturation());
         state.set("health",p.getHealth());
+        state.set("effects",new ArrayList<>(p.getActivePotionEffects()));
         state.set("slot",p.getInventory().getHeldItemSlot());
         var items=p.getInventory().getContents();
         for(int i=0;i<items.length;i++)
@@ -115,8 +117,8 @@ final class StaffWatch implements Listener, CommandExecutor {
                 if(bytes!=null) items[i]=ItemStack.deserializeBytes(Base64.getDecoder().decode(bytes));
             }
             if(location==null || location.getWorld()==null || !p.teleport(location)) {
-                if(!p.teleport(p.getWorld().getSpawnLocation())) throw new IllegalStateException("Téléportation refusée");
-                p.sendMessage("Point de retour indisponible : retour au spawn.");
+                if(p.teleport(p.getWorld().getSpawnLocation())) p.sendMessage("Point de retour indisponible : retour au spawn.");
+                else p.sendMessage("Téléportation refusée : inventaire restauré sur place.");
             }
             p.setGameMode(mode);
             p.setAllowFlight(state.getBoolean("flight"));
@@ -128,6 +130,10 @@ final class StaffWatch implements Listener, CommandExecutor {
             if(state.contains("food")) p.setFoodLevel(state.getInt("food"));
             if(state.contains("saturation")) p.setSaturation((float)state.getDouble("saturation"));
             if(state.contains("health")) p.setHealth(Math.max(0.1,Math.min(p.getMaxHealth(),state.getDouble("health"))));
+            if(state.contains("effects")) {
+                for(var effect:p.getActivePotionEffects()) p.removePotionEffect(effect.getType());
+                for(Object effect:state.getList("effects",List.of())) if(effect instanceof org.bukkit.potion.PotionEffect potion) p.addPotionEffect(potion);
+            }
             features.setVanished(p,state.getBoolean("hidden"));
             p.getPersistentDataContainer().remove(key);
             p.saveData();
