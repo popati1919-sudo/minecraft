@@ -390,6 +390,7 @@ final class LarpersAuth implements Listener {
         java.nio.file.Path target=file.toPath().toAbsolutePath(),tmp=null;
         try {
             if(!accountsReadable) return false;
+            try(var channel=java.nio.channels.FileChannel.open(target.resolveSibling("auth.yml.lock"),java.nio.file.StandardOpenOption.CREATE,java.nio.file.StandardOpenOption.WRITE);var lock=channel.lock()){
             if((file.exists()?file.lastModified():0)!=lastRead || (file.exists()?file.length():0)!=lastSize)throw new IOException("Fichier modifié par une autre instance");
             tmp=java.nio.file.Files.createTempFile(target.getParent(),"auth-",".tmp");
             accounts.save(tmp.toFile());
@@ -397,6 +398,7 @@ final class LarpersAuth implements Listener {
             try{java.nio.file.Files.move(tmp,target,java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}
             catch(java.nio.file.AtomicMoveNotSupportedException ex){java.nio.file.Files.move(tmp,target,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}
             lastRead=file.lastModified();lastSize=file.length();return true;
+            }
         }catch(IOException ex){
             plugin.getLogger().severe("Impossible de sauvegarder auth.yml: "+ex.getMessage());
             lastRead=-1;reloadAccounts();return false;
@@ -405,7 +407,9 @@ final class LarpersAuth implements Listener {
 
     private boolean isFloodgate(Player player) {
         try {
-            Class<?> api = Class.forName("org.geysermc.floodgate.api.FloodgateApi");
+            var floodgate=Bukkit.getPluginManager().getPlugin("floodgate");
+            if(floodgate==null || !floodgate.isEnabled())return false;
+            Class<?> api = Class.forName("org.geysermc.floodgate.api.FloodgateApi",true,floodgate.getClass().getClassLoader());
             Object instance = api.getMethod("getInstance").invoke(null);
             return (boolean) api.getMethod("isFloodgatePlayer", UUID.class).invoke(instance, player.getUniqueId());
         } catch (ReflectiveOperationException | LinkageError ex) {
@@ -416,7 +420,7 @@ final class LarpersAuth implements Listener {
     private boolean exempt(Player player) {
         // Le systeme d'authentification et ses blocages sont reserves au Lobby.
         // Sur le SMP, tout joueur est libre: ne jamais appliquer les restrictions /login.
-        return !plugin.getConfig().getBoolean("network.auth-only", false) || isAuthenticated(player);
+        return plugin.getConfig().getBoolean("auth.proxy-authenticated",false) || isAuthenticated(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -432,7 +436,6 @@ final class LarpersAuth implements Listener {
         // Le verrouillage de déplacement ne concerne que le Lobby d'authentification.
         // Le SMP est derrière Velocity: les joueurs ne doivent jamais y être immobilisés
         // par le système /login, même pendant les premiers ticks de connexion.
-        if (!plugin.getConfig().getBoolean("network.auth-only", false)) return;
         if (exempt(event.getPlayer()) || event.getTo() == null) return;
         Location from = event.getFrom(), to = event.getTo();
         if (from.getX()!=to.getX() || from.getY()!=to.getY() || from.getZ()!=to.getZ()) {
@@ -488,6 +491,8 @@ final class LarpersAuth implements Listener {
     public void onInventory(InventoryClickEvent e) { if (e.getWhoClicked() instanceof Player p && !exempt(p)) e.setCancelled(true); }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
     public void onDrag(org.bukkit.event.inventory.InventoryDragEvent e){if(e.getWhoClicked() instanceof Player p && !exempt(p))e.setCancelled(true);}
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
+    public void onPickup(org.bukkit.event.entity.EntityPickupItemEvent e){if(e.getEntity() instanceof Player p && !exempt(p))e.setCancelled(true);}
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent e) {
         if (e.getDamager() instanceof Player p && !exempt(p)) e.setCancelled(true);
