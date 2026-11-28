@@ -272,6 +272,42 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         data.set("transactions",history);data.set("trade-commits."+tradeId,null);
         return false;
     }
+    boolean migrateAuctions(org.bukkit.configuration.ConfigurationSection legacy){
+        if(data.getBoolean("auction-migrated"))return true;
+        if(legacy!=null)for(String id:legacy.getKeys(false)){
+            var entry=legacy.getConfigurationSection(id);
+            if(entry!=null)data.createSection("auctions."+id,entry.getValues(true));
+        }
+        data.set("auction-migrated",true);
+        if(saveData())return true;
+        data.set("auction-migrated",null);data.set("auctions",null);return false;
+    }
+    org.bukkit.configuration.ConfigurationSection auctions(){return data.getConfigurationSection("auctions");}
+    org.bukkit.configuration.ConfigurationSection auctionEntry(String id){return data.getConfigurationSection("auctions."+id);}
+    boolean commerceCommitted(String id){return data.getBoolean("commerce-commits."+id);}
+    void clearCommerceCommit(String id){data.set("commerce-commits."+id,null);saveData();}
+    boolean commitCommerce(String tx,UUID player,double delta,UUID seller,double sellerCredit,String auctionId,Map<String,Object> listing,boolean remove,String type){
+        if(commerceCommitted(tx)||!Double.isFinite(delta)||!Double.isFinite(sellerCredit)||sellerCredit<0)return false;
+        double before=balance(player),after=before+delta;
+        double oldSeller=seller==null?0:balance(seller),newSeller=oldSeller+sellerCredit;
+        if(!Double.isFinite(after)||after<0||!Double.isFinite(newSeller)||player.equals(seller))return false;
+        String path=auctionId==null?null:"auctions."+auctionId;
+        var oldEntry=path==null?null:data.getConfigurationSection(path);
+        if(path!=null&&(remove?oldEntry==null:oldEntry!=null))return false;
+        Map<String,Object> oldListing=oldEntry==null?null:new java.util.LinkedHashMap<>(oldEntry.getValues(false));
+        var history=data.getStringList("transactions");
+        data.set("balances."+key(player),after);
+        if(seller!=null)data.set("balances."+key(seller),newSeller);
+        if(path!=null){data.set(path,null);if(!remove)data.createSection(path,listing);}
+        UUID system=new UUID(0L,0L);
+        if(delta!=0)appendTransaction(type,delta<0?player:system,delta<0?(seller==null?system:seller):player,Math.abs(delta));
+        data.set("commerce-commits."+tx,true);
+        if(saveData())return true;
+        data.set("balances."+key(player),before);
+        if(seller!=null)data.set("balances."+key(seller),oldSeller);
+        if(path!=null){data.set(path,null);if(oldListing!=null)data.createSection(path,oldListing);}
+        data.set("transactions",history);data.set("commerce-commits."+tx,null);return false;
+    }
     boolean hasTradeCommit(String tradeId){return data.getBoolean("trade-commits."+tradeId,false);}
     void clearTradeCommit(String tradeId){
         data.set("trade-commits."+tradeId,null);saveData();
