@@ -35,7 +35,7 @@ final class RamCommand implements CommandExecutor, Listener {
         String other=server.equalsIgnoreCase("SMP")?"Lobby":"SMP";
         try {
             String arg=Files.readString(Path.of("..",other,"larry-heap.args")).trim();
-            if(arg.matches("-Xmx[1-9][0-9]*G"))return 1+Long.parseLong(arg.substring(4,arg.length()-1));
+            if(arg.matches("-Xmx[1-9][0-9]{0,5}G"))return 1+Long.parseLong(arg.substring(4,arg.length()-1));
         } catch(IOException|NumberFormatException ignored){}
         return 1+(other.equals("Lobby")?1:4);
     }
