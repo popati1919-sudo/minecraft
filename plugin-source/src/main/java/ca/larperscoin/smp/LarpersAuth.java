@@ -56,6 +56,10 @@ final class LarpersAuth implements Listener {
     private final NamespacedKey lobbyCompassKey;
     private final File file;
     private YamlConfiguration accounts;
+    private boolean accountsReadable;
+    private long lastRead=-1;
+    private long lastSize=-1;
+    private final Map<UUID,Long> attemptExpiry=new ConcurrentHashMap<>();
     private final SecureRandom random = new SecureRandom();
     private final Map<UUID, Boolean> authenticated = new ConcurrentHashMap<>();
     private final Map<UUID, Location> joinLocations = new ConcurrentHashMap<>();
@@ -99,16 +103,27 @@ final class LarpersAuth implements Listener {
     }
 
     private void reloadAccounts() {
-        accounts = YamlConfiguration.loadConfiguration(file);
+        try {
+            long modified=file.exists()?file.lastModified():0, size=file.exists()?file.length():0;
+            if(accountsReadable && modified==lastRead && size==lastSize)return;
+            var next=new YamlConfiguration();
+            if(file.exists())next.load(file);
+            accounts=next;accountsReadable=true;lastRead=modified;lastSize=size;
+        }catch(Exception ex){
+            if(accounts==null)accounts=new YamlConfiguration();
+            if(accountsReadable||lastRead==-1)plugin.getLogger().severe("auth.yml illisible; aucune modification autorisée.");
+            accountsReadable=false;lastRead=0;
+        }
     }
 
     boolean resetAccount(String playerName) {
         reloadAccounts();
+        if(!accountsReadable || playerName==null || !playerName.matches("[A-Za-z0-9_]{3,16}"))return false;
         String path = accountPath(playerName);
         if (!accounts.contains(path + ".hash")) return false;
         accounts.set(path, null);
         accounts.set("revoked." + playerName.toLowerCase(Locale.ROOT), System.currentTimeMillis());
-        save();
+        if(!save())return false;
         Player online = null;
         for (Player candidate : Bukkit.getOnlinePlayers()) {
             if (candidate.getName().equalsIgnoreCase(playerName)) { online = candidate; break; }
@@ -142,7 +157,9 @@ final class LarpersAuth implements Listener {
             }
             String path = accountPath(player.getName());
             if (!mustReRegister && plugin.getConfig().getBoolean("auth.remember-ip", false)
-                    && accounts.contains(path + ".ip-hash")
+                    && accountsReadable && player.getAddress()!=null && player.getAddress().getAddress()!=null
+                    && accounts.getLong(path+".ip-expires",0)>System.currentTimeMillis()
+                    && accounts.contains(path + ".hash") && accounts.contains(path + ".ip-hash")
                     && MessageDigest.isEqual(accounts.getString(path + ".ip-hash", "").getBytes(java.nio.charset.StandardCharsets.US_ASCII),
                     ipHash(player).getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {
                 markAuthenticated(player);
@@ -160,6 +177,9 @@ final class LarpersAuth implements Listener {
 
     private void enforceRevokedAccounts() {
         reloadAccounts();
+        long now=System.currentTimeMillis();
+        lockedUntil.entrySet().removeIf(e->e.getValue()<=now);
+        attemptExpiry.entrySet().removeIf(e->{if(e.getValue()>now)return false;attempts.remove(e.getKey());return true;});
         for (Player player : Bukkit.getOnlinePlayers()) {
             String revokedPath = "revoked." + player.getName().toLowerCase(Locale.ROOT);
             long revokedAt = accounts.getLong(revokedPath, 0L);
@@ -177,6 +197,7 @@ final class LarpersAuth implements Listener {
 
     boolean command(Player player, String label, String[] args) {
         reloadAccounts();
+        if(!accountsReadable){player.sendMessage(ChatColor.RED+"Authentification indisponible. Contacte un administrateur.");return true;}
         if (label.equalsIgnoreCase("register")) {
             if (args.length != 1) {
                 player.sendMessage(ChatColor.YELLOW + "Usage : /register <motdepasse>");
@@ -204,7 +225,7 @@ final class LarpersAuth implements Listener {
                 accounts.set(path + ".name", player.getName());
                 accounts.set("revoked." + player.getName().toLowerCase(Locale.ROOT), null);
                 rememberIp(player, path);
-                save();
+                if(!save()){player.sendMessage(ChatColor.RED+"Compte non sauvegardé; réessaie plus tard.");return true;}
                 markAuthenticated(player);
                 player.sendMessage(ChatColor.GREEN + "Compte créé. Bienvenue sur Larry SMP !");
             } catch (GeneralSecurityException ex) {
@@ -222,6 +243,7 @@ final class LarpersAuth implements Listener {
                 player.sendMessage(ChatColor.GREEN + "Tu es déjà connecté.");
                 return true;
             }
+            if(args[0].length()<8 || args[0].length()>64){player.sendMessage(ChatColor.RED+"Mot de passe invalide (8 à 64 caractères).");return true;}
             long lock = lockedUntil.getOrDefault(player.getUniqueId(), 0L);
             if (System.currentTimeMillis() < lock) {
                 long seconds = Math.max(1, (lock - System.currentTimeMillis()) / 1000);
@@ -236,17 +258,19 @@ final class LarpersAuth implements Listener {
             try {
                 byte[] salt = Base64.getDecoder().decode(accounts.getString(path + ".salt", ""));
                 String expected = accounts.getString(path + ".hash", "");
-                int iterations = Math.max(100_000, accounts.getInt(path + ".iterations", ITERATIONS));
+                int iterations = accounts.getInt(path + ".iterations", ITERATIONS);
+                if(iterations<100_000 || iterations>1_000_000 || salt.length<16 || salt.length>64)throw new IllegalArgumentException("Paramètres du compte invalides");
                 String actual = hash(args[0].toCharArray(), salt, iterations);
                 if (MessageDigest.isEqual(expected.getBytes(java.nio.charset.StandardCharsets.US_ASCII),
                         actual.getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {
                     attempts.remove(player.getUniqueId());
                     lockedUntil.remove(player.getUniqueId());
                     rememberIp(player, path);
-                    save();
+                    if(!save()){player.sendMessage(ChatColor.RED+"Sauvegarde indisponible; réessaie plus tard.");return true;}
                     markAuthenticated(player);
                     player.sendMessage(ChatColor.GREEN + "Connexion réussie. Bon jeu !");
                 } else {
+                    attemptExpiry.put(player.getUniqueId(),System.currentTimeMillis()+LOCK_MILLIS);
                     int count = attempts.merge(player.getUniqueId(), 1, Integer::sum);
                     if (count >= MAX_ATTEMPTS) {
                         lockedUntil.put(player.getUniqueId(), System.currentTimeMillis() + LOCK_MILLIS);
@@ -272,7 +296,7 @@ final class LarpersAuth implements Listener {
         if (plugin.getConfig().getBoolean("lobby-return-compass.enabled", false)) {
             Bukkit.getScheduler().runTask(plugin, () -> giveLobbyCompass(player));
         }
-        if (plugin.getConfig().getBoolean("auth.connect-to-smp", false)) {
+        if (plugin.getConfig().getBoolean("auth.connect-to-smp", false) && !plugin.getConfig().getBoolean("lobby-return-compass.enabled",false)) {
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (!player.isOnline()) return;
                 try {
@@ -300,7 +324,7 @@ final class LarpersAuth implements Listener {
         meta.setLore(java.util.List.of(ChatColor.GRAY + "Clic droit pour rejoindre le SMP."));
         meta.getPersistentDataContainer().set(lobbyCompassKey, PersistentDataType.BYTE, (byte) 1);
         compass.setItemMeta(meta);
-        player.getInventory().addItem(compass);
+        if(!player.getInventory().addItem(compass).isEmpty())player.sendMessage(ChatColor.YELLOW+"Libère une place puis reconnecte-toi pour recevoir la boussole.");
     }
 
     private boolean isLobbyCompass(ItemStack item) {
@@ -325,7 +349,9 @@ final class LarpersAuth implements Listener {
 
     private void rememberIp(Player player, String path) {
         if (plugin.getConfig().getBoolean("auth.remember-ip", false)) {
+            if(player.getAddress()==null || player.getAddress().getAddress()==null){accounts.set(path+".ip-hash",null);accounts.set(path+".ip-expires",null);return;}
             accounts.set(path + ".ip-hash", ipHash(player));
+            accounts.set(path+".ip-expires",System.currentTimeMillis()+30L*86400000L);
         }
     }
 
@@ -360,9 +386,21 @@ final class LarpersAuth implements Listener {
         }
     }
 
-    private void save() {
-        try { accounts.save(file); }
-        catch (IOException ex) { plugin.getLogger().severe("Impossible de sauvegarder auth.yml: " + ex.getMessage()); }
+    private boolean save() {
+        java.nio.file.Path target=file.toPath().toAbsolutePath(),tmp=null;
+        try {
+            if(!accountsReadable) return false;
+            if((file.exists()?file.lastModified():0)!=lastRead || (file.exists()?file.length():0)!=lastSize)throw new IOException("Fichier modifié par une autre instance");
+            tmp=java.nio.file.Files.createTempFile(target.getParent(),"auth-",".tmp");
+            accounts.save(tmp.toFile());
+            if(file.exists())java.nio.file.Files.copy(target,target.resolveSibling("auth.yml.bak"),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            try{java.nio.file.Files.move(tmp,target,java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}
+            catch(java.nio.file.AtomicMoveNotSupportedException ex){java.nio.file.Files.move(tmp,target,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}
+            lastRead=file.lastModified();lastSize=file.length();return true;
+        }catch(IOException ex){
+            plugin.getLogger().severe("Impossible de sauvegarder auth.yml: "+ex.getMessage());
+            lastRead=-1;reloadAccounts();return false;
+        }finally{if(tmp!=null)try{java.nio.file.Files.deleteIfExists(tmp);}catch(IOException ignored){}}
     }
 
     private boolean isFloodgate(Player player) {
@@ -386,7 +424,7 @@ final class LarpersAuth implements Listener {
 
     @EventHandler public void onQuit(PlayerQuitEvent event) {
         UUID id = event.getPlayer().getUniqueId();
-        authenticated.remove(id); joinLocations.remove(id); attempts.remove(id); lockedUntil.remove(id); sessionJoinedAt.remove(id);
+        authenticated.remove(id); joinLocations.remove(id); sessionJoinedAt.remove(id);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -397,7 +435,7 @@ final class LarpersAuth implements Listener {
         if (!plugin.getConfig().getBoolean("network.auth-only", false)) return;
         if (exempt(event.getPlayer()) || event.getTo() == null) return;
         Location from = event.getFrom(), to = event.getTo();
-        if (from.getBlockX()!=to.getBlockX() || from.getBlockY()!=to.getBlockY() || from.getBlockZ()!=to.getBlockZ()) {
+        if (from.getX()!=to.getX() || from.getY()!=to.getY() || from.getZ()!=to.getZ()) {
             Location safe = joinLocations.get(event.getPlayer().getUniqueId());
             if (safe != null) {
                 // Bloque uniquement le déplacement avant connexion, jamais la caméra.
@@ -448,6 +486,8 @@ final class LarpersAuth implements Listener {
     public void onConsume(PlayerItemConsumeEvent e) { if (!exempt(e.getPlayer())) e.setCancelled(true); }
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInventory(InventoryClickEvent e) { if (e.getWhoClicked() instanceof Player p && !exempt(p)) e.setCancelled(true); }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true)
+    public void onDrag(org.bukkit.event.inventory.InventoryDragEvent e){if(e.getWhoClicked() instanceof Player p && !exempt(p))e.setCancelled(true);}
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageByEntityEvent e) {
         if (e.getDamager() instanceof Player p && !exempt(p)) e.setCancelled(true);
