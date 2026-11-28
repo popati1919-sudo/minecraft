@@ -22,6 +22,9 @@ final class StaffWatch implements Listener, CommandExecutor {
         this.features=features;
         key=new NamespacedKey(plugin,"staff_watch_return");
         for(String name:List.of("modo","tp")) plugin.getCommand(name).setExecutor(this);
+        plugin.getCommand("modo").setTabCompleter((sender,cmd,alias,args)->
+            sender.hasPermission("larpers.staff") && args.length==1 && "help".startsWith(args[0].toLowerCase(Locale.ROOT))
+                ? List.of("help") : List.of());
         Bukkit.getPluginManager().registerEvents(this,plugin);
         for(Player p:Bukkit.getOnlinePlayers()) if(active(p)) restore(p);
     }
@@ -36,6 +39,12 @@ final class StaffWatch implements Listener, CommandExecutor {
             sender.sendMessage("Active /modo pour rejoindre un joueur.");return true;
         }
         if(p==null) { sender.sendMessage("Commande en jeu.");return true; }
+        if(args.length>0) {
+            if(!p.hasPermission("larpers.staff")) {p.sendMessage("Guide réservé au staff.");return true;}
+            if(args.length==1 && args[0].equalsIgnoreCase("help")) openGuide(p);
+            else p.sendMessage("Utilise /modo ou /modo help.");
+            return true;
+        }
         if(active(p)) { restore(p);return true; }
         if(!p.hasPermission("larpers.staff") || plugin.getConfig().getBoolean("network.auth-only",false)) {
             p.sendMessage("Surveillance réservée au staff sur le SMP.");return true;
@@ -63,7 +72,28 @@ final class StaffWatch implements Listener, CommandExecutor {
         p.sendMessage("Surveillance active. /tp <joueur>, /freeze <joueur>, /vanish. Retape /modo pour revenir.");
         return true;
     }
+    private void openGuide(Player p) {
+        ItemStack book=new ItemStack(Material.WRITTEN_BOOK);
+        var meta=(org.bukkit.inventory.meta.BookMeta)book.getItemMeta();
+        meta.setTitle("Guide modo");
+        meta.setAuthor("Larry SMP");
+        meta.addPage(
+            "§2Surveiller un joueur§r\n\n1. Tape /modo.\n2. Tape /tp Alex pour observer Alex.\n3. Retape /modo pour rentrer.\n\nRemplace Alex par le pseudo exact du joueur.",
+            "§2Entrer en service§r\n\nSur le SMP, /modo garde ta position, ton armure, ta main gauche et ton inventaire. Tu passes en spectateur avec le vanish actif.\n\n/admin ouvre ton menu.",
+            "§2Observer§r\n\n/tp Alex te rapproche du joueur connecté.\n\n/vanish change ta visibilité dans le TAB des joueurs. Tu restes en spectateur.\n\n/staffchat <message> parle au staff.",
+            "§2Immobiliser§r\n\n/freeze Alex bloque ses déplacements. Retape /freeze Alex pour le libérer.\n\nLibère le joueur à la fin de la vérification.",
+            "§2Lire les alertes§r\n\n/ac alerts active ou coupe tes alertes.\n/ac info Alex montre son compteur.\n/ac log montre les alertes récentes.\n/ac top affiche le classement.\n/ac status affiche l’état.",
+            "§2Modérer le chat§r\n\n/mute Alex spam coupe son chat public. Il doit être connecté.\n/unmute Alex lui rend la parole, même hors ligne.\n/kick Alex <raison> le déconnecte du SMP.",
+            "§2Bannir du SMP§r\n\n/ban Alex <raison> bannit le joueur.\n/pardon Alex le débannit.\n/listban players liste les bans de joueurs.",
+            "§2Bannir une IP§r\n\n/banip Alex <raison> bannit son adresse. Plusieurs joueurs peuvent la partager.\n/listban ips liste ces bans.\n/pardon-ip <IP> retire le ban.",
+            "§2Fin de service§r\n\nRetape /modo pour retrouver ta position et ton inventaire. La déconnexion lance aussi le retour.\n\nHors surveillance, /invsee Alex ouvre son inventaire.\n/modo help rouvre ce guide."
+        );
+        book.setItemMeta(meta);
+        p.openBook(book);
+    }
+
     private void follow(Player p,String[] args) {
+        if(!p.hasPermission("larpers.staff")) {restore(p);return;}
         Player target=args.length==1 ? Bukkit.getPlayerExact(args[0]) : null;
         if(target==null || target==p) {p.sendMessage("Utilise /tp <joueur connecté>.");return;}
         if(p.teleport(target.getLocation())) p.sendMessage("Surveillance de "+target.getName()+".");
@@ -99,6 +129,11 @@ final class StaffWatch implements Listener, CommandExecutor {
         if(!active(e.getPlayer())) return;
         String[] parts=e.getMessage().substring(1).trim().split("\\s+");
         String name=parts[0].toLowerCase(Locale.ROOT);
+        if(!e.getPlayer().hasPermission("larpers.staff")) {
+            e.setCancelled(true);
+            restore(e.getPlayer());
+            return;
+        }
         if(name.equals("tp")) {
             e.setCancelled(true);
             follow(e.getPlayer(),Arrays.copyOfRange(parts,1,parts.length));

@@ -12,6 +12,7 @@ commands:
     usage: /ram [GiB]
     permission: larpers.admin
   modo:
+    usage: /modo [help]
     description: Entrer ou sortir de la surveillance du SMP
   tp:
     description: Rejoindre un joueur en surveillance

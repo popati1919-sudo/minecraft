@@ -475,6 +475,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     if(sender instanceof Player p && !watch.active(p) && !p.isOp() && !p.hasPermission("larpers.admin")) { msg(p,"Active /modo sur le SMP.");return true; }
                     if(a.length!=1){msg(sender,"Usage : /freeze <joueur>");return true;}
                     Player t=Bukkit.getPlayerExact(a[0]); if(t==null){msg(sender,"Joueur introuvable.");return true;}
+                    if(t.equals(sender) && !frozen.contains(t.getUniqueId())) {msg(sender,"Choisis un autre joueur à immobiliser.");return true;}
                     if(!frozen.add(t.getUniqueId()))frozen.remove(t.getUniqueId());
                     msg(sender,t.getName()+(frozen.contains(t.getUniqueId())?" est immobilisé.":" peut bouger."));
                     msg(t,frozen.contains(t.getUniqueId())?"Tu as été immobilisé par le staff.":"Tu peux de nouveau bouger."); return true;
