@@ -221,6 +221,41 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         }
         data.set("balances." + key(uuid), next);
     }
+    double clanBank(String bankId,double legacy){
+        double value=data.getDouble("clan-banks."+bankId,legacy);
+        return Double.isFinite(value)&&value>=0?value:0;
+    }
+    boolean changeClanBank(String bankId,double legacy,UUID player,double amount,boolean deposit){
+        if(!Double.isFinite(amount)||amount<=0)return false;
+        String bankPath="clan-banks."+bankId,playerPath="balances."+key(player);
+        double oldBank=clanBank(bankId,legacy),oldBalance=balance(player);
+        if(deposit?oldBalance<amount:oldBank<amount)return false;
+        double nextBank=deposit?oldBank+amount:oldBank-amount,nextBalance=deposit?oldBalance-amount:oldBalance+amount;
+        if(!Double.isFinite(nextBank)||!Double.isFinite(nextBalance))return false;
+        Object oldStored=data.get(bankPath);var history=data.getStringList("transactions");
+        data.set(bankPath,nextBank);data.set(playerPath,nextBalance);
+        UUID system=new UUID(0L,0L);
+        appendTransaction(deposit?"CLAN_DEPOSIT":"CLAN_WITHDRAW",deposit?player:system,deposit?system:player,amount);
+        if(saveData())return true;
+        data.set(bankPath,oldStored);data.set(playerPath,oldBalance);data.set("transactions",history);return false;
+    }
+    boolean changeBalanceSaved(UUID player,double delta){
+        double previous=balance(player),next=previous+delta;
+        if(!Double.isFinite(delta)||!Double.isFinite(next)||next<0)return false;
+        data.set("balances."+key(player),next);
+        if(saveData())return true;
+        data.set("balances."+key(player),previous);return false;
+    }
+    boolean hasQuestClaim(String claim){return data.getBoolean("quest-claims."+claim,false);}
+    boolean commitQuestClaim(UUID player,String claim,double reward,boolean weekly){
+        if(hasQuestClaim(claim)||!Double.isFinite(reward)||reward<=0)return false;
+        double before=balance(player),after=before+reward;if(!Double.isFinite(after))return false;
+        var history=data.getStringList("transactions");
+        data.set("balances."+key(player),after);data.set("quest-claims."+claim,true);
+        appendTransaction(weekly?"QUEST_WEEKLY":"QUEST_DAILY",new UUID(0L,0L),player,reward);
+        if(saveData())return true;
+        data.set("balances."+key(player),before);data.set("quest-claims."+claim,null);data.set("transactions",history);return false;
+    }
     boolean commitTradeMoney(UUID first,UUID second,double firstPays,double secondPays,String tradeId) {
         double a=balance(first),b=balance(second);
         if(!Double.isFinite(firstPays)||!Double.isFinite(secondPays)||firstPays<0||secondPays<0||a<firstPays||b<secondPays)return false;
