@@ -444,7 +444,13 @@ public final class SecureTradeManager implements Listener {
     boolean commerce(Player p,ItemStack[] after,double delta,UUID seller,double sellerCredit,String auctionId,Map<String,Object> listing,boolean remove,String type){
         return inventoryTransaction(p,after,tx->economy.commitCommerce(tx,p.getUniqueId(),delta,seller,sellerCredit,auctionId,listing,remove,type));
     }
+    private boolean conserves(ItemStack[] a,ItemStack[] b,ItemStack[] nextA,ItemStack[] nextB){
+        List<ItemStack> before=new ArrayList<>(Arrays.asList(a));before.addAll(Arrays.asList(b));
+        List<ItemStack> after=new ArrayList<>(Arrays.asList(nextA));after.addAll(Arrays.asList(nextB));
+        return AntiDuplication.conserves(before,after,item->item.getType().isAir()?0:item.getAmount(),ItemStack::isSimilar);
+    }
     boolean chestTransfer(Player p,ItemStack[] after,String id,ItemStack[] beforeChest,ItemStack[] afterChest){
+        if(!conserves(p.getInventory().getStorageContents(),beforeChest,after,afterChest)){msg(p,"Transfert refusé : conservation des objets invalide.");return false;}
         return inventoryTransaction(p,after,tx->economy.commitChest(tx,id,beforeChest,afterChest));
     }
     private boolean inventoryTransaction(Player p,ItemStack[] after,java.util.function.Predicate<String> commit){
@@ -491,6 +497,7 @@ public final class SecureTradeManager implements Listener {
         if(s.a.items.isEmpty()&&s.b.items.isEmpty()&&s.a.money==0&&s.b.money==0){cancel(s,"offres vides");return;}
         ItemStack[] afterA=simulate(a,s.a,s.b),afterB=simulate(b,s.b,s.a);
         if(afterA==null||afterB==null){cancel(s,"inventaire plein ou offre modifiée");return;}
+        if(!conserves(a.getInventory().getStorageContents(),b.getInventory().getStorageContents(),afterA,afterB)){cancel(s,"conservation des objets invalide");return;}
         java.nio.file.Path file;
         try{file=journal(s,a,b,afterA,afterB);}
         catch(java.io.IOException ex){cancel(s,"journal de sécurité indisponible");return;}
