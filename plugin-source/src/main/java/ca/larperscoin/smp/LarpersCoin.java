@@ -151,8 +151,8 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         saveData();
     }
 
-    void saveData() {
-        if(dataFile==null||data==null)return;
+    boolean saveData() {
+        if(dataFile==null||data==null)return false;
         Path target=dataFile.toPath();
         Path temporary=target.resolveSibling(target.getFileName()+".tmp");
         try {
@@ -164,9 +164,11 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             }
             try { Files.move(temporary,target,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING); }
             catch(AtomicMoveNotSupportedException ex) { Files.move(temporary,target,StandardCopyOption.REPLACE_EXISTING); }
+            return true;
         } catch(IOException ex) {
             getLogger().severe("Échec de sauvegarde atomique de data.yml: "+ex.getMessage());
             try { Files.deleteIfExists(temporary); } catch(IOException ignored) { }
+            return false;
         }
     }
 
@@ -220,12 +222,14 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         data.set("balances." + key(uuid), next);
     }
     void recordTransaction(String type, UUID from, UUID to, double amount) {
+        appendTransaction(type,from,to,amount);saveData();
+    }
+    private void appendTransaction(String type, UUID from, UUID to, double amount) {
         if (!Double.isFinite(amount) || amount <= 0.0) return;
         List<String> records = data.getStringList("transactions");
         records.add(System.currentTimeMillis() + "|" + type + "|" + from + "|" + to + "|" + amount);
         if (records.size() > 2000) records = new ArrayList<>(records.subList(records.size() - 2000, records.size()));
         data.set("transactions", records);
-        saveData();
     }
 
     private void reply(CommandSender sender, String message) {
@@ -320,13 +324,20 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         reply(sender, "Le solde du destinataire dépasserait la limite numérique.");
                         return true;
                     }
+                    double beforeSender=balance(player.getUniqueId()),beforeTarget=balance(target.getUniqueId());
+                    List<String> beforeRecords=data.getStringList("transactions");
                     if (!debit(player.getUniqueId(), amount)) {
                         reply(sender, "Fonds insuffisants.");
                         return true;
                     }
                     credit(target.getUniqueId(), amount);
-                    saveData();
-                    recordTransaction("PAY", player.getUniqueId(), target.getUniqueId(), amount);
+                    appendTransaction("PAY",player.getUniqueId(),target.getUniqueId(),amount);
+                    if(!saveData()){
+                        data.set("balances."+key(player.getUniqueId()),beforeSender);
+                        data.set("balances."+key(target.getUniqueId()),beforeTarget);
+                        data.set("transactions",beforeRecords);
+                        reply(sender,"Paiement annulé : sauvegarde impossible.");return true;
+                    }
                     reply(player, "Tu as envoyé " + format(amount) + " à " + target.getName() + ".");
                     reply(target, "Tu as reçu " + format(amount) + " de " + player.getName() + ".");
                     return true;
@@ -476,10 +487,13 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         if(lotteryTicketCount()>100000-count){reply(sender,"Limite totale de tickets atteinte.");return true;}
                         double cost=count*50.0,nextPot=lotteryPot()+cost;
                         if(!Double.isFinite(nextPot)){reply(sender,"Le jackpot dépasserait la limite numérique.");return true;}
+                        double beforeBalance=balance(player.getUniqueId()),beforePot=lotteryPot();
+                        List<String> beforeTickets=data.getStringList("lottery.tickets"),beforeRecords=data.getStringList("transactions");
                         if(!debit(player.getUniqueId(),cost)){reply(sender,"Fonds insuffisants : "+format(cost)+".");return true;}
-                        List<String> tickets=data.getStringList("lottery.tickets");for(int i=0;i<count;i++)tickets.add(key(player.getUniqueId()));
-                        data.set("lottery.tickets",tickets);data.set("lottery.pot",nextPot);saveData();
-                        recordTransaction("LOTTERY_BUY",player.getUniqueId(),new UUID(0L,0L),cost);
+                        List<String> tickets=new ArrayList<>(beforeTickets);for(int i=0;i<count;i++)tickets.add(key(player.getUniqueId()));
+                        data.set("lottery.tickets",tickets);data.set("lottery.pot",nextPot);
+                        appendTransaction("LOTTERY_BUY",player.getUniqueId(),new UUID(0L,0L),cost);
+                        if(!saveData()){data.set("balances."+key(player.getUniqueId()),beforeBalance);data.set("lottery.pot",beforePot);data.set("lottery.tickets",beforeTickets);data.set("transactions",beforeRecords);reply(sender,"Achat annulé : sauvegarde impossible.");return true;}
                         reply(sender,"Tickets achetés : "+count+". Jackpot : "+format(nextPot));
                         Bukkit.broadcastMessage(ChatColor.LIGHT_PURPLE+"[LOTERIE] "+player.getName()+" vient d'acheter "+count+" ticket(s)!");
                         return true;
@@ -717,12 +731,14 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             getLogger().severe("Tirage annulé: jackpot ou solde du gagnant invalide.");
             return;
         }
+        double beforeBalance=balance(winnerUuid);long beforeEnd=lotteryEndsAt();
+        List<String> beforeTickets=data.getStringList("lottery.tickets"),beforeRecords=data.getStringList("transactions");
         credit(winnerUuid, jackpot);
         data.set("lottery.tickets", new ArrayList<String>());
         data.set("lottery.pot", 0.0);
         data.set("lottery.active",false);data.set("lottery.ends-at",0L);
-        saveData();
-        recordTransaction("LOTTERY_WIN", new UUID(0L,0L), winnerUuid, jackpot);
+        appendTransaction("LOTTERY_WIN",new UUID(0L,0L),winnerUuid,jackpot);
+        if(!saveData()){data.set("balances."+key(winnerUuid),beforeBalance);data.set("lottery.tickets",beforeTickets);data.set("lottery.pot",jackpot);data.set("lottery.active",true);data.set("lottery.ends-at",beforeEnd);data.set("transactions",beforeRecords);getLogger().severe("Tirage annulé : sauvegarde impossible. Réessayer /lottery draw.");return;}
         OfflinePlayer winner = Bukkit.getOfflinePlayer(UUID.fromString(winnerId));
         Bukkit.broadcastMessage(ChatColor.GOLD + "[Larry] " + (winner.getName() == null ? "Un joueur" : winner.getName()) + " remporte la loterie : " + format(jackpot) + " !");
     }
