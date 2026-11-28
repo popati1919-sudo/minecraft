@@ -37,6 +37,7 @@ final class LarpersWebDashboard {
     private final JavaPlugin plugin;
     private final LarpersCoin core;
     private HttpServer server;
+    private java.util.concurrent.ExecutorService executor;
     private String token;
     private final Deque<String> consoleLines = new ConcurrentLinkedDeque<>();
     private final Map<String, GrimAlertSummary> grimAlerts = new ConcurrentHashMap<>();
@@ -105,9 +106,11 @@ final class LarpersWebDashboard {
                 plugin.getLogger().warning("Le port 80 est occupé; dashboard déplacé sur le port 8765.");
             }
             server.createContext("/", this::handle);
-            server.setExecutor(Executors.newFixedThreadPool(3, r -> {
-                Thread t = new Thread(r, "Larry-WebAdmin"); t.setDaemon(true); return t;
-            }));
+            executor=new java.util.concurrent.ThreadPoolExecutor(3,3,0L,TimeUnit.MILLISECONDS,
+                new java.util.concurrent.ArrayBlockingQueue<>(32),r->{
+                    Thread t=new Thread(r,"Larry-WebAdmin");t.setDaemon(true);return t;
+                },new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
+            server.setExecutor(executor);
             consoleHandler = new Handler() {
                 @Override public void publish(LogRecord record) {
                     if (record == null || !isLoggable(record)) return;
@@ -154,6 +157,7 @@ final class LarpersWebDashboard {
 
     void shutdown() {
         if (server != null) server.stop(1);
+        if(executor!=null)executor.shutdownNow();
         if (consoleHandler != null) {
             Logger.getLogger("").removeHandler(consoleHandler);
             consoleHandler.close();
@@ -192,7 +196,9 @@ final class LarpersWebDashboard {
                 return;
             }
             if (path.equals("/api/command") && exchange.getRequestMethod().equals("POST")) {
-                String body = new String(exchange.getRequestBody().readNBytes(2048), StandardCharsets.UTF_8);
+                byte[] request=exchange.getRequestBody().readNBytes(2049);
+                if(request.length>2048){send(exchange,413,"application/json; charset=utf-8","{\"error\":\"Requête trop grande\"}");return;}
+                String body=new String(request,StandardCharsets.UTF_8);
                 Matcher matcher = Pattern.compile("\"command\"\\s*:\\s*\"([^\\r\\n]{1,512})\"").matcher(body);
                 if (!matcher.find()) {
                     send(exchange, 400, "application/json; charset=utf-8", "{\"error\":\"Commande invalide (512 caractères maximum)\"}");
@@ -214,16 +220,20 @@ final class LarpersWebDashboard {
                 }
                 final String safeCommand = commandText;
                 try {
-                    boolean accepted = Bukkit.getScheduler().callSyncMethod(plugin, () -> {
-                        consoleLines.addLast(java.time.LocalTime.now().withNano(0) + " [WEB] > " + safeCommand);
+                    long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(30);
+                    var future=Bukkit.getScheduler().callSyncMethod(plugin, () -> {
+                        if(System.nanoTime()>=deadline)return false;
+                        consoleLines.addLast(java.time.LocalTime.now().withNano(0) + " [WEB] Commande administrateur exécutée");
                         while (consoleLines.size() > 400) consoleLines.pollFirst();
                         return Bukkit.dispatchCommand(Bukkit.getConsoleSender(), safeCommand);
-                    }).get(30, TimeUnit.SECONDS);
+                    });
+                    boolean accepted;
+                    try{accepted=future.get(30,TimeUnit.SECONDS);}catch(java.util.concurrent.TimeoutException ex){future.cancel(false);throw ex;}
                     send(exchange, accepted ? 200 : 400, "application/json; charset=utf-8",
                             accepted ? "{\"ok\":true,\"message\":\"Commande exécutée par la console.\"}"
                                      : "{\"ok\":false,\"message\":\"Commande inconnue ou refusée; vérifie la syntaxe.\"}");
                 } catch (Exception ex) {
-                    plugin.getLogger().warning("Commande web non exécutée (" + safeCommand + "): " + ex.getClass().getSimpleName()
+                    plugin.getLogger().warning("Erreur de commande web: " + ex.getClass().getSimpleName()
                             + (ex.getMessage() == null ? "" : " - " + ex.getMessage()));
                     send(exchange, 503, "application/json; charset=utf-8", "{\"error\":\"Le serveur ne répond pas à temps. Réessaie.\"}");
                 }
@@ -299,7 +309,9 @@ final class LarpersWebDashboard {
                 return;
             }
             if (path.equals("/api/reset-password") && exchange.getRequestMethod().equals("POST")) {
-                String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                byte[] request=exchange.getRequestBody().readNBytes(1025);
+                if(request.length>1024){send(exchange,413,"application/json; charset=utf-8","{\"error\":\"Requête trop grande\"}");return;}
+                String body=new String(request,StandardCharsets.UTF_8);
                 Matcher matcher = Pattern.compile("\"player\"\\s*:\\s*\"([A-Za-z0-9_]{3,16})\"").matcher(body);
                 if (!matcher.find()) {
                     send(exchange, 400, "application/json; charset=utf-8", "{\"error\":\"Pseudo invalide\"}");
@@ -307,10 +319,11 @@ final class LarpersWebDashboard {
                 }
                 String playerName = matcher.group(1);
                 java.util.concurrent.CompletableFuture<Boolean> result = new java.util.concurrent.CompletableFuture<>();
-                Bukkit.getScheduler().runTask(plugin, () -> result.complete(core.resetAuthAccount(playerName)));
+                long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
+                var task=Bukkit.getScheduler().runTask(plugin, () -> {if(System.nanoTime()<deadline && !result.isCancelled())result.complete(core.resetAuthAccount(playerName));});
                 boolean ok;
                 try { ok = result.get(10, TimeUnit.SECONDS); }
-                catch (Exception ex) { send(exchange, 503, "application/json; charset=utf-8", "{\"error\":\"Serveur occupé\"}"); return; }
+                catch (Exception ex) { result.cancel(false);task.cancel();send(exchange, 503, "application/json; charset=utf-8", "{\"error\":\"Serveur occupé; vérifier avant de réessayer\"}"); return; }
                 send(exchange, ok ? 200 : 404, "application/json; charset=utf-8",
                         ok ? "{\"ok\":true,\"message\":\"Compte réinitialisé; le joueur devra refaire /register.\"}"
                            : "{\"error\":\"Aucun compte enregistré pour ce pseudo\"}");
@@ -478,9 +491,16 @@ final class LarpersWebDashboard {
     }
 
     private String json(String value) {
-        if (value == null) return "";
-        return value.replace("\\", "\\\\").replace("\"", "\\\"")
-                .replace("\n", "\\n").replace("\r", "\\r");
+        if(value==null)return "";
+        StringBuilder out=new StringBuilder();
+        for(char ch:value.toCharArray()){
+            switch(ch){
+                case '\\' -> out.append("\\\\");
+                case '"' -> out.append("\\\"");
+                default -> {if(ch<32)out.append(String.format("\\u%04x",(int)ch));else out.append(ch);}
+            }
+        }
+        return out.toString();
     }
 
     private void send(HttpExchange exchange, int code, String type, String body) throws IOException {
