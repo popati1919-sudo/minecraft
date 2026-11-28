@@ -5,6 +5,7 @@ import net.luckperms.api.node.Node;
 
 final class ModoGroup {
     private static final java.util.Set<String> RANKS=java.util.Set.of("default","joueur","modo","moderator","mod","admin","owner");
+    private static final java.util.Set<java.util.UUID> pending=java.util.concurrent.ConcurrentHashMap.newKeySet();
     static void assign(LarpersCoin plugin,org.bukkit.entity.Player admin,org.bukkit.entity.Player player,String rank) {
         if(!plugin.isLpcAdmin(admin))return;
         if(!org.bukkit.Bukkit.getPluginManager().isPluginEnabled("LuckPerms")) { admin.sendMessage("LuckPerms indisponible."); return; }
@@ -17,6 +18,9 @@ final class ModoGroup {
         if(group==null){admin.sendMessage("Groupe LuckPerms indisponible : "+rank);return;}
         var user=lp.getUserManager().getUser(player.getUniqueId());
         if(user==null){admin.sendMessage("Profil LuckPerms indisponible.");return;}
+        if(!pending.add(player.getUniqueId())) { admin.sendMessage("Changement de grade déjà en cours."); return; }
+        var previous=user.data().toCollection().stream().filter(node -> node instanceof net.luckperms.api.node.types.InheritanceNode parent && RANKS.contains(parent.getGroupName())).toList();
+        String previousPrimary=user.getPrimaryGroup();
         user.data().clear(node -> node instanceof net.luckperms.api.node.types.InheritanceNode parent &&
             RANKS.contains(parent.getGroupName()));
         user.data().add(net.luckperms.api.node.types.InheritanceNode.builder(rank).build());
@@ -24,7 +28,8 @@ final class ModoGroup {
         String label=rank.equals("default")?"joueur":rank;
         lp.getUserManager().saveUser(user).whenComplete((unused,error)->
             org.bukkit.Bukkit.getScheduler().runTask(plugin,()->{
-                if(error!=null){admin.sendMessage("Échec de sauvegarde du grade.");return;}
+                pending.remove(player.getUniqueId());
+                if(error!=null){user.data().clear(node -> node instanceof net.luckperms.api.node.types.InheritanceNode parent && RANKS.contains(parent.getGroupName())); previous.forEach(node -> user.data().add(node)); user.setPrimaryGroup(previousPrimary); admin.sendMessage("Échec de sauvegarde du grade; ancien grade restauré.");return;}
                 admin.sendMessage(player.getName()+" : grade "+label+".");
                 player.sendMessage("Ton grade sur le SMP est maintenant "+label+".");
                 plugin.getLogger().info(admin.getName()+" attribue le grade "+label+" à "+player.getName());
