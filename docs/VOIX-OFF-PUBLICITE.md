@@ -1,17 +1,29 @@
 # Voix off — Larry SMP
 
-Tu cherches un nouveau serveur Minecraft avec tes amis ?
+[Eventuellement vérifier Java, Bedrock, Education et Java crack avant publication. Les indications entre crochets ne sont pas prononcées.]
 
-Bienvenue sur Larry SMP !
+[Ton accrocheur, enthousiaste]
+Tu cherches un nouveau serveur Minecraft pour jouer avec tes amis ?
 
-Construis ta base, crée ton clan, vends tes ressources et deviens le joueur le plus riche du serveur !
+[Petite pause, puis avec énergie]
+Bienvenue sur LARRY SMP !
 
-Tu as un ennemi ? Place une prime sur sa tête ! Les primes s'additionnent sans expiration et celui qui réussit à l'éliminer peut récupérer tout l'argent !
+[Ton dynamique]
+Construis ta base, crée ton clan, vends tes ressources et deviens le joueur le PLUS RICHE du serveur !
 
+[Voix mystérieuse]
+Tu as un ennemi ? Hmm… Place une prime sur sa tête !
+
+[Montée en intensité]
+Les primes s'additionnent, n'expirent jamais, et celui qui réussit à éliminer la cible peut récupérer TOUT L'ARGENT !
+
+[Voix enthousiaste et rythme rapide]
 Découvre aussi notre boutique, notre hôtel des ventes, nos quêtes et notre loterie !
 
-Alors, prêt à dominer le serveur ?
+[Petite pause, ton provocateur]
+Alors… tu crois vraiment avoir ce qu'il faut pour dominer le serveur ?
 
-Rejoins-nous sur larry-smp.ca, disponible sur Java et Bedrock !
-
-Vérifier l'accès public Java et Bedrock avant publication.
+[Très énergique]
+Rejoins-nous dès maintenant sur larry-smp.ca !
+Java, Bedrock, Minecraft Éducation et même Java crack !
+On t'attend sur LARRY SMP !
