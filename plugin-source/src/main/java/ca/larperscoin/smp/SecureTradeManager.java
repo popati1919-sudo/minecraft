@@ -319,7 +319,7 @@ public final class SecureTradeManager implements Listener {
         y.set("second-before",Arrays.asList(cloneContents(b.getInventory().getStorageContents())));
         y.set("first-after",Arrays.asList(afterA));y.set("second-after",Arrays.asList(afterB));
         try{
-            y.save(tmp.toFile());
+            forceYaml(tmp,y);
             try{java.nio.file.Files.move(tmp,file,java.nio.file.StandardCopyOption.ATOMIC_MOVE);}
             catch(java.nio.file.AtomicMoveNotSupportedException ex){java.nio.file.Files.move(tmp,file);}
         }finally{java.nio.file.Files.deleteIfExists(tmp);}
@@ -337,23 +337,37 @@ public final class SecureTradeManager implements Listener {
         }
         return result;
     }
+    private void forceYaml(java.nio.file.Path tmp,org.bukkit.configuration.file.YamlConfiguration y)throws java.io.IOException{
+        byte[] bytes=y.saveToString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        try(var channel=java.nio.channels.FileChannel.open(tmp,java.nio.file.StandardOpenOption.WRITE,java.nio.file.StandardOpenOption.TRUNCATE_EXISTING)){
+            var buffer=java.nio.ByteBuffer.wrap(bytes);while(buffer.hasRemaining())channel.write(buffer);channel.force(true);
+        }
+    }
+    private void archiveJournal(java.nio.file.Path file)throws java.io.IOException{
+        var archive=file.getParent().resolve("completed");
+        java.nio.file.Files.createDirectories(archive);
+        var target=archive.resolve(file.getFileName());
+        try{java.nio.file.Files.move(file,target,java.nio.file.StandardCopyOption.ATOMIC_MOVE);}
+        catch(java.nio.file.AtomicMoveNotSupportedException ex){java.nio.file.Files.move(file,target);}
+    }
     private void writeJournal(java.nio.file.Path file,org.bukkit.configuration.file.YamlConfiguration y)throws java.io.IOException{
         var tmp=java.nio.file.Files.createTempFile(file.getParent(),"receipt-",".tmp");
         try{
-            y.save(tmp.toFile());
+            forceYaml(tmp,y);
             try{java.nio.file.Files.move(tmp,file,java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}
             catch(java.nio.file.AtomicMoveNotSupportedException ex){java.nio.file.Files.move(tmp,file,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}
         }finally{java.nio.file.Files.deleteIfExists(tmp);}
     }
     private void deliver(java.nio.file.Path file,org.bukkit.configuration.file.YamlConfiguration y,String side,Player p)throws java.io.IOException{
-        if(y.getBoolean(side+"-done"))return;
+        // A YAML done flag alone is not proof that the player data was persisted.
         String tradeId=file.getFileName().toString().replace(".yml","");
         var key=receipt(tradeId);
         var pdc=p.getPersistentDataContainer();
         var type=org.bukkit.persistence.PersistentDataType.BYTE;
-        if(!pdc.has(key,type)){
-            ItemStack[] before=readContents(y,side+"-before"),after=readContents(y,side+"-after");
-            if(!Arrays.equals(before,p.getInventory().getStorageContents()))throw new IllegalStateException("Inventaire différent du journal");
+        ItemStack[] before=readContents(y,side+"-before"),after=readContents(y,side+"-after");
+        var decision=AntiDuplication.recovery(pdc.has(key,type),before,p.getInventory().getStorageContents());
+        if(decision==AntiDuplication.Recovery.CONFLICT)throw new IllegalStateException("Inventaire différent du journal");
+        if(decision==AntiDuplication.Recovery.APPLY){
             p.getInventory().setStorageContents(after);
             pdc.set(key,type,(byte)1);
             p.saveData();
@@ -363,7 +377,7 @@ public final class SecureTradeManager implements Listener {
     private void finishJournal(java.nio.file.Path file,org.bukkit.configuration.file.YamlConfiguration y)throws java.io.IOException{
         if(!y.getBoolean("first-done")||!y.getBoolean("second-done"))return;
         String tradeId=file.getFileName().toString().replace(".yml","");
-        java.nio.file.Files.deleteIfExists(file);
+        archiveJournal(file);
         economy.clearTradeCommit(tradeId);
         for(String side:List.of("first","second")){
             Player p=Bukkit.getPlayer(UUID.fromString(y.getString(side)));
@@ -392,6 +406,13 @@ public final class SecureTradeManager implements Listener {
         }catch(Exception ex){plugin.getLogger().severe("Lecture des journaux d'échange impossible : "+ex.getMessage());p.kickPlayer("Récupération des échanges indisponible. Contacte un admin.");}
     }
     boolean commerce(Player p,ItemStack[] after,double delta,UUID seller,double sellerCredit,String auctionId,Map<String,Object> listing,boolean remove,String type){
+        return inventoryTransaction(p,after,tx->economy.commitCommerce(tx,p.getUniqueId(),delta,seller,sellerCredit,auctionId,listing,remove,type));
+    }
+    boolean chestTransfer(Player p,ItemStack[] after,String id,ItemStack[] beforeChest,ItemStack[] afterChest){
+        return inventoryTransaction(p,after,tx->economy.commitChest(tx,id,beforeChest,afterChest));
+    }
+    private boolean inventoryTransaction(Player p,ItemStack[] after,java.util.function.Predicate<String> commit){
+        if(!p.isOnline()||p.isDead())return false;
         String tx=UUID.randomUUID().toString();
         var dir=plugin.getDataFolder().toPath().resolve("commerce-journal");
         var file=dir.resolve(tx+".yml");
@@ -401,7 +422,7 @@ public final class SecureTradeManager implements Listener {
         y.set("player-after",Arrays.asList(cloneContents(after)));
         try{java.nio.file.Files.createDirectories(dir);writeJournal(file,y);}
         catch(java.io.IOException ex){msg(p,"Journal indisponible; transaction annulée.");return false;}
-        if(!economy.commitCommerce(tx,p.getUniqueId(),delta,seller,sellerCredit,auctionId,listing,remove,type)){
+        if(!commit.test(tx)){
             try{java.nio.file.Files.deleteIfExists(file);}catch(java.io.IOException ignored){}
             return false;
         }
@@ -410,7 +431,7 @@ public final class SecureTradeManager implements Listener {
     }
     private void finishCommerce(java.nio.file.Path file,Player p)throws java.io.IOException{
         String tx=file.getFileName().toString().replace(".yml","");
-        java.nio.file.Files.deleteIfExists(file);economy.clearCommerceCommit(tx);
+        archiveJournal(file);economy.clearCommerceCommit(tx);
         p.getPersistentDataContainer().remove(receipt(tx));p.saveData();
     }
     @EventHandler(priority=org.bukkit.event.EventPriority.LOWEST)
