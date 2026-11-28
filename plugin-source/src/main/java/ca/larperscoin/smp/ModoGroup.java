@@ -6,12 +6,15 @@ import net.luckperms.api.node.Node;
 final class ModoGroup {
     private static final java.util.Set<String> RANKS=java.util.Set.of("default","joueur","modo","moderator","mod","admin","owner");
     private static final java.util.Set<java.util.UUID> pending=java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static volatile boolean ready;
     static void assign(LarpersCoin plugin,org.bukkit.entity.Player admin,org.bukkit.entity.Player player,String rank) {
         if(!plugin.isLpcAdmin(admin))return;
         if(!org.bukkit.Bukkit.getPluginManager().isPluginEnabled("LuckPerms")) { admin.sendMessage("LuckPerms indisponible."); return; }
         if(!admin.isOp() && (player.isOp() || player.hasPermission("group.owner") || plugin.isLpcAdmin(player) || rank.equals("owner") || rank.equals("admin"))) {
             admin.sendMessage("Seul un opérateur peut gérer les grades administratifs.");return;
         }
+        if(!ready){admin.sendMessage("Initialisation des grades en cours ou en échec.");return;}
+        if(!RANKS.contains(rank)){admin.sendMessage("Grade inconnu.");return;}
         var lp=LuckPermsProvider.get();
         var groups=lp.getGroupManager();
         var group=groups.getGroup(rank);
@@ -38,17 +41,21 @@ final class ModoGroup {
 
     static void install(LarpersCoin plugin) {
         var groups=LuckPermsProvider.get().getGroupManager();
+        ready=false;
+        var jobs=new java.util.ArrayList<java.util.concurrent.CompletableFuture<?>>();
         for(String rank:java.util.List.of("admin","owner")) {
-            groups.createAndLoadGroup(rank).thenCompose(group->{
+            jobs.add(groups.createAndLoadGroup(rank).thenCompose(group->{
                 group.data().add(Node.builder("larpers.admin").build());
                 group.data().add(Node.builder("worldedit.*").build());
                 group.data().add(Node.builder("worldguard.*").build());
                 return groups.saveGroup(group);
-            }).exceptionally(error->{plugin.getLogger().warning("Groupe "+rank+" : "+error.getMessage());return null;});
+            }));
         }
-        groups.createAndLoadGroup("modo").thenCompose(group -> {
+        jobs.add(groups.createAndLoadGroup("modo").thenCompose(group -> {
             group.data().add(Node.builder("larpers.modo").build());
+            group.data().add(Node.builder("worldguard.region.info.*").build());
             return groups.saveGroup(group);
-        }).exceptionally(error->{plugin.getLogger().warning("Groupe modo : "+error.getMessage());return null;});
+        }));
+        java.util.concurrent.CompletableFuture.allOf(jobs.toArray(java.util.concurrent.CompletableFuture[]::new)).whenComplete((ok,error)->{ready=error==null;if(error!=null)plugin.getLogger().warning("Initialisation des grades: "+error.getMessage());});
     }
 }
