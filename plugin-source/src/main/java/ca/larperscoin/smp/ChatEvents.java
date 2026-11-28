@@ -18,6 +18,7 @@ public final class ChatEvents implements Listener {
     private static final class ActiveEvent {
         final String type, answer;
         final double reward;
+        final String id=UUID.randomUUID().toString();
         final AtomicBoolean claimed = new AtomicBoolean(false);
         ActiveEvent(String type, String answer, double reward) {
             this.type=type; this.answer=answer; this.reward=reward;
@@ -280,7 +281,7 @@ public final class ChatEvents implements Listener {
         return true;
     }
 
-    @EventHandler
+    @EventHandler(priority=org.bukkit.event.EventPriority.HIGHEST,ignoreCancelled=true)
     public void onChat(AsyncPlayerChatEvent event) {
         ActiveEvent current=active;
         if(current==null||!normalizeAnswer(event.getMessage()).equalsIgnoreCase(current.answer))return;
@@ -289,11 +290,9 @@ public final class ChatEvents implements Listener {
         Player winner=event.getPlayer();
         Bukkit.getScheduler().runTask(plugin,()->{
             if(active!=current)return;
+            if(!winner.isOnline()||!core.isEconomyPlayer(winner)||!core.commitReward(winner.getUniqueId(),"chat."+current.id,current.reward,"CHAT_EVENT_"+current.type.toUpperCase(Locale.ROOT))){current.claimed.set(false);return;}
             active=null;
             if(timeout!=null){timeout.cancel();timeout=null;}
-            core.credit(winner.getUniqueId(),current.reward);
-            core.recordTransaction("CHAT_EVENT_"+current.type.toUpperCase(Locale.ROOT),new UUID(0L,0L),winner.getUniqueId(),current.reward);
-            core.saveData();
             Bukkit.broadcastMessage(ChatColor.GREEN+"[ÉVÉNEMENT] "+winner.getName()+" a trouvé la bonne réponse : "+ChatColor.YELLOW+current.answer+ChatColor.GREEN+" et remporte "+String.format(Locale.CANADA_FRENCH,"%.0f",current.reward)+" Larry !");
         });
     }
