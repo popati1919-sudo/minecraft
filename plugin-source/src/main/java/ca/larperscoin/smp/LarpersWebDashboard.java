@@ -38,6 +38,10 @@ final class LarpersWebDashboard {
     private final LarpersCoin core;
     private HttpServer server;
     private java.util.concurrent.ExecutorService executor;
+    private int failedAuth=0;
+    private long authWindow=0;
+    private synchronized boolean authLimited(){long now=System.currentTimeMillis();if(now-authWindow>=60000L){authWindow=now;failedAuth=0;}return failedAuth>=60;}
+    private synchronized void countAuthFailure(){if(failedAuth<60)failedAuth++;}
     private String token;
     private final Deque<String> consoleLines = new ConcurrentLinkedDeque<>();
     private final Map<String, GrimAlertSummary> grimAlerts = new ConcurrentHashMap<>();
@@ -172,6 +176,8 @@ final class LarpersWebDashboard {
                 return;
             }
             if (!authorized(exchange)) {
+                if(authLimited()){exchange.getResponseHeaders().set("Retry-After","60");send(exchange,429,"application/json; charset=utf-8","{\"error\":\"Trop de tentatives\"}");return;}
+                countAuthFailure();
                 exchange.getResponseHeaders().set("WWW-Authenticate", "Bearer");
                 send(exchange, 401, "application/json; charset=utf-8", "{\"error\":\"Authentification administrateur requise\"}");
                 return;
@@ -199,12 +205,9 @@ final class LarpersWebDashboard {
                 byte[] request=exchange.getRequestBody().readNBytes(2049);
                 if(request.length>2048){send(exchange,413,"application/json; charset=utf-8","{\"error\":\"Requête trop grande\"}");return;}
                 String body=new String(request,StandardCharsets.UTF_8);
-                Matcher matcher = Pattern.compile("\"command\"\\s*:\\s*\"([^\\r\\n]{1,512})\"").matcher(body);
-                if (!matcher.find()) {
-                    send(exchange, 400, "application/json; charset=utf-8", "{\"error\":\"Commande invalide (512 caractères maximum)\"}");
-                    return;
-                }
-                String commandText = matcher.group(1).trim();
+                String commandText=parseStringField(body,"command",512);
+                if(commandText==null){send(exchange,400,"application/json; charset=utf-8","{\"error\":\"Commande JSON invalide\"}");return;}
+                commandText=commandText.trim();
                 if (commandText.startsWith("/")) commandText = commandText.substring(1).trim();
                 if (commandText.isEmpty() || commandText.indexOf('\n') >= 0 || commandText.indexOf('\r') >= 0) {
                     send(exchange, 400, "application/json; charset=utf-8", "{\"error\":\"Commande invalide\"}");
@@ -312,12 +315,8 @@ final class LarpersWebDashboard {
                 byte[] request=exchange.getRequestBody().readNBytes(1025);
                 if(request.length>1024){send(exchange,413,"application/json; charset=utf-8","{\"error\":\"Requête trop grande\"}");return;}
                 String body=new String(request,StandardCharsets.UTF_8);
-                Matcher matcher = Pattern.compile("\"player\"\\s*:\\s*\"([A-Za-z0-9_]{3,16})\"").matcher(body);
-                if (!matcher.find()) {
-                    send(exchange, 400, "application/json; charset=utf-8", "{\"error\":\"Pseudo invalide\"}");
-                    return;
-                }
-                String playerName = matcher.group(1);
+                String playerName=parseStringField(body,"player",16);
+                if(playerName==null||!playerName.matches("[A-Za-z0-9_]{3,16}")){send(exchange,400,"application/json; charset=utf-8","{\"error\":\"Pseudo invalide\"}");return;}
                 java.util.concurrent.CompletableFuture<Boolean> result = new java.util.concurrent.CompletableFuture<>();
                 long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
                 var task=Bukkit.getScheduler().runTask(plugin, () -> {if(System.nanoTime()<deadline && !result.isCancelled())result.complete(core.resetAuthAccount(playerName));});
@@ -335,6 +334,32 @@ final class LarpersWebDashboard {
         }
     }
 
+    // Narrow JSON decoder: exactly one named string property, with standard escapes.
+    private static String parseStringField(String body,String name,int max){
+        var pattern=Pattern.compile("^\\s*\\{\\s*\""+Pattern.quote(name)+"\"\\s*:\\s*\"((?:[^\"\\\\\\x00-\\x1f]|\\\\(?:[\"\\\\/bfnrt]|u[0-9a-fA-F]{4}))*)\"\\s*\\}\\s*$");
+        var matcher=pattern.matcher(body);
+        if(!matcher.matches())return null;
+        String encoded=matcher.group(1);
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<encoded.length();i++){
+            char ch=encoded.charAt(i);
+            if(ch=='\\'){
+                ch=encoded.charAt(++i);
+                switch(ch){
+                    case 'u' -> {ch=(char)Integer.parseInt(encoded.substring(i+1,i+5),16);i+=4;}
+                    case 'b' -> ch='\b';
+                    case 'f' -> ch='\f';
+                    case 'n' -> ch='\n';
+                    case 'r' -> ch='\r';
+                    case 't' -> ch='\t';
+                    default -> {}
+                }
+            }
+            if(ch<32||out.length()>=max)return null;
+            out.append(ch);
+        }
+        return out.toString();
+    }
     private boolean authorized(HttpExchange exchange) {
         String supplied = exchange.getRequestHeaders().getFirst("X-Larry-Token");
         if (supplied == null) supplied = exchange.getRequestHeaders().getFirst("X-LPC-Token");
