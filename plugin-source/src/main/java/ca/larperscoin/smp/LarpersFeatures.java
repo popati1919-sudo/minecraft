@@ -105,6 +105,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         try{if(file.exists())db.load(file);}catch(Exception ex){throw new IllegalStateException("features.yml illisible",ex);}
         auctionsReady=core.migrateAuctions(db.getConfigurationSection("ah"));
         for(var e:SHOP_PRICES.entrySet()){String k=e.getKey();if(!db.contains("shop.sell-prices."+k))db.set("shop.sell-prices."+k,e.getValue());if(!db.contains("shop.buy-prices."+k))db.set("shop.buy-prices."+k,Math.max(.02,e.getValue()*2.8));}
+        Bukkit.getScheduler().runTask(plugin,this::rebuildRecipeCaps);
         if(!db.contains("market.next-refresh"))db.set("market.next-refresh",System.currentTimeMillis()+MARKET_REFRESH_MILLIS);
         long delay=Math.max(1,(db.getLong("market.next-refresh")-System.currentTimeMillis())/50L);
         Bukkit.getScheduler().runTaskLater(plugin,()->{recalculateMarketPrices();Bukkit.getScheduler().runTaskTimer(plugin,this::recalculateMarketPrices,MARKET_REFRESH_MILLIS/50L,MARKET_REFRESH_MILLIS/50L);},delay);
@@ -1575,19 +1576,61 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         return Map.copyOf(units);
     }
 
-    private double shopSellPrice(String key) {
+    private double rawShopSellPrice(String key) {
         MarketUnit unit=MARKET_UNITS.get(key);
-        if(unit!=null) return shopSellPrice(unit.key())*unit.quantity();
+        if(unit!=null) return rawShopSellPrice(unit.key())*unit.quantity();
         return Math.max(.01,db.getDouble("shop.sell-prices."+key,SHOP_PRICES.getOrDefault(key,.05)));
     }
 
+    private Map<String,Double> recipeSaleCaps=Map.of();
+    private boolean recipePricingReady;
+    private double shopSellPrice(String key){return Math.min(rawShopSellPrice(key),recipeSaleCaps.getOrDefault(key,Double.POSITIVE_INFINITY));}
     private double shopBuyPrice(String key) {
         MarketUnit unit=MARKET_UNITS.get(key);
         if(unit!=null) return shopBuyPrice(unit.key())*unit.quantity();
-        double sell=shopSellPrice(key);
+        double sell=rawShopSellPrice(key);
         return Math.max(sell*1.5,db.getDouble("shop.buy-prices."+key,sell*2.8));
     }
 
+    private void rebuildRecipeCaps(){
+        try{
+            Map<String,Double> purchase=new HashMap<>();
+            for(String key:SHOP.keySet()){
+                double price=shopBuyPrice(key);
+                if(Double.isFinite(price)&&price>0)purchase.put(key,Math.floor(price*10000)/10000);
+            }
+            List<RecipeEconomy.Rule> rules=new ArrayList<>();
+            Map<RecipeChoice,List<String>> cached=new HashMap<>();
+            Iterator<Recipe> iterator=Bukkit.recipeIterator();int skipped=0;
+            while(iterator.hasNext()){
+                Recipe recipe=iterator.next();ItemStack result=recipe.getResult();
+                if(result==null||result.getType().isAir()||result.getAmount()<=0)continue;
+                String output=result.getType().name().toLowerCase(Locale.ROOT);
+                if(!purchase.containsKey(output))continue;
+                List<RecipeChoice> choices=new ArrayList<>();
+                if(recipe instanceof ShapedRecipe shaped){
+                    var map=shaped.getChoiceMap();
+                    for(String line:shaped.getShape())for(char symbol:line.toCharArray())if(symbol!=' '&&map.get(symbol)!=null)choices.add(map.get(symbol));
+                }else if(recipe instanceof ShapelessRecipe shapeless)choices.addAll(shapeless.getChoiceList());
+                else if(recipe instanceof CookingRecipe<?> cooking)choices.add(cooking.getInputChoice());
+                else if(recipe instanceof StonecuttingRecipe cutter)choices.add(cutter.getInputChoice());
+                else{skipped++;continue;}
+                if(choices.isEmpty())continue;
+                List<List<String>> inputs=new ArrayList<>();
+                for(RecipeChoice choice:choices){
+                    if(choice==null){inputs.add(List.of());continue;}
+                    inputs.add(cached.computeIfAbsent(choice,x->{
+                        if(x instanceof RecipeChoice.MaterialChoice materials)return materials.getChoices().stream().map(m->m.name().toLowerCase(Locale.ROOT)).filter(purchase::containsKey).toList();
+                        if(x instanceof RecipeChoice.ExactChoice exact)return exact.getChoices().stream().filter(st->!st.hasItemMeta()).map(st->st.getType().name().toLowerCase(Locale.ROOT)).filter(purchase::containsKey).toList();
+                        return SHOP.entrySet().stream().filter(e->purchase.containsKey(e.getKey())&&x.test(new ItemStack(e.getValue()))).map(Map.Entry::getKey).toList();
+                    }));
+                }
+                rules.add(new RecipeEconomy.Rule(output,result.getAmount(),inputs));
+            }
+            recipeSaleCaps=RecipeEconomy.ceilings(purchase,rules);recipePricingReady=true;
+            plugin.getLogger().info("Marché anti-arbitrage : "+rules.size()+" recettes contrôlées, "+skipped+" recettes spéciales non modélisées.");
+        }catch(RuntimeException ex){recipePricingReady=false;plugin.getLogger().severe("Boutique suspendue : contrôle des recettes impossible : "+ex.getMessage());}
+    }
     private void recalculateMarketPrices() {
         Map<String,Double> sales=new HashMap<>();
         for(String key:SHOP.keySet()) {
@@ -1603,6 +1646,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             db.set("shop.sell-prices."+key,Math.round(sell*10000)/10000.0);
             db.set("shop.buy-prices."+key,Math.round(sell*2.8*10000)/10000.0);
         }
+        rebuildRecipeCaps();
         for(String key:SHOP.keySet()) {
             List<Double> trend=db.getDoubleList("market.price-history."+key);
             trend.add(shopSellPrice(key));
@@ -1633,7 +1677,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         return saleNet(Math.round(shopSellPrice(key)*quantity*10000)/10000.0);
     }
 
-    private boolean sellStack(Player p,int inventorySlot,int amount){ItemStack stack=p.getInventory().getItem(inventorySlot);if(stack==null||stack.getType().isAir()||amount<1||amount>stack.getAmount()){msg(p,"Quantité invalide ou aucun objet vendable.");return false;}String k=stack.getType().name().toLowerCase(Locale.ROOT);if(!SHOP.containsKey(k)||SHOP_BLOCKED.contains(stack.getType())||SHOP_BLOCKED_NAMES.contains(stack.getType().name())||k.contains("netherite")){msg(p,"Cet objet ne peut pas être vendu.");return false;}if(stack.hasItemMeta()){msg(p,"Les objets renommés ou enchantés ne sont pas acceptés.");return false;}double total=shopProceeds(k,amount);if(total<=0||!Double.isFinite(core.balance(p.getUniqueId())+total)){msg(p,"Vente impossible.");return false;}int left=stack.getAmount()-amount;ItemStack[] after=p.getInventory().getStorageContents();if(left<=0)after[inventorySlot]=null;else {after[inventorySlot]=stack.clone();after[inventorySlot].setAmount(left);}if(!tradeManager.commerce(p,after,total,null,0,null,null,false,"SHOP_SELL")){msg(p,"Vente non confirmée.");return false;}db.set("market.window-sold."+k,db.getLong("market.window-sold."+k,0L)+amount);db.set("market.total-sold."+k,db.getLong("market.total-sold."+k,0L)+amount);db.set("market.sales-total",db.getLong("market.sales-total",0L)+amount);db.set("market.sales-count",db.getLong("market.sales-count",0L)+1);List<Map<String,Object>> h=new ArrayList<>();for(Map<?,?> old:db.getMapList("market.history")){Map<String,Object> r=new LinkedHashMap<>();for(var x:old.entrySet())r.put(String.valueOf(x.getKey()),x.getValue());h.add(r);}Map<String,Object> row=new LinkedHashMap<>();row.put("type","VENTE");row.put("item",k);row.put("amount",amount);row.put("total",total);row.put("player",p.getName());row.put("time",System.currentTimeMillis());h.add(0,row);if(h.size()>100)h=new ArrayList<>(h.subList(0,100));db.set("market.history",h);save();msg(p,"Vente: "+amount+" x "+k+" pour "+formatShopPrice(total)+" Larry. Prix mis à jour dans "+marketTimeLeft()+".");return true;}
+    private boolean sellStack(Player p,int inventorySlot,int amount){if(!recipePricingReady){msg(p,"Boutique temporairement indisponible.");return false;}ItemStack stack=p.getInventory().getItem(inventorySlot);if(stack==null||stack.getType().isAir()||amount<1||amount>stack.getAmount()){msg(p,"Quantité invalide ou aucun objet vendable.");return false;}String k=stack.getType().name().toLowerCase(Locale.ROOT);if(!SHOP.containsKey(k)||SHOP_BLOCKED.contains(stack.getType())||SHOP_BLOCKED_NAMES.contains(stack.getType().name())||k.contains("netherite")){msg(p,"Cet objet ne peut pas être vendu.");return false;}if(stack.hasItemMeta()){msg(p,"Les objets renommés ou enchantés ne sont pas acceptés.");return false;}double total=shopProceeds(k,amount);if(total<=0||!Double.isFinite(core.balance(p.getUniqueId())+total)){msg(p,"Vente impossible.");return false;}int left=stack.getAmount()-amount;ItemStack[] after=p.getInventory().getStorageContents();if(left<=0)after[inventorySlot]=null;else {after[inventorySlot]=stack.clone();after[inventorySlot].setAmount(left);}if(!tradeManager.commerce(p,after,total,null,0,null,null,false,"SHOP_SELL")){msg(p,"Vente non confirmée.");return false;}db.set("market.window-sold."+k,db.getLong("market.window-sold."+k,0L)+amount);db.set("market.total-sold."+k,db.getLong("market.total-sold."+k,0L)+amount);db.set("market.sales-total",db.getLong("market.sales-total",0L)+amount);db.set("market.sales-count",db.getLong("market.sales-count",0L)+1);List<Map<String,Object>> h=new ArrayList<>();for(Map<?,?> old:db.getMapList("market.history")){Map<String,Object> r=new LinkedHashMap<>();for(var x:old.entrySet())r.put(String.valueOf(x.getKey()),x.getValue());h.add(r);}Map<String,Object> row=new LinkedHashMap<>();row.put("type","VENTE");row.put("item",k);row.put("amount",amount);row.put("total",total);row.put("player",p.getName());row.put("time",System.currentTimeMillis());h.add(0,row);if(h.size()>100)h=new ArrayList<>(h.subList(0,100));db.set("market.history",h);save();msg(p,"Vente: "+amount+" x "+k+" pour "+formatShopPrice(total)+" Larry. Prix mis à jour dans "+marketTimeLeft()+".");return true;}
     private boolean sellShop(Player p,int amount){return sellStack(p,p.getInventory().getHeldItemSlot(),amount);}
     private boolean isSellable(ItemStack stack){if(stack==null||stack.getType().isAir())return false;String k=stack.getType().name().toLowerCase(Locale.ROOT);return SHOP.containsKey(k)&&!SHOP_BLOCKED.contains(stack.getType())&&!SHOP_BLOCKED_NAMES.contains(stack.getType().name())&&!k.contains("netherite")&&!stack.hasItemMeta();}
     private double sellAllValue(Player p) {
@@ -1648,6 +1692,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Map<UUID,Double> saleQuotes=new HashMap<>();
     private void openSellAllConfirmation(Player p){double total=sellAllValue(p);saleSnapshots.put(p.getUniqueId(),Arrays.stream(p.getInventory().getStorageContents()).map(x->x==null?null:x.clone()).toArray(ItemStack[]::new));saleQuotes.put(p.getUniqueId(),total);Inventory inv=Bukkit.createInventory(null,27,"Larry | Confirmer vente totale");inv.setItem(11,item(Material.LIME_CONCRETE,"CONFIRMER","Vendre tous les objets admissibles","Net après taxe: "+total+" Larry","Cette action est irréversible"));inv.setItem(15,item(Material.RED_CONCRETE,"ANNULER","Ne rien vendre"));inv.setItem(13,item(Material.GOLD_INGOT,"Résumé","Net après taxe: "+total+" Larry","Les objets renommés/enchantés et interdits sont ignorés"));p.openInventory(inv);}
     private void executeSellAll(Player p){
+        if(!recipePricingReady){msg(p,"Boutique temporairement indisponible.");return;}
         ItemStack[] expected=saleSnapshots.remove(p.getUniqueId());Double quote=saleQuotes.remove(p.getUniqueId());
         if(expected==null||quote==null||!Arrays.equals(expected,p.getInventory().getStorageContents())||Double.compare(quote,sellAllValue(p))!=0){msg(p,"Inventaire ou prix modifié. Confirme à nouveau.");openSellAllConfirmation(p);return;}
         ItemStack[] after=p.getInventory().getStorageContents();
@@ -1676,7 +1721,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         db.set("market.history",new ArrayList<>(history.subList(0,Math.min(100,history.size()))));save();
         msg(p,"Vente totale terminée : "+sold+" objet(s) pour "+formatShopPrice(total)+" Larry.");openSellMenu(p);
     }
-    private boolean buyShop(Player p,String key,int amount){if(!SHOP.containsKey(key)){msg(p,"Objet inconnu. Utilise /shop search <objet>.");return true;}if(amount<1||amount>64){msg(p,"Quantité autorisée: 1 à 64.");return true;}ItemStack purchase=new ItemStack(SHOP.get(key),amount);Inventory test=Bukkit.createInventory(null,36);test.setStorageContents(p.getInventory().getStorageContents());if(!test.addItem(purchase.clone()).isEmpty()){msg(p,"Inventaire insuffisant; aucun Larry débité.");return true;}double price=Math.round(shopBuyPrice(key)*amount*10000)/10000.0;if(!Double.isFinite(price)||price<=0||!tradeManager.commerce(p,test.getStorageContents(),-price,null,0,null,null,false,"SHOP_BUY")){msg(p,"Fonds Larry insuffisants. Prix: "+formatShopPrice(price)+" Larry.");return true;}List<Map<String,Object>> history=new ArrayList<>();for(Map<?,?> old:db.getMapList("market.history")){Map<String,Object> rowCopy=new LinkedHashMap<>();for(var x:old.entrySet())rowCopy.put(String.valueOf(x.getKey()),x.getValue());history.add(rowCopy);}Map<String,Object> buyRow=new LinkedHashMap<>();buyRow.put("type","ACHAT");buyRow.put("item",key);buyRow.put("amount",amount);buyRow.put("total",price);buyRow.put("player",p.getName());buyRow.put("time",System.currentTimeMillis());history.add(0,buyRow);if(history.size()>100)history=new ArrayList<>(history.subList(0,100));db.set("market.history",history);db.set("market.purchase-total",db.getLong("market.purchase-total",0L)+amount);save();msg(p,"Achat effectué: "+amount+" x "+key+" pour "+formatShopPrice(price)+" Larry.");return true;}
+    private boolean buyShop(Player p,String key,int amount){if(!recipePricingReady){msg(p,"Boutique temporairement indisponible.");return true;}if(!SHOP.containsKey(key)){msg(p,"Objet inconnu. Utilise /shop search <objet>.");return true;}if(amount<1||amount>64){msg(p,"Quantité autorisée: 1 à 64.");return true;}ItemStack purchase=new ItemStack(SHOP.get(key),amount);Inventory test=Bukkit.createInventory(null,36);test.setStorageContents(p.getInventory().getStorageContents());if(!test.addItem(purchase.clone()).isEmpty()){msg(p,"Inventaire insuffisant; aucun Larry débité.");return true;}double price=Math.round(shopBuyPrice(key)*amount*10000)/10000.0;if(!Double.isFinite(price)||price<=0||!tradeManager.commerce(p,test.getStorageContents(),-price,null,0,null,null,false,"SHOP_BUY")){msg(p,"Fonds Larry insuffisants. Prix: "+formatShopPrice(price)+" Larry.");return true;}List<Map<String,Object>> history=new ArrayList<>();for(Map<?,?> old:db.getMapList("market.history")){Map<String,Object> rowCopy=new LinkedHashMap<>();for(var x:old.entrySet())rowCopy.put(String.valueOf(x.getKey()),x.getValue());history.add(rowCopy);}Map<String,Object> buyRow=new LinkedHashMap<>();buyRow.put("type","ACHAT");buyRow.put("item",key);buyRow.put("amount",amount);buyRow.put("total",price);buyRow.put("player",p.getName());buyRow.put("time",System.currentTimeMillis());history.add(0,buyRow);if(history.size()>100)history=new ArrayList<>(history.subList(0,100));db.set("market.history",history);db.set("market.purchase-total",db.getLong("market.purchase-total",0L)+amount);save();msg(p,"Achat effectué: "+amount+" x "+key+" pour "+formatShopPrice(price)+" Larry.");return true;}
     private boolean shop(CommandSender sender,String[] args){if(args.length==0){Player p=player(sender);if(p!=null)openShop(p);return true;}if(args[0].equalsIgnoreCase("sell")){Player p=player(sender);if(p==null)return true;int n=p.getInventory().getItemInMainHand().getAmount();if(args.length>1)try{n=Integer.parseInt(args[1]);}catch(NumberFormatException ex){n=0;}return sellShop(p,n);}if(args.length>=2&&args[0].equalsIgnoreCase("buy")){Player p=player(sender);if(p==null)return true;int n=1;if(args.length>2)try{n=Integer.parseInt(args[2]);}catch(NumberFormatException ex){n=0;}return buyShop(p,args[1].toLowerCase(Locale.ROOT),n);}if(args.length<2||!args[0].equalsIgnoreCase("search")){msg(sender,"Usage: /shop | /shop search <objet> | /shop buy <clé> [quantité] | /shop sell [quantité]");return true;}String q=String.join(" ",Arrays.copyOfRange(args,1,args.length)).toLowerCase(Locale.ROOT);if(sender instanceof Player p){shopSearch.put(p.getUniqueId(),q);openShopSearch(p,0);return true;}List<String> found=SHOP.entrySet().stream().filter(e->e.getKey().contains(q)||e.getValue().name().toLowerCase(Locale.ROOT).contains(q)).limit(30).map(e->e.getKey()+" — Achat "+formatShopPrice(shopBuyPrice(e.getKey()))+" / vente "+formatShopPrice(shopSellPrice(e.getKey()))+" Larry/u").toList();msg(sender,found.isEmpty()?"Aucun objet correspondant.":"Résultats: "+String.join(" | ",found));return true;}
     private boolean auction(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
