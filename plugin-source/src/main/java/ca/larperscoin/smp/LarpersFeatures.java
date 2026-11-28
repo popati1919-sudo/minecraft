@@ -637,8 +637,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 if(a.length!=2||!a[1].equalsIgnoreCase("confirm")){msg(p,"Action irréversible: /clan disband confirm.");return true;}
                 if(clanChestUsers.containsKey(own)){msg(p,"Ferme d'abord le coffre du clan avant de le dissoudre.");return true;}
                 String path=clanPath(own);
-                if(db.getDouble(path+".bank")>0){msg(p,"Vide la banque avant la dissolution.");return;}
-                if(db.getList(path+".chest",List.of()).stream().anyMatch(x->x instanceof ItemStack st && !st.getType().isAir() && !isChestLock(st))){msg(p,"Vide le coffre avant la dissolution.");return;}
+                if(db.getDouble(path+".bank")>0){msg(p,"Vide la banque avant la dissolution.");return true;}
+                if(db.getList(path+".chest",List.of()).stream().anyMatch(x->x instanceof ItemStack st && !st.getType().isAir() && !isChestLock(st))){msg(p,"Vide le coffre avant la dissolution.");return true;}
                 List<String> members=db.getStringList(path+".members");
                 for(String member:members)db.set("clan-members."+member,null);
                 for(String ally:db.getStringList(path+".allies")){List<String> list=db.getStringList(clanPath(ally)+".allies");list.remove(own);db.set(clanPath(ally)+".allies",list);}
