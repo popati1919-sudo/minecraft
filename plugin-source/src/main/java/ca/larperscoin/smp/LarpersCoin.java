@@ -87,6 +87,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             data=new YamlConfiguration();if(dataFile.exists())data.load(dataFile);
             File featuresFile=new File(getDataFolder(),"features.yml");
             if(featuresFile.exists())new YamlConfiguration().load(featuresFile);
+            migrateMoneyUnits();
         }catch(Exception ex){data=null;getLogger().severe("Données illisibles : arrêt de sécurité, aucun fichier écrasé. "+ex.getMessage());getServer().shutdown();getServer().getPluginManager().disablePlugin(this);return;}
         for (String name : getDescription().getCommands().keySet()) {
             if (getCommand(name) != null) {
@@ -177,18 +178,53 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         }
     }
 
+    // Keep legacy decimal mirrors for existing readers; integer units are authoritative.
+    private double ledgerAmount(String path,double fallback){
+        Object stored=data.get("money-units."+path);
+        if(stored!=null){
+            if(!(stored instanceof Integer||stored instanceof Long))throw new IllegalStateException("Unités invalides: "+path);
+            long units=((Number)stored).longValue();
+            if(units<0||units>AntiDuplication.MAX_UNITS)throw new IllegalStateException("Unités hors limites: "+path);
+            return AntiDuplication.amount(units);
+        }
+        Object raw=data.get(path);
+        if(raw!=null&&!(raw instanceof Number))throw new IllegalStateException("Montant invalide: "+path);
+        long units=AntiDuplication.units(raw==null?fallback:((Number)raw).doubleValue());
+        if(units<0)throw new IllegalStateException("Montant négatif: "+path);
+        return AntiDuplication.amount(units);
+    }
+    private void setLedgerAmount(String path,double amount){
+        long units=AntiDuplication.units(amount);
+        if(units<0)throw new IllegalArgumentException("Montant négatif: "+path);
+        data.set("money-units."+path,units);data.set(path,AntiDuplication.amount(units));
+    }
+    private void migrateMoneyUnits()throws IOException{
+        if(data.getBoolean("money-units-v1"))return;
+        if(dataFile.exists()){
+            Path source=dataFile.toPath(),backup=source.resolveSibling("data.yml.pre-units.bak");
+            if(!Files.exists(backup))Files.copy(source,backup);
+        }
+        for(String group:List.of("balances","bounties","clan-banks")){
+            var section=data.getConfigurationSection(group);if(section==null)continue;
+            for(String name:new ArrayList<>(section.getKeys(false))){
+                String path=group+"."+name;setLedgerAmount(path,ledgerAmount(path,0));
+            }
+        }
+        setLedgerAmount("lottery.pot",ledgerAmount("lottery.pot",0));
+        data.set("money-units-v1",true);
+        if(!saveData())throw new IOException("Migration monétaire non sauvegardée");
+    }
+
     private String key(UUID uuid) {
         return uuid.toString();
     }
 
     double balance(UUID uuid) {
-        double value=data.getDouble("balances." + key(uuid),0.0);
-        try{return AntiDuplication.amount(Math.max(0,AntiDuplication.units(value)));}catch(ArithmeticException|IllegalArgumentException ex){throw new IllegalStateException("Solde invalide: "+uuid,ex);}
+        return ledgerAmount("balances."+key(uuid),0);
     }
 
     public double bountyAmount(UUID uuid) {
-        double value=data.getDouble("bounties."+key(uuid),0.0);
-        return Double.isFinite(value)&&value>0.0?value:0.0;
+        return ledgerAmount("bounties."+key(uuid),0);
     }
 
     public java.util.Map<UUID,Double> bountyLeaderboard() {
@@ -207,13 +243,13 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
 
     private void setBalance(UUID uuid, double amount) {
         if (!Double.isFinite(amount)) return;
-        data.set("balances." + key(uuid), Math.max(0.0, amount));
+        setLedgerAmount("balances." + key(uuid), Math.max(0.0, amount));
         saveData();
     }
 
     boolean debit(UUID uuid, double amount) {
         if (!Double.isFinite(amount) || amount <= 0.0 || balance(uuid) < amount) return false;
-        try{data.set("balances."+key(uuid),AntiDuplication.add(balance(uuid),-amount));}catch(ArithmeticException|IllegalArgumentException ex){return false;}
+        try{setLedgerAmount("balances."+key(uuid),AntiDuplication.add(balance(uuid),-amount));}catch(ArithmeticException|IllegalArgumentException ex){return false;}
         return true;
     }
 
@@ -224,11 +260,10 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             getLogger().warning("Crédit refusé: dépassement numérique pour " + uuid);
             return;
         }
-        data.set("balances." + key(uuid), next);
+        setLedgerAmount("balances." + key(uuid), next);
     }
     double clanBank(String bankId,double legacy){
-        double value=data.getDouble("clan-banks."+bankId,legacy);
-        return Double.isFinite(value)&&value>=0?value:0;
+        return ledgerAmount("clan-banks."+bankId,legacy);
     }
     boolean changeClanBank(String bankId,double legacy,UUID player,double amount,boolean deposit){
         if(!Double.isFinite(amount)||amount<=0)return false;
@@ -238,38 +273,38 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         double nextBank,nextBalance;try{nextBank=AntiDuplication.add(oldBank,deposit?amount:-amount);nextBalance=AntiDuplication.add(oldBalance,deposit?-amount:amount);}catch(ArithmeticException|IllegalArgumentException ex){return false;}
         if(!Double.isFinite(nextBank)||!Double.isFinite(nextBalance))return false;
         Object oldStored=data.get(bankPath);var history=data.getStringList("transactions");
-        data.set(bankPath,nextBank);data.set(playerPath,nextBalance);
+        setLedgerAmount(bankPath,nextBank);setLedgerAmount(playerPath,nextBalance);
         UUID system=new UUID(0L,0L);
         appendTransaction(deposit?"CLAN_DEPOSIT":"CLAN_WITHDRAW",deposit?player:system,deposit?system:player,amount);
         if(saveData())return true;
-        data.set(bankPath,oldStored);data.set(playerPath,oldBalance);data.set("transactions",history);return false;
+        if(oldStored==null){data.set(bankPath,null);data.set("money-units."+bankPath,null);}else setLedgerAmount(bankPath,oldBank);setLedgerAmount(playerPath,oldBalance);data.set("transactions",history);return false;
     }
     boolean changeBalanceSaved(UUID player,double delta){
         double previous=balance(player),next;try{next=AntiDuplication.add(previous,delta);}catch(ArithmeticException|IllegalArgumentException ex){return false;}
         if(!Double.isFinite(delta)||!Double.isFinite(next)||next<0)return false;
-        data.set("balances."+key(player),next);
+        setLedgerAmount("balances."+key(player),next);
         if(saveData())return true;
-        data.set("balances."+key(player),previous);return false;
+        setLedgerAmount("balances."+key(player),previous);return false;
     }
     boolean hasQuestClaim(String claim){return data.getBoolean("quest-claims."+claim,false);}
     boolean commitQuestClaim(UUID player,String claim,double reward,boolean weekly){
         if(hasQuestClaim(claim)||!Double.isFinite(reward)||reward<=0)return false;
         double before=balance(player),after;try{after=AntiDuplication.add(before,reward);}catch(ArithmeticException|IllegalArgumentException ex){return false;}
         var history=data.getStringList("transactions");
-        data.set("balances."+key(player),after);data.set("quest-claims."+claim,true);
+        setLedgerAmount("balances."+key(player),after);data.set("quest-claims."+claim,true);
         appendTransaction(weekly?"QUEST_WEEKLY":"QUEST_DAILY",new UUID(0L,0L),player,reward);
         if(saveData())return true;
-        data.set("balances."+key(player),before);data.set("quest-claims."+claim,null);data.set("transactions",history);return false;
+        setLedgerAmount("balances."+key(player),before);data.set("quest-claims."+claim,null);data.set("transactions",history);return false;
     }
     boolean rewardClaimed(String claim){return data.getBoolean("reward-claims."+claim);}
     boolean commitReward(UUID player,String claim,double reward,String type){
         if(rewardClaimed(claim)||reward<=0)return false;
         double before=balance(player),after;try{after=AntiDuplication.add(before,reward);}catch(ArithmeticException|IllegalArgumentException ex){return false;}
         var history=data.getStringList("transactions");
-        data.set("balances."+key(player),after);data.set("reward-claims."+claim,true);
+        setLedgerAmount("balances."+key(player),after);data.set("reward-claims."+claim,true);
         appendTransaction(type,new UUID(0L,0L),player,reward);
         if(saveData())return true;
-        data.set("balances."+key(player),before);data.set("reward-claims."+claim,null);data.set("transactions",history);return false;
+        setLedgerAmount("balances."+key(player),before);data.set("reward-claims."+claim,null);data.set("transactions",history);return false;
     }
     boolean initChest(String id,List<ItemStack> legacy,int level){
         String path="clan-chests."+id;
@@ -296,10 +331,10 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         String path="clan-chests."+id+".level";
         if(!data.contains(path)||chestLevel(id,1)!=level||level>=7)return false;
         double before=balance(player),after;try{after=AntiDuplication.add(before,-cost);}catch(ArithmeticException|IllegalArgumentException ex){return false;}
-        var history=data.getStringList("transactions");data.set(path,level+1);data.set("balances."+key(player),after);
+        var history=data.getStringList("transactions");data.set(path,level+1);setLedgerAmount("balances."+key(player),after);
         appendTransaction("CLAN_CHEST_UPGRADE",player,new UUID(0L,0L),cost);
         if(saveData())return true;
-        data.set(path,level);data.set("balances."+key(player),before);data.set("transactions",history);return false;
+        data.set(path,level);setLedgerAmount("balances."+key(player),before);data.set("transactions",history);return false;
     }
     boolean commitTradeMoney(UUID first,UUID second,double firstPays,double secondPays,String tradeId) {
         double a=balance(first),b=balance(second);
@@ -307,13 +342,13 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         double nextA,nextB;try{nextA=AntiDuplication.add(AntiDuplication.add(a,-firstPays),secondPays);nextB=AntiDuplication.add(AntiDuplication.add(b,-secondPays),firstPays);}catch(ArithmeticException|IllegalArgumentException ex){return false;}
         if(!Double.isFinite(nextA)||!Double.isFinite(nextB))return false;
         var history=data.getStringList("transactions");
-        data.set("balances."+key(first),nextA);
-        data.set("balances."+key(second),nextB);
+        setLedgerAmount("balances."+key(first),nextA);
+        setLedgerAmount("balances."+key(second),nextB);
         appendTransaction("TRADE",first,second,firstPays);
         appendTransaction("TRADE",second,first,secondPays);
         data.set("trade-commits."+tradeId,true);
         if(saveData())return true;
-        data.set("balances."+key(first),a);data.set("balances."+key(second),b);
+        setLedgerAmount("balances."+key(first),a);setLedgerAmount("balances."+key(second),b);
         data.set("transactions",history);data.set("trade-commits."+tradeId,null);
         return false;
     }
@@ -341,15 +376,15 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         if(path!=null&&(remove?oldEntry==null:oldEntry!=null))return false;
         Map<String,Object> oldListing=oldEntry==null?null:new java.util.LinkedHashMap<>(oldEntry.getValues(false));
         var history=data.getStringList("transactions");
-        data.set("balances."+key(player),after);
-        if(seller!=null)data.set("balances."+key(seller),newSeller);
+        setLedgerAmount("balances."+key(player),after);
+        if(seller!=null)setLedgerAmount("balances."+key(seller),newSeller);
         if(path!=null){data.set(path,null);if(!remove)data.createSection(path,listing);}
         UUID system=new UUID(0L,0L);
         if(delta!=0)appendTransaction(type,delta<0?player:system,delta<0?(seller==null?system:seller):player,Math.abs(delta));
         data.set("commerce-commits."+tx,true);
         if(saveData())return true;
-        data.set("balances."+key(player),before);
-        if(seller!=null)data.set("balances."+key(seller),oldSeller);
+        setLedgerAmount("balances."+key(player),before);
+        if(seller!=null)setLedgerAmount("balances."+key(seller),oldSeller);
         if(path!=null){data.set(path,null);if(oldListing!=null)data.createSection(path,oldListing);}
         data.set("transactions",history);data.set("commerce-commits."+tx,null);return false;
     }
@@ -466,12 +501,12 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         reply(sender, "Fonds insuffisants.");
                         return true;
                     }
-                    double receiverNext;try{receiverNext=AntiDuplication.add(beforeTarget,amount);}catch(ArithmeticException|IllegalArgumentException ex){data.set("balances."+key(player.getUniqueId()),beforeSender);reply(sender,"Solde du destinataire hors limites.");return true;}
-                    data.set("balances."+key(target.getUniqueId()),receiverNext);
+                    double receiverNext;try{receiverNext=AntiDuplication.add(beforeTarget,amount);}catch(ArithmeticException|IllegalArgumentException ex){setLedgerAmount("balances."+key(player.getUniqueId()),beforeSender);reply(sender,"Solde du destinataire hors limites.");return true;}
+                    setLedgerAmount("balances."+key(target.getUniqueId()),receiverNext);
                     appendTransaction("PAY",player.getUniqueId(),target.getUniqueId(),amount);
                     if(!saveData()){
-                        data.set("balances."+key(player.getUniqueId()),beforeSender);
-                        data.set("balances."+key(target.getUniqueId()),beforeTarget);
+                        setLedgerAmount("balances."+key(player.getUniqueId()),beforeSender);
+                        setLedgerAmount("balances."+key(target.getUniqueId()),beforeTarget);
                         data.set("transactions",beforeRecords);
                         reply(sender,"Paiement annulé : sauvegarde impossible.");return true;
                     }
@@ -526,7 +561,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         if (rank > 10) break;
                         OfflinePlayer offline = Bukkit.getOfflinePlayer(UUID.fromString(id));
                         String playerName = offline.getName() == null ? id.substring(0, 8) : offline.getName();
-                        reply(sender, rank + ". " + playerName + " : " + format(data.getDouble("balances." + id)));
+                        reply(sender, rank + ". " + playerName + " : " + format(balance(UUID.fromString(id))));
                         rank++;
                     }
                     return true;
@@ -551,7 +586,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     String targetId = key(target.getUniqueId());
                     double previousBounty=bountyAmount(target.getUniqueId()), previousBalance=balance(player.getUniqueId());
                     var previousHistory=data.getStringList("transactions");
-                    double nextBounty = previousBounty + amount;
+                    double nextBounty;try{nextBounty=AntiDuplication.add(previousBounty,amount);}catch(ArithmeticException|IllegalArgumentException ex){reply(sender,"Prime hors limites.");return true;}
                     if (!Double.isFinite(nextBounty)) {
                         reply(sender, "La prime totale dépasserait la limite numérique.");
                         return true;
@@ -560,9 +595,9 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         reply(sender, "Fonds insuffisants.");
                         return true;
                     }
-                    data.set("bounties." + targetId, nextBounty);
+                    setLedgerAmount("bounties." + targetId, nextBounty);
                     appendTransaction("BOUNTY_PLACE",player.getUniqueId(),new UUID(0L,0L),amount);
-                    if(!saveData()){data.set("bounties."+targetId,previousBounty);data.set("balances."+key(player.getUniqueId()),previousBalance);data.set("transactions",previousHistory);reply(sender,"Prime annulée : sauvegarde impossible.");return true;}
+                    if(!saveData()){setLedgerAmount("bounties."+targetId,previousBounty);setLedgerAmount("balances."+key(player.getUniqueId()),previousBalance);data.set("transactions",previousHistory);reply(sender,"Prime annulée : sauvegarde impossible.");return true;}
                     Bukkit.broadcastMessage(ChatColor.GOLD + "[Larry] " + player.getName() + " place une prime de " + format(amount) + " sur " + target.getName() + " !");
                     return true;
                 }
@@ -592,14 +627,14 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     double recordedAmount = amount;
                     UUID systemAccount = new UUID(0L,0L);
                     switch (args[0].toLowerCase(Locale.ROOT)) {
-                        case "give" -> credit(target.getUniqueId(), amount);
+                        case "give" -> {try{setLedgerAmount("balances."+key(target.getUniqueId()),AntiDuplication.add(oldBalance,amount));}catch(ArithmeticException|IllegalArgumentException ex){reply(sender,"Solde hors limites.");return true;}}
                         case "take" -> {
                             recordedAmount = Math.min(oldBalance, amount);
-                            data.set("balances." + key(target.getUniqueId()), oldBalance - recordedAmount);
+                            setLedgerAmount("balances." + key(target.getUniqueId()), oldBalance - recordedAmount);
                         }
                         case "set" -> {
                             recordedAmount = Math.abs(amount - oldBalance);
-                            data.set("balances." + key(target.getUniqueId()), amount);
+                            setLedgerAmount("balances." + key(target.getUniqueId()), amount);
                         }
                         default -> {
                             reply(sender, "Action invalide : give, take ou set.");
@@ -612,7 +647,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                             appendTransaction("ECO_" + action, target.getUniqueId(), systemAccount, recordedAmount);
                         else appendTransaction("ECO_" + action, systemAccount, target.getUniqueId(), recordedAmount);
                     }
-                    if(!saveData()){data.set("balances."+key(target.getUniqueId()),oldBalance);data.set("transactions",previousHistory);reply(sender,"Opération annulée : sauvegarde impossible.");return true;}
+                    if(!saveData()){setLedgerAmount("balances."+key(target.getUniqueId()),oldBalance);data.set("transactions",previousHistory);reply(sender,"Opération annulée : sauvegarde impossible.");return true;}
                     reply(sender, "Solde de " + args[1] + " : " + format(balance(target.getUniqueId())));
                     return true;
                 }
@@ -626,15 +661,15 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         int count=args.length>=2?Integer.parseInt(args[1]):1;
                         if(count<1||count>1000){reply(sender,"Choisis entre 1 et 1 000 tickets.");return true;}
                         if(lotteryTicketCount()>100000-count){reply(sender,"Limite totale de tickets atteinte.");return true;}
-                        double cost=count*50.0,nextPot=lotteryPot()+cost;
+                        double cost=count*50.0,nextPot;try{nextPot=AntiDuplication.add(lotteryPot(),cost);}catch(ArithmeticException|IllegalArgumentException ex){reply(sender,"Jackpot hors limites.");return true;}
                         if(!Double.isFinite(nextPot)){reply(sender,"Le jackpot dépasserait la limite numérique.");return true;}
                         double beforeBalance=balance(player.getUniqueId()),beforePot=lotteryPot();
                         List<String> beforeTickets=data.getStringList("lottery.tickets"),beforeRecords=data.getStringList("transactions");
                         if(!debit(player.getUniqueId(),cost)){reply(sender,"Fonds insuffisants : "+format(cost)+".");return true;}
                         List<String> tickets=new ArrayList<>(beforeTickets);for(int i=0;i<count;i++)tickets.add(key(player.getUniqueId()));
-                        data.set("lottery.tickets",tickets);data.set("lottery.pot",nextPot);
+                        data.set("lottery.tickets",tickets);setLedgerAmount("lottery.pot",nextPot);
                         appendTransaction("LOTTERY_BUY",player.getUniqueId(),new UUID(0L,0L),cost);
-                        if(!saveData()){data.set("balances."+key(player.getUniqueId()),beforeBalance);data.set("lottery.pot",beforePot);data.set("lottery.tickets",beforeTickets);data.set("transactions",beforeRecords);reply(sender,"Achat annulé : sauvegarde impossible.");return true;}
+                        if(!saveData()){setLedgerAmount("balances."+key(player.getUniqueId()),beforeBalance);setLedgerAmount("lottery.pot",beforePot);data.set("lottery.tickets",beforeTickets);data.set("transactions",beforeRecords);reply(sender,"Achat annulé : sauvegarde impossible.");return true;}
                         reply(sender,"Tickets achetés : "+count+". Jackpot : "+format(nextPot));
                         Bukkit.broadcastMessage(ChatColor.LIGHT_PURPLE+"[LOTERIE] "+player.getName()+" vient d'acheter "+count+" ticket(s)!");
                         return true;
@@ -708,7 +743,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
 
     public boolean resetAuthAccount(String playerName){return auth!=null&&auth.resetAccount(playerName);}
     LarpersAntiCheat getAntiCheat(){return antiCheat;}
-    public double lotteryPot(){return Math.max(0.0,data.getDouble("lottery.pot",0.0));}
+    public double lotteryPot(){return ledgerAmount("lottery.pot",0);}
     public int lotteryTicketCount(){return data.getStringList("lottery.tickets").size();}
     public boolean lotteryActive(){return data.getBoolean("lottery.active",false);}
     public long lotteryEndsAt(){return data.getLong("lottery.ends-at",0L);}
@@ -867,7 +902,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         tickets.removeIf(id->{try{UUID.fromString(id);return false;}catch(IllegalArgumentException ex){return true;}});
         if(tickets.isEmpty()){getLogger().severe("Tirage suspendu: aucun ticket valide. Données conservées.");return;}
         String winnerId = tickets.get(ThreadLocalRandom.current().nextInt(tickets.size()));
-        double jackpot = data.getDouble("lottery.pot", 0.0);
+        double jackpot = lotteryPot();
         UUID winnerUuid = UUID.fromString(winnerId);
         if (!Double.isFinite(jackpot) || jackpot <= 0.0 || !Double.isFinite(balance(winnerUuid) + jackpot)) {
             getLogger().severe("Tirage annulé: jackpot ou solde du gagnant invalide.");
@@ -876,12 +911,12 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         double beforeBalance=balance(winnerUuid);long beforeEnd=lotteryEndsAt();
         List<String> beforeTickets=data.getStringList("lottery.tickets"),beforeRecords=data.getStringList("transactions");
         double winnerBalance;try{winnerBalance=AntiDuplication.add(beforeBalance,jackpot);}catch(ArithmeticException|IllegalArgumentException ex){getLogger().severe("Jackpot hors limite : tirage suspendu.");return;}
-        data.set("balances."+key(winnerUuid),winnerBalance);
+        setLedgerAmount("balances."+key(winnerUuid),winnerBalance);
         data.set("lottery.tickets", new ArrayList<String>());
-        data.set("lottery.pot", 0.0);
+        setLedgerAmount("lottery.pot", 0.0);
         data.set("lottery.active",false);data.set("lottery.ends-at",0L);
         appendTransaction("LOTTERY_WIN",new UUID(0L,0L),winnerUuid,jackpot);
-        if(!saveData()){data.set("balances."+key(winnerUuid),beforeBalance);data.set("lottery.tickets",beforeTickets);data.set("lottery.pot",jackpot);data.set("lottery.active",true);data.set("lottery.ends-at",beforeEnd);data.set("transactions",beforeRecords);getLogger().severe("Tirage annulé : sauvegarde impossible. Réessayer /lottery draw.");return;}
+        if(!saveData()){setLedgerAmount("balances."+key(winnerUuid),beforeBalance);data.set("lottery.tickets",beforeTickets);setLedgerAmount("lottery.pot",jackpot);data.set("lottery.active",true);data.set("lottery.ends-at",beforeEnd);data.set("transactions",beforeRecords);getLogger().severe("Tirage annulé : sauvegarde impossible. Réessayer /lottery draw.");return;}
         OfflinePlayer winner = Bukkit.getOfflinePlayer(UUID.fromString(winnerId));
         Bukkit.broadcastMessage(ChatColor.GOLD + "[Larry] " + (winner.getName() == null ? "Un joueur" : winner.getName()) + " remporte la loterie : " + format(jackpot) + " !");
     }
@@ -897,7 +932,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         long previousKill=data.getLong(cooldown,0L),now=System.currentTimeMillis();
         if(now-previousKill<86400000L)return;
         String victimId = key(event.getEntity().getUniqueId());
-        double bounty = data.getDouble("bounties." + victimId, 0.0);
+        double bounty = bountyAmount(victim);
         if (!Double.isFinite(bounty) || bounty <= 0.0) return;
         if (!Double.isFinite(balance(killer.getUniqueId()) + bounty)) {
             getLogger().warning("Prime conservée: solde maximal atteint pour " + killer.getName());
@@ -905,10 +940,10 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         }
         double previous=balance(killer.getUniqueId());var history=data.getStringList("transactions");
         double after;try{after=AntiDuplication.add(previous,bounty);}catch(ArithmeticException|IllegalArgumentException ex){return;}
-        data.set("bounties." + victimId, 0.0);data.set(cooldown,now);
-        data.set("balances."+key(killer.getUniqueId()),after);
+        setLedgerAmount("bounties." + victimId, 0.0);data.set(cooldown,now);
+        setLedgerAmount("balances."+key(killer.getUniqueId()),after);
         appendTransaction("BOUNTY_WIN",new UUID(0L,0L),killer.getUniqueId(),bounty);
-        if(!saveData()){data.set(cooldown,previousKill);data.set("bounties."+victimId,bounty);data.set("balances."+key(killer.getUniqueId()),previous);data.set("transactions",history);getLogger().warning("Prime non versée : sauvegarde impossible.");return;}
+        if(!saveData()){data.set(cooldown,previousKill);setLedgerAmount("bounties."+victimId,bounty);setLedgerAmount("balances."+key(killer.getUniqueId()),previous);data.set("transactions",history);getLogger().warning("Prime non versée : sauvegarde impossible.");return;}
         Bukkit.broadcastMessage(ChatColor.GOLD + "[Larry] " + killer.getName() + " a récupéré la prime de " + format(bounty) + " sur " + event.getEntity().getName() + " !");
     }
 
