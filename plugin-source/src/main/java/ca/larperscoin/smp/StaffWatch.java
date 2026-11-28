@@ -12,7 +12,7 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 final class StaffWatch implements Listener, CommandExecutor {
-    private final NamespacedKey key;
+    private final NamespacedKey key,sessionKey;
     private final Set<UUID> recoveryWarnings=new HashSet<>();
     private final JavaPlugin plugin;
     private final LarpersFeatures features;
@@ -21,7 +21,7 @@ final class StaffWatch implements Listener, CommandExecutor {
     StaffWatch(JavaPlugin plugin,LarpersFeatures features) {
         this.plugin=plugin;
         this.features=features;
-        key=new NamespacedKey(plugin,"staff_watch_return");
+        key=new NamespacedKey(plugin,"staff_watch_return");sessionKey=new NamespacedKey(plugin,"staff_watch_session");
         for(String name:List.of("modo","tp")) plugin.getCommand(name).setExecutor(this);
         plugin.getCommand("modo").setTabCompleter((sender,cmd,alias,args)->
             sender.hasPermission("larpers.staff") && args.length==1 && "help".startsWith(args[0].toLowerCase(Locale.ROOT))
@@ -56,6 +56,7 @@ final class StaffWatch implements Listener, CommandExecutor {
         }
         p.closeInventory();
         var state=new YamlConfiguration();
+        String session=UUID.randomUUID().toString();state.set("session",session);
         Location origin=p.getLocation();
         state.set("world",origin.getWorld().getUID().toString());
         state.set("x",origin.getX());state.set("y",origin.getY());state.set("z",origin.getZ());
@@ -79,13 +80,16 @@ final class StaffWatch implements Listener, CommandExecutor {
         try {
             var dir=plugin.getDataFolder().toPath().resolve("staff-recovery");
             java.nio.file.Files.createDirectories(dir);
-            var backup=dir.resolve(p.getUniqueId()+".yml");
+            var backup=dir.resolve(p.getUniqueId()+"-"+session+".yml");
             var tmp=java.nio.file.Files.createTempFile(dir,"snapshot-",".tmp");
             try {
-                java.nio.file.Files.writeString(tmp,serialized);
-                java.nio.file.Files.move(tmp,backup,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                try(var channel=java.nio.channels.FileChannel.open(tmp,java.nio.file.StandardOpenOption.WRITE)){
+                    var bytes=java.nio.ByteBuffer.wrap(serialized.getBytes(java.nio.charset.StandardCharsets.UTF_8));while(bytes.hasRemaining())channel.write(bytes);channel.force(true);
+                }
+                try{java.nio.file.Files.move(tmp,backup,java.nio.file.StandardCopyOption.ATOMIC_MOVE);}catch(java.nio.file.AtomicMoveNotSupportedException ex){java.nio.file.Files.move(tmp,backup);}
             } finally {java.nio.file.Files.deleteIfExists(tmp);}
         } catch(java.io.IOException ex){p.sendMessage("Sauvegarde de sécurité impossible; mode annulé.");return true;}
+        p.getPersistentDataContainer().set(sessionKey,PersistentDataType.STRING,session);
         p.getPersistentDataContainer().set(key,PersistentDataType.STRING,serialized);
         p.getInventory().clear();
         p.setGameMode(GameMode.SPECTATOR);
@@ -130,11 +134,23 @@ final class StaffWatch implements Listener, CommandExecutor {
         }
         return state;
     }
+    private java.nio.file.Path backupPath(Player p,String session){
+        UUID.fromString(session);
+        return plugin.getDataFolder().toPath().resolve("staff-recovery").resolve(p.getUniqueId()+"-"+session+".yml");
+    }
     private YamlConfiguration readSnapshot(Player p) throws Exception {
-        try {return validateSnapshot(p.getPersistentDataContainer().get(key,PersistentDataType.STRING),p.getInventory().getSize());}
-        catch(Exception ex){
-            var backup=plugin.getDataFolder().toPath().resolve("staff-recovery").resolve(p.getUniqueId()+".yml");
-            return validateSnapshot(java.nio.file.Files.readString(backup),p.getInventory().getSize());
+        String session=p.getPersistentDataContainer().get(sessionKey,PersistentDataType.STRING);
+        try{
+            var state=validateSnapshot(p.getPersistentDataContainer().get(key,PersistentDataType.STRING),p.getInventory().getSize());
+            if(!Objects.equals(session,state.getString("session")))throw new IllegalStateException("Session incohérente");
+            return state;
+        }catch(Exception ex){
+            if(session==null)throw new IllegalStateException("Ancienne sauvegarde sans identifiant; vérification manuelle requise",ex);
+            var backup=backupPath(p,session);
+            if(!java.nio.file.Files.exists(backup))backup=backup.getParent().resolve("completed").resolve(backup.getFileName());
+            var state=validateSnapshot(java.nio.file.Files.readString(backup),p.getInventory().getSize());
+            if(!session.equals(state.getString("session")))throw new IllegalStateException("Sauvegarde d'une autre session");
+            return state;
         }
     }
     private void restore(Player p) {
@@ -170,8 +186,10 @@ final class StaffWatch implements Listener, CommandExecutor {
             }
             features.setVanished(p,state.getBoolean("hidden"));
             p.getInventory().setContents(items);
-            p.getPersistentDataContainer().remove(key);
+            p.getPersistentDataContainer().remove(key);p.getPersistentDataContainer().remove(sessionKey);
             p.saveData();
+            String session=state.getString("session");
+            if(session!=null){try{var backup=backupPath(p,session);if(java.nio.file.Files.exists(backup)){var archive=backup.getParent().resolve("completed");java.nio.file.Files.createDirectories(archive);java.nio.file.Files.move(backup,archive.resolve(backup.getFileName()));}}catch(java.io.IOException ex){plugin.getLogger().warning("Archive modo: "+ex.getMessage());}}
             recoveryWarnings.remove(p.getUniqueId());
             p.sendMessage("Retour à ta position. Inventaire restauré.");
         } catch(Exception ex) {
@@ -212,7 +230,7 @@ final class StaffWatch implements Listener, CommandExecutor {
         if(active(e.getPlayer())) e.setCancelled(true);
     }
     @EventHandler public void join(PlayerJoinEvent e) {
-        if(active(e.getPlayer())) restore(e.getPlayer());
+        if(active(e.getPlayer())) {restore(e.getPlayer());if(active(e.getPlayer()))e.getPlayer().kickPlayer("Inventaire modo à vérifier par un administrateur.");}
     }
     @EventHandler public void quit(PlayerQuitEvent e) {
         if(active(e.getPlayer())) restore(e.getPlayer());
