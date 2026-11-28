@@ -47,7 +47,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private final Set<String> playerPlacedBlocks = new HashSet<>();
     private final Map<String, Inventory> clanChests = new HashMap<>();
     private final Map<String, UUID> clanChestUsers = new HashMap<>();
-    private final Map<String, ItemStack[]> clanChestSnapshots = new HashMap<>();
+    private static final class ClanChestHolder implements InventoryHolder {
+        final String clan; final UUID viewer; Inventory inventory;
+        ClanChestHolder(String clan,UUID viewer){this.clan=clan;this.viewer=viewer;}
+        @Override public Inventory getInventory(){return inventory;}
+    }
     private final Set<UUID> vanished = new HashSet<>();
     private final SecureTradeManager tradeManager;
     private final ChatEvents chatEvents;
@@ -94,7 +98,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         this.chatEvents = new ChatEvents(plugin, core);
         if (!plugin.getDataFolder().exists()) plugin.getDataFolder().mkdirs();
         file = new File(plugin.getDataFolder(), "features.yml");
-        db = YamlConfiguration.loadConfiguration(file);
+        db=new YamlConfiguration();
+        try{if(file.exists())db.load(file);}catch(Exception ex){throw new IllegalStateException("features.yml illisible",ex);}
         auctionsReady=core.migrateAuctions(db.getConfigurationSection("ah"));
         for(var e:SHOP_PRICES.entrySet()){String k=e.getKey();if(!db.contains("shop.sell-prices."+k))db.set("shop.sell-prices."+k,e.getValue());if(!db.contains("shop.buy-prices."+k))db.set("shop.buy-prices."+k,Math.max(.02,e.getValue()*2.8));}
         if(!db.contains("market.next-refresh"))db.set("market.next-refresh",System.currentTimeMillis()+MARKET_REFRESH_MILLIS);
@@ -114,7 +119,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
 
     private boolean save() {
-        for(var entry:clanChests.entrySet())db.set(clanPath(entry.getKey())+".chest",Arrays.asList(entry.getValue().getContents()));
+        // Clan chest contents are owned by the transaction ledger, never by GUI snapshots.
         Path target=file.toPath(),temporary=target.resolveSibling(target.getFileName()+".tmp");
         try {
             byte[] bytes=db.saveToString().getBytes(StandardCharsets.UTF_8);
@@ -150,6 +155,58 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private boolean member(Player p) { return clanOf(p.getUniqueId()) != null; }
     private String clanBankId(String clan){return db.getString(clanPath(clan)+".bank-id","legacy-"+clan);}
     private double clanBank(String clan){return core.clanBank(clanBankId(clan),db.getDouble(clanPath(clan)+".bank"));}
+    private boolean prepareChest(String clan){
+        String path=clanPath(clan);
+        int level=db.getInt(path+".chest-level",db.contains(path+".chest")?7:1);
+        level=Math.max(1,Math.min(7,level));
+        ItemStack[] legacy=new ItemStack[54];var list=db.getList(path+".chest",List.of());
+        for(int i=0;i<Math.min(54,list.size());i++){
+            Object value=list.get(i);
+            if(value==null)continue;
+            if(!(value instanceof ItemStack st))return false;
+            if(st.getType().isAir()||isChestLock(st))continue;
+            legacy[i]=st.clone();
+            while(level<7&&i>=AntiDuplication.capacity(level))level++;
+        }
+        return core.initChest(clanBankId(clan),Arrays.asList(legacy),level);
+    }
+    private int chestLevel(String clan){return core.chestLevel(clanBankId(clan),db.getInt(clanPath(clan)+".chest-level",db.contains(clanPath(clan)+".chest")?7:1));}
+    private void renderChest(ClanChestHolder holder){
+        ItemStack[] items=core.chestItems(clanBankId(holder.clan));
+        int unlocked=AntiDuplication.capacity(chestLevel(holder.clan));
+        for(int i=0;i<54;i++)holder.inventory.setItem(i,i<unlocked?items[i]:item(Material.GRAY_STAINED_GLASS_PANE,"Emplacement verrouillé","/clan chest upgrade"));
+    }
+    private boolean validChest(Player p,ClanChestHolder holder){
+        return holder.viewer.equals(p.getUniqueId())&&holder.clan.equals(clanOf(p.getUniqueId()))
+            &&db.getStringList(clanPath(holder.clan)+".members").contains(id(p))
+            &&Objects.equals(clanChestUsers.get(holder.clan),p.getUniqueId())&&clanChests.get(holder.clan)==holder.inventory;
+    }
+    private void transferChest(Player p,ClanChestHolder holder,int raw){
+        if(!validChest(p,holder)||!p.isOnline()||p.isDead()||watch.active(p))return;
+        if(p.getOpenInventory().getTopInventory()!=holder.inventory||!p.getItemOnCursor().getType().isAir())return;
+        String clan=holder.clan,chestId=clanBankId(clan);
+        ItemStack[] before=core.chestItems(chestId),after=Arrays.stream(before).map(x->x==null?null:x.clone()).toArray(ItemStack[]::new);
+        ItemStack[] playerAfter=p.getInventory().getStorageContents();
+        int unlocked=AntiDuplication.capacity(chestLevel(clan));
+        String action;
+        if(raw>=0&&raw<54){
+            if(raw>=unlocked||before[raw]==null||before[raw].getType().isAir())return;
+            Inventory test=Bukkit.createInventory(null,36);test.setStorageContents(playerAfter);
+            if(!test.addItem(before[raw].clone()).isEmpty()){msg(p,"Inventaire plein.");return;}
+            playerAfter=test.getStorageContents();after[raw]=null;action="retrait "+before[raw].getAmount()+" "+before[raw].getType();
+        }else{
+            int slot=p.getOpenInventory().convertSlot(raw);if(slot<0||slot>=36)return;
+            ItemStack stack=playerAfter[slot];if(stack==null||stack.getType().isAir())return;
+            int target=-1;for(int i=0;i<unlocked;i++)if(after[i]==null||after[i].getType().isAir()){target=i;break;}
+            if(target<0){msg(p,"Coffre plein.");return;}
+            after[target]=stack.clone();playerAfter[slot]=null;action="dépôt "+stack.getAmount()+" "+stack.getType();
+        }
+        if(!tradeManager.chestTransfer(p,playerAfter,chestId,before,after)){msg(p,"Transfert non confirmé.");return;}
+        List<String> audit=db.getStringList(clanPath(clan)+".chest-audit");
+        audit.add(System.currentTimeMillis()+"|"+id(p)+"|"+action);
+        db.set(clanPath(clan)+".chest-audit",new ArrayList<>(audit.subList(Math.max(0,audit.size()-500),audit.size())));
+        saveSoon();if(validChest(p,holder))renderChest(holder);
+    }
     private void give(Player p, double amount) {
         core.credit(p.getUniqueId(), amount);
         core.saveData();
@@ -199,7 +256,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         inv.setItem(12,item(Material.GOLD_INGOT,"Banque","/clan bank"));
         inv.setItem(14,item(Material.CHEST,"Coffre partagé","1 emplacement disponible au départ","/clan chest"));
         String own=clanOf(p.getUniqueId());
-        int chestLevel=own==null?1:Math.max(1,db.getInt(clanPath(own)+".chest-level",1));
+        int chestLevel=own==null?1:chestLevel(own);
         double upgradePrice=250.0*Math.pow(2,chestLevel-1);
         inv.setItem(15,item(Material.ANVIL,"Améliorer le coffre","Capacité actuelle: "+(chestLevel==1?1:(chestLevel-1)*9)+"/54","Prochaine amélioration: "+upgradePrice+" Larry","Clique pour payer et agrandir"));
         inv.setItem(16,item(Material.EMERALD,"Classement","/clan top"));
@@ -643,7 +700,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 if(clanChestUsers.containsKey(own)){msg(p,"Ferme d'abord le coffre du clan avant de le dissoudre.");return true;}
                 String path=clanPath(own);
                 if(clanBank(own)>0){msg(p,"Vide la banque avant la dissolution.");return true;}
-                if(db.getList(path+".chest",List.of()).stream().anyMatch(x->x instanceof ItemStack st && !st.getType().isAir() && !isChestLock(st))){msg(p,"Vide le coffre avant la dissolution.");return true;}
+                if(!prepareChest(own)||Arrays.stream(core.chestItems(clanBankId(own))).anyMatch(x->x!=null&&!x.getType().isAir())){msg(p,"Vide le coffre avant la dissolution.");return true;}
                 List<String> members=db.getStringList(path+".members");
                 for(String member:members)db.set("clan-members."+member,null);
                 for(String ally:db.getStringList(path+".allies")){List<String> list=db.getStringList(clanPath(ally)+".allies");list.remove(own);db.set(clanPath(ally)+".allies",list);}
@@ -653,7 +710,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                     db.set("alliance-requests."+key+"."+own,null);
                     db.set("alliance-requests."+own+"."+key,null);
                 }
-                db.set(path,null);clanChests.remove(own);clanChestUsers.remove(own);clanChestSnapshots.remove(own);save();msg(p,"Clan dissous. Les membres ont été retirés.");return true;
+                db.set(path,null);clanChests.remove(own);clanChestUsers.remove(own);save();msg(p,"Clan dissous. Les membres ont été retirés.");return true;
             }
             case "info","stats","level" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
@@ -692,58 +749,24 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             }
             case "chest" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
-                if(a.length>1 && a[1].equalsIgnoreCase("upgrade")) {
-                    String cp=clanPath(own);
-                    int level=Math.max(1,db.getInt(cp+".chest-level",1));
-                    if(level>=7){msg(p,"Ton coffre a déjà sa capacité maximale (54 emplacements).");return true;}
-                    double price=250.0*Math.pow(2,level-1);
-                    if(!charge(p,price)){msg(p,"Amélioration du coffre: "+price+" Larry. Fonds insuffisants.");return true;}
-                    db.set(cp+".chest-level",level+1);
-                    Inventory cached=clanChests.get(own);
-                    if(cached!=null) {
-                        int oldSlots=level==1?1:(level-1)*9;
-                        int newSlots=level*9;
-                        for(int slot=oldSlots;slot<newSlots;slot++) {
-                            ItemStack existing=cached.getItem(slot);
-                            if(existing!=null && existing.getType()==Material.GRAY_STAINED_GLASS_PANE
-                                    && existing.hasItemMeta() && "Emplacement verrouillé".equals(ChatColor.stripColor(existing.getItemMeta().getDisplayName()))) cached.clear(slot);
-                        }
-                    }
-                    save();
-                    msg(p,"Coffre amélioré à "+(level*9)+" emplacements. Coût: "+price+" Larry.");
-                    return true;
+                if(!db.getStringList(clanPath(own)+".members").contains(id(p))){msg(p,"Accès réservé aux membres.");return true;}
+                if(!prepareChest(own)){msg(p,"Coffre indisponible; contacte un admin.");return true;}
+                if(a.length>1&&a[1].equalsIgnoreCase("upgrade")){
+                    if(clanChestUsers.containsKey(own)){msg(p,"Ferme le coffre avant de l'améliorer.");return true;}
+                    int level=chestLevel(own);if(level>=7){msg(p,"Coffre déjà au maximum (54).");return true;}
+                    double price=250*Math.pow(2,level-1);
+                    if(!core.upgradeChest(clanBankId(own),p.getUniqueId(),level,price)){msg(p,"Amélioration annulée : fonds ou sauvegarde insuffisants.");return true;}
+                    msg(p,"Coffre amélioré à "+AntiDuplication.capacity(level+1)+" emplacements.");return true;
                 }
                 UUID user=clanChestUsers.get(own);
-                if(user!=null && Bukkit.getPlayer(user)==null){clanChestUsers.remove(own);user=null;}
-                if(user!=null&&!user.equals(p.getUniqueId())){msg(p,"Le coffre du clan est déjà utilisé par un autre membre.");return true;}
-                if(!db.getStringList(clanPath(own)+".members").contains(id(p))){msg(p,"Accès réservé aux membres du clan.");return true;}
-                Inventory inv=clanChests.get(own);
-                if(inv==null) {
-                    inv=Bukkit.createInventory(null,54,"Coffre clan: "+own);
-                    List<?> contents=db.getList(clanPath(own)+".chest");
-                    if(contents!=null)for(int i=0;i<Math.min(54,contents.size());i++)if(contents.get(i) instanceof ItemStack st)inv.setItem(i,st);
-                    int storedLevel=db.getInt(clanPath(own)+".chest-level",0);
-                    if(storedLevel<=0) {
-                        // Un coffre déjà sauvegardé avant ce système conserve son ancienne capacité.
-                        storedLevel=db.contains(clanPath(own)+".chest")?7:1;
-                        db.set(clanPath(own)+".chest-level",storedLevel);
-                    }
-                    int loadedLevel=Math.max(1,Math.min(7,storedLevel));
-                    int loadedUnlocked=loadedLevel==1?1:(loadedLevel-1)*9;
-                    for(int slot=0;slot<loadedUnlocked;slot++) {
-                        ItemStack existing=inv.getItem(slot);
-                        if(existing!=null&&existing.getType()==Material.GRAY_STAINED_GLASS_PANE&&existing.hasItemMeta()
-                                &&"Emplacement verrouillé".equals(ChatColor.stripColor(existing.getItemMeta().getDisplayName()))) inv.clear(slot);
-                    }
-                    clanChests.put(own,inv);
-                }
-                int chestLevel=Math.max(1,db.getInt(clanPath(own)+".chest-level",1));
-                int unlocked=Math.max(1,Math.min(54,chestLevel==1?1:(chestLevel-1)*9));
-                for(int slot=unlocked;slot<54;slot++){ItemStack st=inv.getItem(slot);if(st!=null&&!st.getType().isAir()&&!isChestLock(st)){msg(p,"Coffre incohérent : objet dans un emplacement verrouillé. Contacte un admin.");return true;}}
-                for(int slot=unlocked;slot<54;slot++) inv.setItem(slot,item(Material.GRAY_STAINED_GLASS_PANE,"Emplacement verrouillé","/clan chest upgrade"));
-                clanChestUsers.put(own,p.getUniqueId());
-                clanChestSnapshots.put(own,Arrays.stream(inv.getContents()).map(x->x==null?null:x.clone()).toArray(ItemStack[]::new));
-                p.openInventory(inv);msg(p,"Coffre partagé: "+unlocked+"/54 emplacements. Améliore avec /clan chest upgrade.");return true;
+                if(user!=null&&!user.equals(p.getUniqueId())&&Bukkit.getPlayer(user)!=null){msg(p,"Coffre déjà utilisé.");return true;}
+                p.closeInventory();
+                ClanChestHolder holder=new ClanChestHolder(own,p.getUniqueId());
+                holder.inventory=Bukkit.createInventory(holder,54,"Coffre clan: "+own);
+                renderChest(holder);
+                clanChests.put(own,holder.inventory);clanChestUsers.put(own,p.getUniqueId());
+                p.openInventory(holder.inventory);
+                msg(p,"Clic gauche sur une pile : dépôt ou retrait. "+AntiDuplication.capacity(chestLevel(own))+"/54 emplacements.");return true;
             }
             case "allies" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
@@ -805,15 +828,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         saveSoon();
     }
     private boolean achievementClaimed(Player p,String key) {
-        return db.getBoolean(achievementPath(p)+".claimed."+key,false);
+        return db.getBoolean(achievementPath(p)+".claimed."+key,false)||core.rewardClaimed("achievement."+id(p)+"."+key);
     }
     private void unlockAchievement(Player p,String key,String label,String tier,double money,Material rewardMaterial,int rewardAmount) {
         if(achievementClaimed(p,key)) return;
-        db.set(achievementPath(p)+".claimed."+key,true);
         String rewardText="";
         if(money>0 && Double.isFinite(core.balance(p.getUniqueId())+money)) {
-            give(p,money);
-            core.recordTransaction("ACHIEVEMENT_"+key.toUpperCase(Locale.ROOT),new UUID(0L,0L),p.getUniqueId(),money);
+            if(!core.commitReward(p.getUniqueId(),"achievement."+id(p)+"."+key,money,"ACHIEVEMENT_"+key.toUpperCase(Locale.ROOT)))return;
             rewardText=" — +"+formatShopPrice(money)+" Larry";
         } else if(rewardMaterial!=null && rewardAmount>0) {
             ItemStack reward=new ItemStack(rewardMaterial,rewardAmount);
@@ -821,6 +842,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             leftovers.values().forEach(stack->p.getWorld().dropItemNaturally(p.getLocation(),stack));
             rewardText=" — récompense: "+rewardAmount+" "+rewardMaterial.name();
         }
+        db.set(achievementPath(p)+".claimed."+key,true);
         msg(p,ChatColor.GOLD+"Succès débloqué: "+label+" ["+tier+"]"+rewardText+"!");
         if(tier.equalsIgnoreCase("EXTRÊME") || tier.equalsIgnoreCase("MYTHIQUE")) {
             Bukkit.broadcastMessage(ChatColor.DARK_PURPLE+"✦ "+ChatColor.LIGHT_PURPLE+p.getName()
@@ -1265,7 +1287,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         String loc=b.getWorld().getUID()+":"+b.getX()+":"+b.getY()+":"+b.getZ();
         if(playerPlacedBlocks.remove(loc) || db.getBoolean("player-placed-blocks."+loc,false)) {
             db.set("player-placed-blocks."+loc,null);
-            // Les autres compteurs conservent leur traitement des blocs posés.
+            saveSoon();return; // Un bloc replacé ne génère pas une nouvelle récompense de minage.
         } else if(b.getType().name().endsWith("_LOG") && !b.getType().name().startsWith("STRIPPED_") &&
             p.getInventory().getItemInMainHand().getType().name().endsWith("_AXE")) {
             generalProgress(p,"logs-chopped");
@@ -1307,7 +1329,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuestMobKill(EntityDeathEvent e) {
         Player killer=e.getEntity().getKiller();
-        if(killer!=null) {
+        if(killer!=null && !(e.getEntity() instanceof Player)) {
             progressQuest(killer,"kills");
             if(e.getEntity() instanceof org.bukkit.entity.Monster) addAchievementProgress(killer,"monster-kills",1);
             if(e.getEntity() instanceof org.bukkit.entity.Wither) addAchievementProgress(killer,"wither-kills",1);
@@ -1381,7 +1403,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             recordCollection(p);
         }
     }
-    @EventHandler public void onQuestFish(PlayerFishEvent e) {
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void onQuestFish(PlayerFishEvent e) {
         if(e.getState()==PlayerFishEvent.State.CAUGHT_FISH) {
             progressQuest(e.getPlayer(),"fish");
             addAchievementProgress(e.getPlayer(),"fish-caught",1);
@@ -1704,15 +1726,14 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onInvClick(InventoryClickEvent e) {
         String title=e.getView().getTitle();
-        if(title.startsWith("Coffre clan:") && e.isShiftClick() && e.getClickedInventory()!=null
-                && e.getClickedInventory().equals(e.getView().getBottomInventory())) { e.setCancelled(true); return; }
-        if(title.startsWith("Coffre clan:") && e.getRawSlot()>=0 && e.getRawSlot()<e.getView().getTopInventory().getSize()) {
-            String clan=title.substring("Coffre clan:".length());
-            if(!Objects.equals(clanChests.get(clan),e.getView().getTopInventory())||!clan.equals(clanOf(e.getWhoClicked().getUniqueId()))||!Objects.equals(clanChestUsers.get(clan),e.getWhoClicked().getUniqueId())){e.setCancelled(true);return;}
-            int level=Math.max(1,db.getInt(clanPath(clan)+".chest-level",1));
-            int unlocked=Math.max(1,Math.min(54,level==1?1:(level-1)*9));
-            if(e.getRawSlot()>=unlocked){e.setCancelled(true);if(e.getWhoClicked() instanceof Player p)msg(p,"Emplacement verrouillé. Utilise /clan chest upgrade.");}
-            return;
+        if(e.getView().getTopInventory().getHolder() instanceof ClanChestHolder holder){
+            boolean alreadyCancelled=e.isCancelled();e.setCancelled(true);
+            if(alreadyCancelled||!(e.getWhoClicked() instanceof Player p))return;
+            boolean left=e.getClick()==ClickType.LEFT;
+            boolean empty=e.getCursor()==null||e.getCursor().getType().isAir();
+            if(!AntiDuplication.allowedChestClick(validChest(p,holder),e.getView().getTopInventory()==holder.inventory,left,empty))return;
+            int raw=e.getRawSlot();if(raw<0||raw>=e.getView().countSlots())return;
+            Bukkit.getScheduler().runTask(plugin,()->transferChest(p,holder,raw));return;
         }
         if(title.equals("Larry | Succès")) {
             e.setCancelled(true);
@@ -1975,7 +1996,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             if(expected.isEmpty()){msg(p,"Cette question est expirée. Fais /quiz.");p.closeInventory();return;}
             if(selected.equalsIgnoreCase(expected)){
                 if(!Double.isFinite(core.balance(p.getUniqueId())+50)){msg(p,"Ton solde ne peut pas recevoir la récompense.");}
-                else {give(p,50);core.recordTransaction("QUIZ",new UUID(0L,0L),p.getUniqueId(),50);String scorePath="quiz-scores."+id(p);db.set(scorePath,db.getInt(scorePath,0)+1);msg(p,"Bonne réponse! +50 Larry. Score: "+db.getInt(scorePath)+" points.");}
+                else if(core.commitReward(p.getUniqueId(),"quiz."+id(p)+"."+db.getLong("quiz."+id(p)+".time"),50,"QUIZ")){String scorePath="quiz-scores."+id(p);db.set(scorePath,db.getInt(scorePath,0)+1);msg(p,"Bonne réponse! +50 Larry. Score: "+db.getInt(scorePath)+" points.");}
             } else msg(p,"Mauvaise réponse. La bonne réponse était: "+expected+".");
             db.set("quiz."+id(p)+".answer",null);save();p.closeInventory();
             return;
@@ -2011,43 +2032,18 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         }
     }
 
-    @EventHandler public void onClanChestDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
-        String title=e.getView().getTitle();
-        if(!title.startsWith("Coffre clan:"))return;
-        String clan=title.substring("Coffre clan:".length());
-        if(!Objects.equals(clanChests.get(clan),e.getView().getTopInventory())||!clan.equals(clanOf(e.getWhoClicked().getUniqueId()))||!Objects.equals(clanChestUsers.get(clan),e.getWhoClicked().getUniqueId())){e.setCancelled(true);return;}
-        int level=Math.max(1,db.getInt(clanPath(clan)+".chest-level",1));
-        int unlocked=Math.max(1,Math.min(54,level==1?1:(level-1)*9));
-        for(int rawSlot:e.getRawSlots()) {
-            if(rawSlot>=0 && rawSlot<e.getView().getTopInventory().getSize() && rawSlot>=unlocked) {
-                e.setCancelled(true);
-                if(e.getWhoClicked() instanceof Player p)msg(p,"Emplacement verrouillé. Utilise /clan chest upgrade.");
-                return;
-            }
-        }
+    @EventHandler(priority=EventPriority.HIGHEST) public void onClanChestDrag(InventoryDragEvent e){
+        if(e.getView().getTopInventory().getHolder() instanceof ClanChestHolder)e.setCancelled(true);
     }
-    @EventHandler public void onChestClose(org.bukkit.event.inventory.InventoryCloseEvent e) {
+    @EventHandler public void onChestClose(InventoryCloseEvent e){
         if(e.getView().getTitle().equals("Larry | Grades"))rankTargets.remove(e.getPlayer().getUniqueId());
-        String title=e.getView().getTitle();
-        if(!title.startsWith("Coffre clan:"))return;
-        String clan=title.substring("Coffre clan:".length());
-        if(!Objects.equals(clanChestUsers.get(clan),e.getPlayer().getUniqueId()))return;
-        ItemStack[] before=clanChestSnapshots.remove(clan),after=e.getInventory().getContents();
-        db.set(clanPath(clan)+".chest",Arrays.asList(after));
-        if(before!=null) {
-            List<String> audit=db.getStringList(clanPath(clan)+".chest-audit");
-            for(int slot=0;slot<after.length;slot++) {
-                ItemStack a=before[slot],b=after[slot];
-                if(Objects.equals(a,b))continue;
-                audit.add(System.currentTimeMillis()+"|"+e.getPlayer().getUniqueId()+"|slot="+slot+"|"+(a==null?"vide":a.serialize().toString())+" -> "+(b==null?"vide":b.serialize().toString()));
-            }
-            if(audit.size()>500)audit=new ArrayList<>(audit.subList(audit.size()-500,audit.size()));
-            db.set(clanPath(clan)+".chest-audit",audit);
+        if(e.getInventory().getHolder() instanceof ClanChestHolder holder&&clanChests.get(holder.clan)==holder.inventory){
+            clanChests.remove(holder.clan);clanChestUsers.remove(holder.clan,holder.viewer);
         }
-        clanChestUsers.remove(clan);save();
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) {
         UUID id=e.getPlayer().getUniqueId();
+        for(String clan:new ArrayList<>(clanChestUsers.keySet()))if(id.equals(clanChestUsers.get(clan))){clanChestUsers.remove(clan);clanChests.remove(clan);}
         saleSnapshots.remove(id);saleQuotes.remove(id);
         ahSlots.remove(id);ahPage.remove(id);ahSearch.remove(id);
         shopPage.remove(id);shopSearch.remove(id);shopCategory.remove(id);
