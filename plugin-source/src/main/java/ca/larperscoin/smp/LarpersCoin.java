@@ -43,6 +43,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -503,7 +504,9 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         return true;
                     }
                     String targetId = key(target.getUniqueId());
-                    double nextBounty = data.getDouble("bounties." + targetId) + amount;
+                    double previousBounty=bountyAmount(target.getUniqueId()), previousBalance=balance(player.getUniqueId());
+                    var previousHistory=data.getStringList("transactions");
+                    double nextBounty = previousBounty + amount;
                     if (!Double.isFinite(nextBounty)) {
                         reply(sender, "La prime totale dépasserait la limite numérique.");
                         return true;
@@ -513,8 +516,8 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         return true;
                     }
                     data.set("bounties." + targetId, nextBounty);
-                    saveData();
-                    recordTransaction("BOUNTY_PLACE", player.getUniqueId(), new UUID(0L,0L), amount);
+                    appendTransaction("BOUNTY_PLACE",player.getUniqueId(),new UUID(0L,0L),amount);
+                    if(!saveData()){data.set("bounties."+targetId,previousBounty);data.set("balances."+key(player.getUniqueId()),previousBalance);data.set("transactions",previousHistory);reply(sender,"Prime annulée : sauvegarde impossible.");return true;}
                     Bukkit.broadcastMessage(ChatColor.GOLD + "[Larry] " + player.getName() + " place une prime de " + format(amount) + " sur " + target.getName() + " !");
                     return true;
                 }
@@ -527,7 +530,9 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         reply(sender, "Usage : /eco <give|take|set> <joueur> <montant>");
                         return true;
                     }
-                    OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
+                    OfflinePlayer target = Bukkit.getOfflinePlayerIfCached(args[1]);
+                    if(target==null||(!target.hasPlayedBefore()&&!target.isOnline())){reply(sender,"Compte inconnu.");return true;}
+                    var previousHistory=data.getStringList("transactions");
                     Double amount = parseAmount(args[2]);
                     if(args[0].equalsIgnoreCase("set") && args[2].matches("0+(?:[.,]0+)?"))amount=0.0;
                     if (amount == null) {
@@ -556,13 +561,13 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                             return true;
                         }
                     }
-                    saveData();
                     if (recordedAmount > 0) {
                         String action = args[0].toUpperCase(Locale.ROOT);
                         if (action.equals("TAKE") || action.equals("SET") && amount < oldBalance)
-                            recordTransaction("ECO_" + action, target.getUniqueId(), systemAccount, recordedAmount);
-                        else recordTransaction("ECO_" + action, systemAccount, target.getUniqueId(), recordedAmount);
+                            appendTransaction("ECO_" + action, target.getUniqueId(), systemAccount, recordedAmount);
+                        else appendTransaction("ECO_" + action, systemAccount, target.getUniqueId(), recordedAmount);
                     }
+                    if(!saveData()){data.set("balances."+key(target.getUniqueId()),oldBalance);data.set("transactions",previousHistory);reply(sender,"Opération annulée : sauvegarde impossible.");return true;}
                     reply(sender, "Solde de " + args[1] + " : " + format(balance(target.getUniqueId())));
                     return true;
                 }
@@ -845,10 +850,11 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             getLogger().warning("Prime conservée: solde maximal atteint pour " + killer.getName());
             return;
         }
+        double previous=balance(killer.getUniqueId());var history=data.getStringList("transactions");
         data.set("bounties." + victimId, 0.0);
         credit(killer.getUniqueId(), bounty);
-        saveData();
-        recordTransaction("BOUNTY_WIN", new UUID(0L,0L), killer.getUniqueId(), bounty);
+        appendTransaction("BOUNTY_WIN",new UUID(0L,0L),killer.getUniqueId(),bounty);
+        if(!saveData()){data.set("bounties."+victimId,bounty);data.set("balances."+key(killer.getUniqueId()),previous);data.set("transactions",history);getLogger().warning("Prime non versée : sauvegarde impossible.");return;}
         Bukkit.broadcastMessage(ChatColor.GOLD + "[Larry] " + killer.getName() + " a récupéré la prime de " + format(bounty) + " sur " + event.getEntity().getName() + " !");
     }
 
