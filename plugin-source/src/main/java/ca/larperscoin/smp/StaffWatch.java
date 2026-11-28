@@ -13,6 +13,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 final class StaffWatch implements Listener, CommandExecutor {
     private final NamespacedKey key;
+    private final Set<UUID> recoveryWarnings=new HashSet<>();
     private final JavaPlugin plugin;
     private final LarpersFeatures features;
     private static final Set<String> WATCH_COMMANDS=Set.of("admin","rank","modo","tp","freeze","vanish","staffchat","ac","mute","unmute","ban","banip","ban-ip","kick","listban","banlist","pardon","pardon-ip");
@@ -71,7 +72,18 @@ final class StaffWatch implements Listener, CommandExecutor {
         for(int i=0;i<items.length;i++)
             if(items[i]!=null && !items[i].getType().isAir())
                 state.set("item."+i,Base64.getEncoder().encodeToString(items[i].serializeAsBytes()));
-        p.getPersistentDataContainer().set(key,PersistentDataType.STRING,state.saveToString());
+        String serialized=state.saveToString();
+        try {
+            var dir=plugin.getDataFolder().toPath().resolve("staff-recovery");
+            java.nio.file.Files.createDirectories(dir);
+            var backup=dir.resolve(p.getUniqueId()+".yml");
+            var tmp=java.nio.file.Files.createTempFile(dir,"snapshot-",".tmp");
+            try {
+                java.nio.file.Files.writeString(tmp,serialized);
+                java.nio.file.Files.move(tmp,backup,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } finally {java.nio.file.Files.deleteIfExists(tmp);}
+        } catch(java.io.IOException ex){p.sendMessage("Sauvegarde de sécurité impossible; mode annulé.");return true;}
+        p.getPersistentDataContainer().set(key,PersistentDataType.STRING,serialized);
         p.getInventory().clear();
         p.setGameMode(GameMode.SPECTATOR);
         features.setVanished(p,true);
@@ -90,7 +102,7 @@ final class StaffWatch implements Listener, CommandExecutor {
             "§2Observer§r\n\n/tp Alex te rapproche du joueur connecté.\n\n/vanish change ta visibilité dans le TAB des joueurs. Tu restes en spectateur.\n\n/staffchat <message> parle au staff.",
             "§2Immobiliser§r\n\n/freeze Alex bloque ses déplacements. Retape /freeze Alex pour le libérer.\n\nLibère le joueur à la fin de la vérification.",
             "§2Lire les alertes§r\n\n/ac alerts active ou coupe tes alertes.\n/ac info Alex montre son compteur.\n/ac log montre les alertes récentes.\n/ac top affiche le classement.\n/ac status affiche l’état.",
-            "§2Modérer le chat§r\n\n/mute Alex spam coupe son chat public. Il doit être connecté.\n/unmute Alex lui rend la parole, même hors ligne.\n/kick Alex <raison> le déconnecte du SMP.",
+            "§2Modérer le chat§r\n\n/mute Alex spam coupe son chat public. Exemple temporaire : /mute Alex 30m spam. Les admins peuvent sanctionner un compte hors ligne.\n/unmute Alex lui rend la parole, même hors ligne.\n/kick Alex <raison> le déconnecte du SMP.",
             "§2Bannir du SMP§r\n\n/ban Alex <raison> bannit le joueur.\n/pardon Alex le débannit.\n/listban players liste les bans de joueurs.",
             "§2Bannir une IP§r\n\n/banip Alex <raison> bannit son adresse. Plusieurs joueurs peuvent la partager.\n/listban ips liste ces bans.\n/pardon-ip <IP> retire le ban.",
             "§2Fin de service§r\n\nRetape /modo pour retrouver ta position et ton inventaire. La déconnexion lance aussi le retour.\n\nHors surveillance, /invsee Alex ouvre son inventaire.\n/modo help rouvre ce guide."
@@ -105,10 +117,26 @@ final class StaffWatch implements Listener, CommandExecutor {
         if(target==null || target==p) {p.sendMessage("Utilise /tp <joueur connecté>.");return;}
         if(p.teleport(target.getLocation())) p.sendMessage("Surveillance de "+target.getName()+".");
     }
+    private YamlConfiguration validateSnapshot(String raw,int size) throws Exception {
+        var state=new YamlConfiguration();
+        state.loadFromString(raw);
+        GameMode.valueOf(state.getString("mode"));
+        for(int i=0;i<size;i++){
+            String bytes=state.getString("item."+i);
+            if(bytes!=null)ItemStack.deserializeBytes(Base64.getDecoder().decode(bytes));
+        }
+        return state;
+    }
+    private YamlConfiguration readSnapshot(Player p) throws Exception {
+        try {return validateSnapshot(p.getPersistentDataContainer().get(key,PersistentDataType.STRING),p.getInventory().getSize());}
+        catch(Exception ex){
+            var backup=plugin.getDataFolder().toPath().resolve("staff-recovery").resolve(p.getUniqueId()+".yml");
+            return validateSnapshot(java.nio.file.Files.readString(backup),p.getInventory().getSize());
+        }
+    }
     private void restore(Player p) {
         try {
-            var state=new YamlConfiguration();
-            state.loadFromString(p.getPersistentDataContainer().get(key,PersistentDataType.STRING));
+            var state=readSnapshot(p);
             Location location=state.getLocation("position");
             GameMode mode=GameMode.valueOf(state.getString("mode"));
             ItemStack[] items=new ItemStack[p.getInventory().getSize()];
@@ -137,10 +165,13 @@ final class StaffWatch implements Listener, CommandExecutor {
             features.setVanished(p,state.getBoolean("hidden"));
             p.getPersistentDataContainer().remove(key);
             p.saveData();
+            recoveryWarnings.remove(p.getUniqueId());
             p.sendMessage("Retour à ta position. Inventaire restauré.");
         } catch(Exception ex) {
-            plugin.getLogger().warning("Retour modo de "+p.getName()+" : "+ex.getMessage());
-            p.sendMessage("Retour impossible. Contacte un admin pour vérifier ton point de retour.");
+            if(recoveryWarnings.add(p.getUniqueId())) {
+                plugin.getLogger().warning("Retour modo de "+p.getName()+" : "+ex.getMessage());
+                p.sendMessage("Retour impossible. Sauvegarde conservée dans staff-recovery; contacte un admin.");
+            }
         }
     }
     @EventHandler(priority=EventPriority.LOWEST,ignoreCancelled=true)
