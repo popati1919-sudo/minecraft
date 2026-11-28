@@ -237,6 +237,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         data.set("transactions",history);data.set("trade-commits."+tradeId,null);
         return false;
     }
+    boolean hasTradeCommit(String tradeId){return data.getBoolean("trade-commits."+tradeId,false);}
     void clearTradeCommit(String tradeId){
         data.set("trade-commits."+tradeId,null);saveData();
     }
