@@ -78,21 +78,48 @@ public final class SecureTradeManager implements Listener {
     private void returnItems(Player p,Offer offer) {
         for(ItemStack item:offer.items) {
             Map<Integer,ItemStack> left=p.getInventory().addItem(item.clone());
-            for(ItemStack rest:left.values()) p.getWorld().dropItemNaturally(p.getLocation(),rest);
+            for(ItemStack rest:left.values()) {
+                var dropped=p.getWorld().dropItemNaturally(p.getLocation(),rest);
+                dropped.setOwner(p.getUniqueId());
+            }
         }
         offer.items.clear();
+    }
+    private void storeReturns(UUID id,Offer offer){
+        if(offer.items.isEmpty())return;
+        var dir=plugin.getDataFolder().toPath().resolve("trade-returns");
+        try {
+            java.nio.file.Files.createDirectories(dir);
+            var file=dir.resolve(id+".yml");
+            var y=new org.bukkit.configuration.file.YamlConfiguration();
+            if(java.nio.file.Files.exists(file))y.load(file.toFile());
+            var items=new ArrayList<ItemStack>();
+            var prior=y.getList("items",List.of());
+            for(Object entry:prior)if(entry instanceof ItemStack item)items.add(item);
+            for(ItemStack item:offer.items)items.add(item.clone());
+            y.set("items",items);
+            var tmp=java.nio.file.Files.createTempFile(dir,"return-",".tmp");
+            try{y.save(tmp.toFile());try{java.nio.file.Files.move(tmp,file,java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}catch(java.nio.file.AtomicMoveNotSupportedException ex){java.nio.file.Files.move(tmp,file,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}}finally{java.nio.file.Files.deleteIfExists(tmp);}
+            offer.items.clear();
+        }catch(Exception ex){plugin.getLogger().severe("Objets à restituer manuellement pour "+id+": "+offer.items+" ("+ex.getMessage()+")");}
     }
     private void closeViews(Session s) {
         for(UUID id:List.of(s.first,s.second)) {
             Player p=Bukkit.getPlayer(id);
-            if(p!=null && (tradeView(p.getOpenInventory()) || moneyInput.contains(id))) p.closeInventory();
+            if(p!=null && (tradeView(p.getOpenInventory()) || moneyInput.contains(id))) {
+                if(moneyInput.remove(id))p.getOpenInventory().getTopInventory().clear();
+                p.closeInventory();
+            }
+            moneyInput.remove(id);
         }
     }
     private void cancel(Session s,String reason) {
         clear(s);
         Player a=Bukkit.getPlayer(s.first), b=Bukkit.getPlayer(s.second);
         if(a!=null) returnItems(a,s.a);
+        else storeReturns(s.first,s.a);
         if(b!=null) returnItems(b,s.b);
+        else storeReturns(s.second,s.b);
         closeViews(s);
         if(a!=null) msg(a,"Échange annulé : "+reason+". Tes objets t'ont été rendus.");
         if(b!=null) msg(b,"Échange annulé : "+reason+". Tes objets t'ont été rendus.");
@@ -222,6 +249,7 @@ public final class SecureTradeManager implements Listener {
                 msg(player,"Montant invalide ou solde Larry insuffisant.");
                 return;
             }
+            e.getView().getTopInventory().clear();
             moneyInput.remove(player.getUniqueId());
             opening.add(player.getUniqueId());
             player.closeInventory();
@@ -322,8 +350,8 @@ public final class SecureTradeManager implements Listener {
         if(s.a.money>0)economy.recordTransaction("TRADE",a.getUniqueId(),b.getUniqueId(),s.a.money);
         if(s.b.money>0)economy.recordTransaction("TRADE",b.getUniqueId(),a.getUniqueId(),s.b.money);
         clear(s);
-        for(ItemStack item:s.a.items)b.getInventory().addItem(item.clone());
-        for(ItemStack item:s.b.items)a.getInventory().addItem(item.clone());
+        for(ItemStack item:s.a.items)for(ItemStack rest:b.getInventory().addItem(item.clone()).values()){var dropped=b.getWorld().dropItemNaturally(b.getLocation(),rest);dropped.setOwner(b.getUniqueId());}
+        for(ItemStack item:s.b.items)for(ItemStack rest:a.getInventory().addItem(item.clone()).values()){var dropped=a.getWorld().dropItemNaturally(a.getLocation(),rest);dropped.setOwner(a.getUniqueId());}
         s.a.items.clear();s.b.items.clear();
         closeViews(s);
         msg(a,"Échange terminé avec "+b.getName()+". Argent reçu : "+s.b.money+" Larry, envoyé : "+s.a.money+" Larry.");
@@ -333,7 +361,8 @@ public final class SecureTradeManager implements Listener {
     }
     @EventHandler public void onClose(InventoryCloseEvent e) {
         UUID closedId=e.getPlayer().getUniqueId();
-        if(e.getView().getTitle().equals(MONEY_TITLE) && moneyInput.remove(closedId)) {
+        if(e.getView() instanceof AnvilView && moneyInput.remove(closedId)) {
+            e.getView().getTopInventory().clear();
             Bukkit.getScheduler().runTask(plugin,()->{
                 Session active=session(closedId);
                 Player player=Bukkit.getPlayer(closedId);
