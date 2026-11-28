@@ -152,6 +152,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     }
 
     void saveData() {
+        if(dataFile==null||data==null)return;
         Path target=dataFile.toPath();
         Path temporary=target.resolveSibling(target.getFileName()+".tmp");
         try {
@@ -204,7 +205,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     }
 
     boolean debit(UUID uuid, double amount) {
-        if (!Double.isFinite(amount) || amount <= 0.0 || balance(uuid) + 1.0e-9 < amount) return false;
+        if (!Double.isFinite(amount) || amount <= 0.0 || balance(uuid) < amount) return false;
         data.set("balances." + key(uuid), Math.max(0.0,balance(uuid) - amount));
         return true;
     }
@@ -248,7 +249,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private Double parseAmount(String raw) {
         try {
             double value = Double.parseDouble(raw.replace(',', '.'));
-            return Double.isFinite(value) && value > 0.0 ? value : null;
+            return Double.isFinite(value) && value >=0.0001 && java.math.BigDecimal.valueOf(value).stripTrailingZeros().scale()<=4 ? value : null;
         } catch (NumberFormatException ex) {
             return null;
         }
@@ -369,7 +370,8 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                         return true;
                     }
                     List<String> ids = new ArrayList<>(section.getKeys(false));
-                    ids.sort(Comparator.comparingDouble((String id) -> data.getDouble("balances." + id)).reversed());
+                    ids.removeIf(id->{try{return balance(UUID.fromString(id))<=0;}catch(IllegalArgumentException ex){return true;}});
+                    ids.sort(Comparator.comparingDouble((String id) -> balance(UUID.fromString(id))).reversed());
                     reply(sender, "§6--- Classement des fortunes Larry ---");
                     int rank = 1;
                     for (String id : ids) {
@@ -425,6 +427,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     }
                     OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
                     Double amount = parseAmount(args[2]);
+                    if(args[0].equalsIgnoreCase("set") && args[2].matches("0+(?:[.,]0+)?"))amount=0.0;
                     if (amount == null) {
                         reply(sender, "Montant invalide.");
                         return true;
@@ -467,9 +470,10 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     }
                     if(args[0].equalsIgnoreCase("buy")) {
                         Player player=requirePlayer(sender);if(player==null)return true;
-                        if(!lotteryActive()){reply(sender,"Aucune loterie en cours. Attends l'annonce d'un administrateur.");return true;}
+                        if(!lotteryActive()||System.currentTimeMillis()>=lotteryEndsAt()){reply(sender,"Aucune loterie ouverte. Attends le prochain tirage.");return true;}
                         int count=args.length>=2?Integer.parseInt(args[1]):1;
                         if(count<1||count>1000){reply(sender,"Choisis entre 1 et 1 000 tickets.");return true;}
+                        if(lotteryTicketCount()>100000-count){reply(sender,"Limite totale de tickets atteinte.");return true;}
                         double cost=count*50.0,nextPot=lotteryPot()+cost;
                         if(!Double.isFinite(nextPot)){reply(sender,"Le jackpot dépasserait la limite numérique.");return true;}
                         if(!debit(player.getUniqueId(),cost)){reply(sender,"Fonds insuffisants : "+format(cost)+".");return true;}
@@ -561,7 +565,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private void startLottery(int minutes,String starter) {
         long end=System.currentTimeMillis()+minutes*60_000L;
         data.set("lottery.active",true);data.set("lottery.ends-at",end);saveData();
-        Bukkit.broadcastMessage(ChatColor.LIGHT_PURPLE+"§l✦ LOTERIE LARPERS COIN ✦");
+        Bukkit.broadcastMessage(ChatColor.LIGHT_PURPLE+"§l✦ LOTERIE LARRY SMP ✦");
         Bukkit.broadcastMessage(ChatColor.YELLOW+"Une nouvelle loterie vient de commencer!");
         Bukkit.broadcastMessage(ChatColor.GREEN+"Ticket: 50 Larry | Durée: "+minutes+" minute(s) | Jackpot: "+format(lotteryPot()));
         Bukkit.broadcastMessage(ChatColor.AQUA+"Ouvre /lottery pour acheter tes tickets!");
@@ -571,9 +575,9 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private void finishLottery(boolean automatic) {
         if(!lotteryActive())return;
         if(lotteryTimer!=null){lotteryTimer.cancel();lotteryTimer=null;}
-        data.set("lottery.active",false);data.set("lottery.ends-at",0L);saveData();
         List<String> tickets=data.getStringList("lottery.tickets");
         if(tickets.isEmpty()) {
+            data.set("lottery.active",false);data.set("lottery.ends-at",0L);saveData();
             Bukkit.broadcastMessage(ChatColor.LIGHT_PURPLE+"[LOTERIE] Fin du tirage: aucun ticket vendu. Le jackpot est conservé.");
             return;
         }
@@ -606,6 +610,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR)
     public void onAnticheatJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        if (!Bukkit.getPluginManager().isPluginEnabled("GrimAC"))return;
         if (player.getName().startsWith("+")) {
             applyGrimPermission(player, "grim.exempt", 0, true);
         } else if (getConfig().getBoolean("anticheat.education-no-setback", true)) {
@@ -641,8 +646,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
             return;
         }
         try {
-            var attachment = player.addAttachment(this);
-            attachment.setPermission(permission, true);
+            if(!player.hasPermission(permission)){var attachment = player.addAttachment(this);attachment.setPermission(permission, true);}
             GrimAbstractAPI api = GrimAPIProvider.get();
             GrimUser grimUser = api.getGrimUser(player.getUniqueId());
             if (grimUser == null) {
@@ -704,6 +708,8 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private void drawLottery() {
         List<String> tickets = data.getStringList("lottery.tickets");
         if (tickets.isEmpty()) return;
+        tickets.removeIf(id->{try{UUID.fromString(id);return false;}catch(IllegalArgumentException ex){return true;}});
+        if(tickets.isEmpty()){getLogger().severe("Tirage suspendu: aucun ticket valide. Données conservées.");return;}
         String winnerId = tickets.get(ThreadLocalRandom.current().nextInt(tickets.size()));
         double jackpot = data.getDouble("lottery.pot", 0.0);
         UUID winnerUuid = UUID.fromString(winnerId);
@@ -714,6 +720,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         credit(winnerUuid, jackpot);
         data.set("lottery.tickets", new ArrayList<String>());
         data.set("lottery.pot", 0.0);
+        data.set("lottery.active",false);data.set("lottery.ends-at",0L);
         saveData();
         recordTransaction("LOTTERY_WIN", new UUID(0L,0L), winnerUuid, jackpot);
         OfflinePlayer winner = Bukkit.getOfflinePlayer(UUID.fromString(winnerId));
@@ -723,7 +730,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event) {
         Player killer = event.getEntity().getKiller();
-        if (killer == null) return;
+        if (killer == null || killer.getUniqueId().equals(event.getEntity().getUniqueId())) return;
         String victimId = key(event.getEntity().getUniqueId());
         double bounty = data.getDouble("bounties." + victimId, 0.0);
         if (!Double.isFinite(bounty) || bounty <= 0.0) return;
