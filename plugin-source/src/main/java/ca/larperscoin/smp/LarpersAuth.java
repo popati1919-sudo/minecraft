@@ -160,6 +160,7 @@ final class LarpersAuth implements Listener {
                     && accountsReadable && player.getAddress()!=null && player.getAddress().getAddress()!=null
                     && accounts.getLong(path+".ip-expires",0)>System.currentTimeMillis()
                     && accounts.contains(path + ".hash") && accounts.contains(path + ".ip-hash")
+                    && player.getUniqueId().toString().equals(accounts.getString(path+".uuid",""))
                     && MessageDigest.isEqual(accounts.getString(path + ".ip-hash", "").getBytes(java.nio.charset.StandardCharsets.US_ASCII),
                     ipHash(player).getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {
                 markAuthenticated(player);
@@ -195,98 +196,65 @@ final class LarpersAuth implements Listener {
         return authenticated.getOrDefault(player.getUniqueId(), false);
     }
 
-    boolean command(Player player, String label, String[] args) {
+    private final java.util.Set<UUID> hashing=ConcurrentHashMap.newKeySet();
+    boolean command(Player player,String label,String[] args){
+        boolean register=label.equalsIgnoreCase("register");
+        if(!register&&!label.equalsIgnoreCase("login"))return false;
+        if(args.length!=1){player.sendMessage("Usage : /"+label+" <motdepasse>");return true;}
+        if(isAuthenticated(player)){player.sendMessage("Tu es déjà connecté.");return true;}
+        if(args[0].length()<8||args[0].length()>64){player.sendMessage("Mot de passe : 8 à 64 caractères.");return true;}
+        UUID id=player.getUniqueId();
+        if(lockedUntil.getOrDefault(id,0L)>System.currentTimeMillis()){player.sendMessage("Trop d'essais. Réessaie plus tard.");return true;}
         reloadAccounts();
-        if(!accountsReadable){player.sendMessage(ChatColor.RED+"Authentification indisponible. Contacte un administrateur.");return true;}
-        if (label.equalsIgnoreCase("register")) {
-            if (args.length != 1) {
-                player.sendMessage(ChatColor.YELLOW + "Usage : /register <motdepasse>");
-                return true;
-            }
-            if (isAuthenticated(player)) {
-                player.sendMessage(ChatColor.GREEN + "Tu es déjà connecté.");
-                return true;
-            }
-            String path = accountPath(player.getName());
-            if (accounts.contains(path + ".hash")) {
-                player.sendMessage(ChatColor.RED + "Ce pseudo possède déjà un compte. Utilise /login.");
-                return true;
-            }
-                        if (args[0].length() < 8 || args[0].length() > 64) {
-                player.sendMessage(ChatColor.RED + "Le mot de passe doit contenir entre 8 et 64 caractères.");
-                return true;
-            }
-            try {
-                byte[] salt = new byte[16];
-                random.nextBytes(salt);
-                accounts.set(path + ".salt", Base64.getEncoder().encodeToString(salt));
-                accounts.set(path + ".hash", hash(args[0].toCharArray(), salt));
-                accounts.set(path + ".iterations", ITERATIONS);
-                accounts.set(path + ".name", player.getName());
-                accounts.set("revoked." + player.getName().toLowerCase(Locale.ROOT), null);
-                rememberIp(player, path);
-                if(!save()){player.sendMessage(ChatColor.RED+"Compte non sauvegardé; réessaie plus tard.");return true;}
-                markAuthenticated(player);
-                player.sendMessage(ChatColor.GREEN + "Compte créé. Bienvenue sur Larry SMP !");
-            } catch (GeneralSecurityException ex) {
-                plugin.getLogger().severe("Erreur de hachage du mot de passe: " + ex.getMessage());
-                player.sendMessage(ChatColor.RED + "Erreur interne. Réessaie plus tard.");
-            }
-            return true;
-        }
-        if (label.equalsIgnoreCase("login")) {
-            if (args.length != 1) {
-                player.sendMessage(ChatColor.YELLOW + "Usage : /login <motdepasse>");
-                return true;
-            }
-            if (isAuthenticated(player)) {
-                player.sendMessage(ChatColor.GREEN + "Tu es déjà connecté.");
-                return true;
-            }
-            if(args[0].length()<8 || args[0].length()>64){player.sendMessage(ChatColor.RED+"Mot de passe invalide (8 à 64 caractères).");return true;}
-            long lock = lockedUntil.getOrDefault(player.getUniqueId(), 0L);
-            if (System.currentTimeMillis() < lock) {
-                long seconds = Math.max(1, (lock - System.currentTimeMillis()) / 1000);
-                player.sendMessage(ChatColor.RED + "Trop d'essais. Réessaie dans " + seconds + " secondes.");
-                return true;
-            }
-            String path = accountPath(player.getName());
-            if (!accounts.contains(path + ".hash")) {
-                player.sendMessage(ChatColor.RED + "Aucun compte trouvé. Utilise /register <motdepasse>.");
-                return true;
-            }
-            try {
-                byte[] salt = Base64.getDecoder().decode(accounts.getString(path + ".salt", ""));
-                String expected = accounts.getString(path + ".hash", "");
-                int iterations = accounts.getInt(path + ".iterations", ITERATIONS);
-                if(iterations<100_000 || iterations>1_000_000 || salt.length<16 || salt.length>64)throw new IllegalArgumentException("Paramètres du compte invalides");
-                String actual = hash(args[0].toCharArray(), salt, iterations);
-                if (MessageDigest.isEqual(expected.getBytes(java.nio.charset.StandardCharsets.US_ASCII),
-                        actual.getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {
-                    attempts.remove(player.getUniqueId());
-                    lockedUntil.remove(player.getUniqueId());
-                    rememberIp(player, path);
-                    if(!save()){player.sendMessage(ChatColor.RED+"Sauvegarde indisponible; réessaie plus tard.");return true;}
-                    markAuthenticated(player);
-                    player.sendMessage(ChatColor.GREEN + "Connexion réussie. Bon jeu !");
-                } else {
-                    attemptExpiry.put(player.getUniqueId(),System.currentTimeMillis()+LOCK_MILLIS);
-                    int count = attempts.merge(player.getUniqueId(), 1, Integer::sum);
-                    if (count >= MAX_ATTEMPTS) {
-                        lockedUntil.put(player.getUniqueId(), System.currentTimeMillis() + LOCK_MILLIS);
-                        attempts.remove(player.getUniqueId());
-                        player.kickPlayer(ChatColor.RED + "Trop de mots de passe incorrects. Réessaie dans 15 minutes.");
-                    } else {
-                        player.sendMessage(ChatColor.RED + "Mot de passe incorrect (" + count + "/" + MAX_ATTEMPTS + ").");
-                    }
+        if(!accountsReadable){player.sendMessage("Authentification indisponible.");return true;}
+        String path=accountPath(player.getName());
+        String expected=accounts.getString(path+".hash","");
+        String owner=accounts.getString(path+".uuid","");
+        if(!owner.isEmpty()&&!owner.equals(id.toString())){player.sendMessage("Compte associé à un autre UUID. Contacte un admin.");return true;}
+        if(register&&!expected.isEmpty()){player.sendMessage("Compte existant. Utilise /login.");return true;}
+        if(!register&&expected.isEmpty()){player.sendMessage("Aucun compte. Utilise /register.");return true;}
+        final byte[] salt;
+        final int iterations;
+        try{
+            if(register){salt=new byte[16];random.nextBytes(salt);iterations=ITERATIONS;}
+            else{salt=Base64.getDecoder().decode(accounts.getString(path+".salt",""));iterations=accounts.getInt(path+".iterations",ITERATIONS);}
+            if(iterations<100000||iterations>1000000||salt.length<16||salt.length>64)throw new IllegalArgumentException();
+        }catch(IllegalArgumentException ex){player.sendMessage("Compte invalide. Contacte un admin.");return true;}
+        if(hashing.size()>=8||!hashing.add(id)){player.sendMessage("Vérification déjà en cours ou serveur occupé.");return true;}
+        char[] password=args[0].toCharArray();
+        long joined=sessionJoinedAt.getOrDefault(id,0L);
+        long revoked=accounts.getLong("revoked."+player.getName().toLowerCase(Locale.ROOT),0L);
+        player.sendMessage("Vérification en cours...");
+        Bukkit.getScheduler().runTaskAsynchronously(plugin,()->{
+            String calculated=null;
+            try{calculated=hash(password,salt,iterations);}
+            catch(GeneralSecurityException|RuntimeException ex){plugin.getLogger().warning("Calcul de mot de passe impossible.");}
+            finally{java.util.Arrays.fill(password,'\0');}
+            final String actual=calculated;
+            Bukkit.getScheduler().runTask(plugin,()->{
+                hashing.remove(id);
+                if(!player.isOnline()||sessionJoinedAt.getOrDefault(id,0L)!=joined||isAuthenticated(player))return;
+                reloadAccounts();
+                if(actual==null||!accountsReadable||!expected.equals(accounts.getString(path+".hash",""))||!owner.equals(accounts.getString(path+".uuid",""))||revoked!=accounts.getLong("revoked."+player.getName().toLowerCase(Locale.ROOT),0L)){
+                    player.sendMessage("Le compte a changé ou est indisponible. Réessaie.");return;
                 }
-            } catch (GeneralSecurityException | IllegalArgumentException ex) {
-                plugin.getLogger().warning("Impossible de vérifier le compte " + player.getName());
-                player.sendMessage(ChatColor.RED + "Erreur de vérification du compte.");
-            }
-            return true;
-        }
-        return false;
+                if(!register&&!MessageDigest.isEqual(expected.getBytes(java.nio.charset.StandardCharsets.US_ASCII),actual.getBytes(java.nio.charset.StandardCharsets.US_ASCII))){
+                    attemptExpiry.put(id,System.currentTimeMillis()+LOCK_MILLIS);
+                    int count=attempts.merge(id,1,Integer::sum);
+                    if(count>=MAX_ATTEMPTS){lockedUntil.put(id,System.currentTimeMillis()+LOCK_MILLIS);attempts.remove(id);player.kickPlayer("Trop de mots de passe incorrects. Réessaie dans 15 minutes.");}
+                    else player.sendMessage("Mot de passe incorrect ("+count+"/"+MAX_ATTEMPTS+").");
+                    return;
+                }
+                if(register){accounts.set(path+".salt",Base64.getEncoder().encodeToString(salt));accounts.set(path+".hash",actual);accounts.set(path+".iterations",iterations);}
+                accounts.set(path+".uuid",id.toString());accounts.set(path+".name",player.getName());
+                accounts.set("revoked."+player.getName().toLowerCase(Locale.ROOT),null);
+                rememberIp(player,path);
+                if(!save()){player.sendMessage("Sauvegarde impossible. Réessaie.");return;}
+                attempts.remove(id);lockedUntil.remove(id);attemptExpiry.remove(id);
+                markAuthenticated(player);player.sendMessage(register?"Compte créé. Bienvenue sur Larry SMP !":"Connexion réussie. Bon jeu !");
+            });
+        });
+        return true;
     }
 
     private void markAuthenticated(Player player) {
