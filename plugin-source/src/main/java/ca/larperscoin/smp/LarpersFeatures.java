@@ -1171,12 +1171,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             boolean isWeekly=weekly;
             String period=isWeekly?weeklyQuestKey():dailyQuestKey();
             String claimPath="quest-claims."+(isWeekly?"weekly":"daily")+"."+period+"."+id(p);
-            if(db.getBoolean(claimPath,false)){msg(p,"Cette récompense a déjà été réclamée pour cette période.");return true;}
+            String ledgerClaim=claimPath.substring("quest-claims.".length());
+            if(db.getBoolean(claimPath,false)||core.hasQuestClaim(ledgerClaim)){msg(p,"Cette récompense a déjà été réclamée pour cette période.");return true;}
             if(!questReady(p,isWeekly)){msg(p,"Objectifs incomplets. Fais /quests pour voir ta progression.");return true;}
             double reward=isWeekly?400.0:100.0;
             if(!Double.isFinite(core.balance(p.getUniqueId())+reward)){msg(p,"Ton solde ne peut pas recevoir cette récompense.");return true;}
-            db.set(claimPath,true);
-            give(p,reward);core.recordTransaction(isWeekly?"QUEST_WEEKLY":"QUEST_DAILY",new UUID(0L,0L),p.getUniqueId(),reward);save();
+            if(!core.commitQuestClaim(p.getUniqueId(),ledgerClaim,reward,isWeekly)){msg(p,"Récompense non versée : sauvegarde impossible ou déjà réclamée.");return true;}
+            db.set(claimPath,true);save();
             msg(p,"Quête "+(isWeekly?"hebdomadaire":"quotidienne")+" terminée : +"+reward+" Larry.");
             return true;
         }
