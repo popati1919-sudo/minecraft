@@ -185,7 +185,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             &&Objects.equals(clanChestUsers.get(holder.clan),p.getUniqueId())&&clanChests.get(holder.clan)==holder.inventory;
     }
     private void transferChest(Player p,ClanChestHolder holder,int raw){
-        if(!validChest(p,holder)||!p.isOnline()||p.isDead()||watch.active(p))return;
+        if(!validChest(p,holder)||!core.isEconomyPlayer(p)||watch.active(p))return;
         if(p.getOpenInventory().getTopInventory()!=holder.inventory||!p.getItemOnCursor().getType().isAir())return;
         String clan=holder.clan,chestId=clanBankId(clan);
         ItemStack[] before=core.chestItems(chestId),after=Arrays.stream(before).map(x->x==null?null:x.clone()).toArray(ItemStack[]::new);
@@ -443,7 +443,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     private static boolean forbiddenCommerce(Material m){return SHOP_BLOCKED.contains(m)||SHOP_BLOCKED_NAMES.contains(m.name())||m.name().contains("NETHERITE")||m.name().endsWith("_SPAWN_EGG");}
     private void createAuction(Player p,double price) {
-        if(!auctionsReady){msg(p,"Hôtel des ventes indisponible.");return;}
+        if(!auctionsReady||!core.isEconomyPlayer(p)){msg(p,"Hôtel des ventes indisponible.");return;}
         ItemStack hand=p.getInventory().getItemInMainHand();
         if(!Double.isFinite(price)||price<=0||hand.getType().isAir()||java.math.BigDecimal.valueOf(price).stripTrailingZeros().scale()>4){msg(p,"Prix ou objet invalide.");return;}
         if(forbiddenCommerce(hand.getType())){msg(p,"Objet interdit à la vente.");return;}
@@ -814,6 +814,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         return "quests."+(weekly?"weekly."+weeklyQuestKey():"daily."+dailyQuestKey())+"."+id(p)+"."+objective;
     }
     private void progressQuest(Player p, String objective) {
+        if(!core.isEconomyPlayer(p))return;
         db.set(questPath(false,p,objective),db.getInt(questPath(false,p,objective),0)+1);
         db.set(questPath(true,p,objective),db.getInt(questPath(true,p,objective),0)+1);
         addClanXp(p,1);
@@ -825,6 +826,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         return Math.max(0L,db.getLong(achievementPath(p)+".stats."+stat,0L));
     }
     private void addAchievementProgress(Player p,String stat,long amount) {
+        if(!core.isEconomyPlayer(p))return;
         String path=achievementPath(p)+".stats."+stat;
         db.set(path,Math.max(0L,db.getLong(path,0L)+amount));
         checkAchievements(p);
@@ -834,7 +836,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         return db.getBoolean(achievementPath(p)+".claimed."+key,false)||core.rewardClaimed("achievement."+id(p)+"."+key);
     }
     private void unlockAchievement(Player p,String key,String label,String tier,double money,Material rewardMaterial,int rewardAmount) {
-        if(achievementClaimed(p,key)) return;
+        if(!core.isEconomyPlayer(p)||achievementClaimed(p,key)) return;
         String rewardText="";
         if(money>0 && Double.isFinite(core.balance(p.getUniqueId())+money)) {
             if(!core.commitReward(p.getUniqueId(),"achievement."+id(p)+"."+key,money,"ACHIEVEMENT_"+key.toUpperCase(Locale.ROOT)))return;
@@ -1388,11 +1390,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             saveSoon();
         }
     }
-    @EventHandler public void onItemPickup(EntityPickupItemEvent e) {
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void onItemPickup(EntityPickupItemEvent e) {
         if(e.getEntity() instanceof Player p)
             Bukkit.getScheduler().runTask(plugin,()->recordCollection(p));
     }
-    @EventHandler public void onItemCraft(CraftItemEvent e) {
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=true) public void onItemCraft(CraftItemEvent e) {
         if(e.getWhoClicked() instanceof Player p)
             Bukkit.getScheduler().runTask(plugin,()->recordCollection(p));
     }
@@ -1679,6 +1681,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private boolean auction(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
         if(!auctionsReady){msg(p,"Hôtel des ventes indisponible.");return true;}
+        if(!core.isEconomyPlayer(p)){msg(p,"Commerce réservé aux joueurs authentifiés en survie.");return true;}
         if(a.length==0||a[0].equalsIgnoreCase("list")) { openAuction(p,0);return true; }
         if(a[0].equalsIgnoreCase("search")) {
             if(a.length<2){msg(p,"Usage: /ah search <objet|vendeur> ou /ah search clear");return true;}
@@ -1738,6 +1741,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             int raw=e.getRawSlot();if(raw<0||raw>=e.getView().countSlots())return;
             Bukkit.getScheduler().runTask(plugin,()->transferChest(p,holder,raw));return;
         }
+        if(e.isCancelled())return;
         if(title.equals("Larry | Succès")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player viewer)) return;
