@@ -112,7 +112,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         plugin.getLogger().info("Modules clans, quêtes, classements, commerce entre joueurs et modération chargés.");
     }
 
-    private void save() {
+    private boolean save() {
         for(var entry:clanChests.entrySet())db.set(clanPath(entry.getKey())+".chest",Arrays.asList(entry.getValue().getContents()));
         Path target=file.toPath(),temporary=target.resolveSibling(target.getFileName()+".tmp");
         try {
@@ -124,9 +124,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             }
             try { Files.move(temporary,target,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING); }
             catch(AtomicMoveNotSupportedException ex) { Files.move(temporary,target,StandardCopyOption.REPLACE_EXISTING); }
+            return true;
         } catch(IOException ex) {
             plugin.getLogger().severe("Échec de sauvegarde atomique de features.yml: "+ex.getMessage());
             try { Files.deleteIfExists(temporary); } catch(IOException ignored) { }
+            return false;
         }
     }
     private void seedQuizQuestion(String key,String question,String answer,List<String> choices) {
@@ -389,7 +391,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         db.set(path+".seller",p.getName());db.set(path+".sellerId",id(p));
         db.set(path+".item",hand.getType().name());db.set(path+".amount",hand.getAmount());
         db.set(path+".price",price);db.set(path+".stack",hand.clone());db.set(path+".created",System.currentTimeMillis());
-        p.getInventory().setItemInMainHand(null);save();msg(p,"Annonce créée pour "+price+" Larry. Après taxe : "+formatShopPrice(saleNet(price))+" Larry.");
+        if(!save()){db.set(path,null);msg(p,"Annonce annulée : sauvegarde impossible.");return;}
+        p.getInventory().setItemInMainHand(null);p.saveData();msg(p,"Annonce créée pour "+price+" Larry. Après taxe : "+formatShopPrice(saleNet(price))+" Larry.");
         openAuction(p,0);
     }
     private void openOpConfirm(Player p,Player target) {
@@ -1614,8 +1617,10 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         return cents/100.0;
     }
     private void openSellMenu(Player p){Inventory inv=Bukkit.createInventory(null,54,"Larry | Vendre");int shown=0;for(int slot=0;slot<36;slot++){ItemStack stack=p.getInventory().getItem(slot);if(!isSellable(stack))continue;ItemStack display=stack.clone();ItemMeta meta=display.getItemMeta();if(meta!=null){List<String> lore=meta.hasLore()?new ArrayList<>(meta.getLore()):new ArrayList<>();String k=stack.getType().name().toLowerCase(Locale.ROOT);lore.add(ChatColor.GRAY+"Quantité: "+stack.getAmount());lore.add(ChatColor.GOLD+"Net après taxe: "+formatShopPrice(shopProceeds(k,stack.getAmount()))+" Larry");lore.add(ChatColor.YELLOW+"Clique pour vendre cette pile");meta.setLore(lore);display.setItemMeta(meta);}inv.setItem(slot,display);shown++;}inv.setItem(45,item(Material.GOLD_INGOT,"Vendre tout","Net après taxe: "+formatShopPrice(sellAllValue(p))+" Larry","Une confirmation sera demandée"));inv.setItem(49,item(Material.BARRIER,"Fermer"));inv.setItem(53,item(Material.SUNFLOWER,"Actualiser",shown+" pile(s) vendable(s)"));p.openInventory(inv);}
-    private void openSellAllConfirmation(Player p){double total=sellAllValue(p);Inventory inv=Bukkit.createInventory(null,27,"Larry | Confirmer vente totale");inv.setItem(11,item(Material.LIME_CONCRETE,"CONFIRMER","Vendre tous les objets admissibles","Net après taxe: "+total+" Larry","Cette action est irréversible"));inv.setItem(15,item(Material.RED_CONCRETE,"ANNULER","Ne rien vendre"));inv.setItem(13,item(Material.GOLD_INGOT,"Résumé","Net après taxe: "+total+" Larry","Les objets renommés/enchantés et interdits sont ignorés"));p.openInventory(inv);}
-    private void executeSellAll(Player p){int sold=0;double total=0;for(int slot=0;slot<36;slot++){ItemStack stack=p.getInventory().getItem(slot);if(!isSellable(stack))continue;int amount=stack.getAmount();String key=stack.getType().name().toLowerCase(Locale.ROOT);double value=shopProceeds(key,amount);if(value<=0||!Double.isFinite(core.balance(p.getUniqueId())+total+value))continue;if(sellStack(p,slot,amount)){sold+=amount;total+=value;}}msg(p,"Vente totale terminée: "+sold+" objet(s) pour "+formatShopPrice(Math.round(total*10000)/10000.0)+" Larry.");openSellMenu(p);}
+    private final Map<UUID,ItemStack[]> saleSnapshots=new HashMap<>();
+    private final Map<UUID,Double> saleQuotes=new HashMap<>();
+    private void openSellAllConfirmation(Player p){double total=sellAllValue(p);saleSnapshots.put(p.getUniqueId(),Arrays.stream(p.getInventory().getStorageContents()).map(x->x==null?null:x.clone()).toArray(ItemStack[]::new));saleQuotes.put(p.getUniqueId(),total);Inventory inv=Bukkit.createInventory(null,27,"Larry | Confirmer vente totale");inv.setItem(11,item(Material.LIME_CONCRETE,"CONFIRMER","Vendre tous les objets admissibles","Net après taxe: "+total+" Larry","Cette action est irréversible"));inv.setItem(15,item(Material.RED_CONCRETE,"ANNULER","Ne rien vendre"));inv.setItem(13,item(Material.GOLD_INGOT,"Résumé","Net après taxe: "+total+" Larry","Les objets renommés/enchantés et interdits sont ignorés"));p.openInventory(inv);}
+    private void executeSellAll(Player p){ItemStack[] expected=saleSnapshots.remove(p.getUniqueId());Double quote=saleQuotes.remove(p.getUniqueId());if(expected==null||quote==null||!Arrays.equals(expected,p.getInventory().getStorageContents())||Double.compare(quote,sellAllValue(p))!=0){msg(p,"Inventaire ou prix modifié. Confirme à nouveau.");openSellAllConfirmation(p);return;}int sold=0;double total=0;for(int slot=0;slot<36;slot++){ItemStack stack=p.getInventory().getItem(slot);if(!isSellable(stack))continue;int amount=stack.getAmount();String key=stack.getType().name().toLowerCase(Locale.ROOT);double value=shopProceeds(key,amount);if(value<=0||!Double.isFinite(core.balance(p.getUniqueId())+total+value))continue;if(sellStack(p,slot,amount)){sold+=amount;total+=value;}}msg(p,"Vente totale terminée: "+sold+" objet(s) pour "+formatShopPrice(Math.round(total*10000)/10000.0)+" Larry.");openSellMenu(p);}
     private boolean buyShop(Player p,String key,int amount){if(!SHOP.containsKey(key)){msg(p,"Objet inconnu. Utilise /shop search <objet>.");return true;}if(amount<1||amount>64){msg(p,"Quantité autorisée: 1 à 64.");return true;}ItemStack purchase=new ItemStack(SHOP.get(key),amount);Inventory test=Bukkit.createInventory(null,36);test.setStorageContents(p.getInventory().getStorageContents());if(!test.addItem(purchase.clone()).isEmpty()){msg(p,"Inventaire insuffisant; aucun Larry débité.");return true;}double price=Math.round(shopBuyPrice(key)*amount*100)/100.0;if(!Double.isFinite(price)||price<=0||!charge(p,price)){msg(p,"Fonds Larry insuffisants. Prix: "+formatShopPrice(price)+" Larry.");return true;}p.getInventory().addItem(purchase);List<Map<String,Object>> history=new ArrayList<>();for(Map<?,?> old:db.getMapList("market.history")){Map<String,Object> rowCopy=new LinkedHashMap<>();for(var x:old.entrySet())rowCopy.put(String.valueOf(x.getKey()),x.getValue());history.add(rowCopy);}Map<String,Object> buyRow=new LinkedHashMap<>();buyRow.put("type","ACHAT");buyRow.put("item",key);buyRow.put("amount",amount);buyRow.put("total",price);buyRow.put("player",p.getName());buyRow.put("time",System.currentTimeMillis());history.add(0,buyRow);if(history.size()>100)history=new ArrayList<>(history.subList(0,100));db.set("market.history",history);db.set("market.purchase-total",db.getLong("market.purchase-total",0L)+amount);save();core.recordTransaction("SHOP_BUY",p.getUniqueId(),new UUID(0L,0L),price);msg(p,"Achat effectué: "+amount+" x "+key+" pour "+formatShopPrice(price)+" Larry.");return true;}
     private boolean shop(CommandSender sender,String[] args){if(args.length==0){Player p=player(sender);if(p!=null)openShop(p);return true;}if(args[0].equalsIgnoreCase("sell")){Player p=player(sender);if(p==null)return true;int n=p.getInventory().getItemInMainHand().getAmount();if(args.length>1)try{n=Integer.parseInt(args[1]);}catch(NumberFormatException ex){n=0;}return sellShop(p,n);}if(args.length>=2&&args[0].equalsIgnoreCase("buy")){Player p=player(sender);if(p==null)return true;int n=1;if(args.length>2)try{n=Integer.parseInt(args[2]);}catch(NumberFormatException ex){n=0;}return buyShop(p,args[1].toLowerCase(Locale.ROOT),n);}if(args.length<2||!args[0].equalsIgnoreCase("search")){msg(sender,"Usage: /shop | /shop search <objet> | /shop buy <clé> [quantité] | /shop sell [quantité]");return true;}String q=String.join(" ",Arrays.copyOfRange(args,1,args.length)).toLowerCase(Locale.ROOT);if(sender instanceof Player p){shopSearch.put(p.getUniqueId(),q);openShopSearch(p,0);return true;}List<String> found=SHOP.entrySet().stream().filter(e->e.getKey().contains(q)||e.getValue().name().toLowerCase(Locale.ROOT).contains(q)).limit(30).map(e->e.getKey()+" — Achat "+formatShopPrice(shopBuyPrice(e.getKey()))+" / vente "+formatShopPrice(shopSellPrice(e.getKey()))+" Larry/u").toList();msg(sender,found.isEmpty()?"Aucun objet correspondant.":"Résultats: "+String.join(" | ",found));return true;}
     private boolean auction(CommandSender s,String[] a) {
@@ -1866,8 +1871,11 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                         Inventory simulated=Bukkit.createInventory(null,36);
                         simulated.setStorageContents(buyer.getInventory().getStorageContents());
                         if(!simulated.addItem(stack.clone()).isEmpty()){msg(buyer,"Inventaire plein; annonce conservée.");return;}
-                        buyer.getInventory().addItem(stack);
-                        db.set(path,null);save();msg(buyer,"Ton annonce a été retirée et l'objet rendu.");openAuction(buyer,ahPage.getOrDefault(buyer.getUniqueId(),0));return;
+                        var section=db.getConfigurationSection(path);
+                        var original=section==null?Map.<String,Object>of():new HashMap<>(section.getValues(false));
+                        db.set(path,null);
+                        if(!save()){db.createSection(path,original);msg(buyer,"Retrait annulé : sauvegarde impossible.");return;}
+                        buyer.getInventory().setStorageContents(simulated.getStorageContents());buyer.saveData();msg(buyer,"Ton annonce a été retirée et l'objet rendu.");openAuction(buyer,ahPage.getOrDefault(buyer.getUniqueId(),0));return;
                     }
                 }
                 auction(buyer,new String[]{"buy",key});
@@ -1898,7 +1906,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         if(title.equals("Larry | Confirmer vente totale")) {
             e.setCancelled(true);
             if(!(e.getWhoClicked() instanceof Player seller))return;
-            if(e.getRawSlot()==11){executeSellAll(seller);return;}if(e.getRawSlot()==15){openSellMenu(seller);return;}return;
+            if(e.getRawSlot()==11){executeSellAll(seller);return;}if(e.getRawSlot()==15){saleSnapshots.remove(seller.getUniqueId());saleQuotes.remove(seller.getUniqueId());openSellMenu(seller);return;}return;
         }
         if(title.equals("Larry | Catégories")) {
             e.setCancelled(true);
@@ -1979,7 +1987,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         String title = e.getView().getTitle();
         boolean lpcMenu = title.startsWith("Larry |")
             || title.startsWith("Larry I")
-            || title.startsWith("Coffre clan:");
+            ;
         if (!lpcMenu) return;
         int topSize = e.getView().getTopInventory().getSize();
         for (int rawSlot : e.getRawSlots()) {
@@ -1994,6 +2002,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         String title=e.getView().getTitle();
         if(!title.startsWith("Coffre clan:"))return;
         String clan=title.substring("Coffre clan:".length());
+        if(!Objects.equals(clanChests.get(clan),e.getView().getTopInventory())||!clan.equals(clanOf(e.getWhoClicked().getUniqueId()))||!Objects.equals(clanChestUsers.get(clan),e.getWhoClicked().getUniqueId())){e.setCancelled(true);return;}
         int level=Math.max(1,db.getInt(clanPath(clan)+".chest-level",1));
         int unlocked=Math.max(1,Math.min(54,level==1?1:(level-1)*9));
         for(int rawSlot:e.getRawSlots()) {
@@ -2026,6 +2035,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) {
         UUID id=e.getPlayer().getUniqueId();
+        saleSnapshots.remove(id);saleQuotes.remove(id);
         ahSlots.remove(id);ahPage.remove(id);ahSearch.remove(id);
         shopPage.remove(id);shopSearch.remove(id);shopCategory.remove(id);
         rankTargets.remove(id);frozen.remove(id);awaitingAhSearch.remove(id);awaitingShopSearch.remove(id);pendingBountyTarget.remove(id);
