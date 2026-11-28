@@ -48,6 +48,10 @@ final class LarryModeration implements Listener, CommandExecutor {
         if(name.equals("unmute")){
             UUID id=target!=null?target.getUniqueId():null;
             if(id==null){
+                OfflinePlayer cached=Bukkit.getOfflinePlayerIfCached(args[0]);
+                if(cached!=null && store.snapshot().containsKey(cached.getUniqueId()))id=cached.getUniqueId();
+            }
+            if(id==null){
                 var matches=store.snapshot().entrySet().stream().filter(e->e.getValue().name().equalsIgnoreCase(args[0])||e.getKey().toString().equalsIgnoreCase(args[0])).map(Map.Entry::getKey).toList();
                 if(matches.size()==1)id=matches.getFirst();
             }
