@@ -144,13 +144,16 @@ final class LarpersAuth implements Listener {
         boolean mustReRegister = accounts.getLong("revoked." + player.getName().toLowerCase(Locale.ROOT), 0L) > 0L;
         sessionJoinedAt.put(player.getUniqueId(), System.currentTimeMillis());
         joinLocations.put(player.getUniqueId(), player.getLocation().clone());
+        if(plugin.getConfig().getBoolean("auth.proxy-authenticated",false) && !plugin.getConfig().getBoolean("network.auth-only",false)){
+            if(!accountsReadable||mustReRegister||!consumeHandoff(player)){player.kickPlayer("Rejoins le Lobby et authentifie-toi avant de rejoindre le SMP.");return;}
+            markAuthenticated(player);return;
+        }
         player.sendMessage(ChatColor.YELLOW + "Vérification de ton compte...");
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!player.isOnline() || authenticated.containsKey(player.getUniqueId())) return;
             // Le backend est privé derrière Velocity: le proxy valide les comptes Java
             // en mode online et Floodgate valide les comptes Bedrock.
-            if (!mustReRegister && (plugin.getConfig().getBoolean("auth.proxy-authenticated", false)
-                    || isFloodgate(player))) {
+            if (!mustReRegister && isFloodgate(player)) {
                 markAuthenticated(player);
                 player.sendMessage(ChatColor.GREEN + "Connexion automatique réussie.");
                 return;
@@ -268,6 +271,7 @@ final class LarpersAuth implements Listener {
             Bukkit.getScheduler().runTask(plugin, () -> {
                 if (!player.isOnline()) return;
                 try {
+                    if(plugin.getConfig().getBoolean("network.auth-only",false))issueHandoff(player);
                     java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
                     java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
                     out.writeUTF("Connect");
@@ -303,6 +307,7 @@ final class LarpersAuth implements Listener {
     private void returnToLobby(Player player) {
         String target = plugin.getConfig().getString("lobby-return-compass.server", "lobby");
         try {
+            if(plugin.getConfig().getBoolean("network.auth-only",false)&&"smp".equalsIgnoreCase(target))issueHandoff(player);
             java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
             java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
             out.writeUTF("Connect");
@@ -313,6 +318,28 @@ final class LarpersAuth implements Listener {
             plugin.getLogger().warning("Impossible de transférer " + player.getName() + " vers le serveur configuré: " + ex.getMessage());
             player.sendMessage(ChatColor.RED + "Impossible de rejoindre le serveur pour le moment.");
         }
+    }
+
+    private Path handoffDirectory(){return file.toPath().toAbsolutePath().normalize().getParent().resolve("handoff");}
+    private void issueHandoff(Player p)throws IOException{
+        if(!isAuthenticated(p))throw new IOException("Session non authentifiée");
+        var dir=handoffDirectory();java.nio.file.Files.createDirectories(dir);
+        var target=dir.resolve(p.getUniqueId()+".ticket");var tmp=java.nio.file.Files.createTempFile(dir,"handoff-",".tmp");
+        try{
+            java.nio.file.Files.writeString(tmp,(System.currentTimeMillis()+30000L)+"\n"+ipHash(p));
+            try{java.nio.file.Files.move(tmp,target,java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}
+            catch(java.nio.file.AtomicMoveNotSupportedException ex){java.nio.file.Files.move(tmp,target,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}
+        }finally{java.nio.file.Files.deleteIfExists(tmp);}
+    }
+    private boolean consumeHandoff(Player p){
+        var dir=handoffDirectory();var source=dir.resolve(p.getUniqueId()+".ticket");var claimed=dir.resolve(p.getUniqueId()+"-"+UUID.randomUUID()+".used");
+        try{
+            try{java.nio.file.Files.move(source,claimed,java.nio.file.StandardCopyOption.ATOMIC_MOVE);}
+            catch(java.nio.file.AtomicMoveNotSupportedException ex){java.nio.file.Files.move(source,claimed);}
+            var lines=java.nio.file.Files.readAllLines(claimed);
+            return lines.size()==2&&Long.parseLong(lines.get(0))>=System.currentTimeMillis()&&MessageDigest.isEqual(lines.get(1).getBytes(java.nio.charset.StandardCharsets.US_ASCII),ipHash(p).getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+        }catch(IOException|IllegalArgumentException ex){return false;}
+        finally{try{java.nio.file.Files.deleteIfExists(claimed);}catch(IOException ignored){}}
     }
 
     private void rememberIp(Player player, String path) {
@@ -388,7 +415,7 @@ final class LarpersAuth implements Listener {
     private boolean exempt(Player player) {
         // Le systeme d'authentification et ses blocages sont reserves au Lobby.
         // Sur le SMP, tout joueur est libre: ne jamais appliquer les restrictions /login.
-        return plugin.getConfig().getBoolean("auth.proxy-authenticated",false) || isAuthenticated(player);
+        return isAuthenticated(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
