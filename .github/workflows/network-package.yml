@@ -240,8 +240,8 @@ jobs:
               PVP=true
             fi
             cat > "$ROOT/$SERVER/eula.txt" <<'EOF'
-          # EULA acceptee a la demande de l'administrateur. Conditions: https://aka.ms/MinecraftEULA
-          eula=true
+          # Lire et accepter les conditions: https://aka.ms/MinecraftEULA
+          eula=false
           EOF
             cat > "$ROOT/$SERVER/server.properties" <<EOF
           enable-jmx-monitoring=false
@@ -367,7 +367,7 @@ jobs:
           web-admin:
             enabled: true
             bind: 127.0.0.1
-            port: 80
+            port: 8765
           EOF
 
           cat > "$ROOT/START-NETWORK.bat" <<'EOF'
@@ -586,6 +586,18 @@ jobs:
           - Les mondes et donnees existants ne sont pas inclus: ce ZIP est un paquet serveur propre.
           - Le premier demarrage et les connexions reelles doivent etre testes sur ta machine.
           EOF
+
+      - name: Installer WorldEdit et WorldGuard compatibles Paper 26.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          for project in worldedit worldguard; do
+            meta="$(curl --retry 3 -fsSL "https://api.modrinth.com/v2/project/$project/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%2C%22bukkit%22%2C%22spigot%22%5D")"
+            url="$(echo "$meta" | jq -r '[.[] | select(.version_type == "release") | .files[] | select(.primary == true) | .url][0] // empty')"
+            test -n "$url" || { echo "Aucune version compatible de $project"; exit 1; }
+            curl --retry 3 -fL "$url" -o "package/LarrySMP-Network/SMP/plugins/$project.jar"
+            unzip -tq "package/LarrySMP-Network/SMP/plugins/$project.jar"
+          done
 
       - name: Ajouter le lanceur HTTPS du dashboard
         run: cp DEMARRER-DASHBOARD-HTTPS.bat DEMARRER-DASHBOARD-HTTPS.ps1 package/LarrySMP-Network/SMP/
