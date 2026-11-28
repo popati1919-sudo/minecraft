@@ -59,6 +59,11 @@ final class StaffWatch implements Listener, CommandExecutor {
         state.set("flight",p.getAllowFlight());
         state.set("flying",p.isFlying());
         state.set("hidden",features.isVanished(p));
+        state.set("level",p.getLevel());
+        state.set("exp",p.getExp());
+        state.set("food",p.getFoodLevel());
+        state.set("saturation",p.getSaturation());
+        state.set("health",p.getHealth());
         state.set("slot",p.getInventory().getHeldItemSlot());
         var items=p.getInventory().getContents();
         for(int i=0;i<items.length;i++)
@@ -109,12 +114,20 @@ final class StaffWatch implements Listener, CommandExecutor {
                 String bytes=state.getString("item."+i);
                 if(bytes!=null) items[i]=ItemStack.deserializeBytes(Base64.getDecoder().decode(bytes));
             }
-            if(location==null || !p.teleport(location)) throw new IllegalStateException("Téléportation refusée");
+            if(location==null || location.getWorld()==null || !p.teleport(location)) {
+                if(!p.teleport(p.getWorld().getSpawnLocation())) throw new IllegalStateException("Téléportation refusée");
+                p.sendMessage("Point de retour indisponible : retour au spawn.");
+            }
             p.setGameMode(mode);
             p.setAllowFlight(state.getBoolean("flight"));
             p.setFlying(state.getBoolean("flying") && p.getAllowFlight());
             p.getInventory().setContents(items);
-            p.getInventory().setHeldItemSlot(state.getInt("slot"));
+            p.getInventory().setHeldItemSlot(Math.max(0,Math.min(8,state.getInt("slot"))));
+            if(state.contains("level")) p.setLevel(state.getInt("level"));
+            if(state.contains("exp")) p.setExp((float)state.getDouble("exp"));
+            if(state.contains("food")) p.setFoodLevel(state.getInt("food"));
+            if(state.contains("saturation")) p.setSaturation((float)state.getDouble("saturation"));
+            if(state.contains("health")) p.setHealth(Math.max(0.1,Math.min(p.getMaxHealth(),state.getDouble("health"))));
             features.setVanished(p,state.getBoolean("hidden"));
             p.getPersistentDataContainer().remove(key);
             p.saveData();
@@ -141,6 +154,12 @@ final class StaffWatch implements Listener, CommandExecutor {
             e.setCancelled(true);
             e.getPlayer().sendMessage("Quitte la surveillance avec /modo pour utiliser cette commande.");
         }
+    }
+    @EventHandler(ignoreCancelled=true) public void pickup(org.bukkit.event.entity.EntityPickupItemEvent e) {
+        if(e.getEntity() instanceof Player p && active(p)) e.setCancelled(true);
+    }
+    @EventHandler(ignoreCancelled=true) public void drop(PlayerDropItemEvent e) {
+        if(active(e.getPlayer())) e.setCancelled(true);
     }
     @EventHandler public void join(PlayerJoinEvent e) {
         if(active(e.getPlayer())) restore(e.getPlayer());
