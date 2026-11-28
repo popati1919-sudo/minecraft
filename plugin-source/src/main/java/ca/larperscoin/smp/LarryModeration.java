@@ -27,11 +27,11 @@ final class LarryModeration implements Listener, CommandExecutor {
     }
 
     public boolean onCommand(CommandSender sender,Command command,String label,String[] args) {
+        if(!sender.hasPermission("larpers.staff") && !sender.hasPermission("larpers.admin")) { sender.sendMessage("Permission refusée."); return true; }
         String name=command.getName();
         if(name.equals("listban") || name.equals("banip")) {
             String nativeName=name.equals("banip") ? "ban-ip" : "banlist";
-            Bukkit.dispatchCommand(sender,"minecraft:"+nativeName+" "+String.join(" ",args));
-            return true;
+            return Bukkit.dispatchCommand(sender,"minecraft:"+nativeName+" "+String.join(" ",args));
         }
         if(args.length==0) return false;
         Player target=Bukkit.getPlayerExact(args[0]);
