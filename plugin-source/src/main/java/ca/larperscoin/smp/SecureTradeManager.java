@@ -391,6 +391,42 @@ public final class SecureTradeManager implements Listener {
             }
         }catch(Exception ex){plugin.getLogger().severe("Lecture des journaux d'échange impossible : "+ex.getMessage());p.kickPlayer("Récupération des échanges indisponible. Contacte un admin.");}
     }
+    boolean commerce(Player p,ItemStack[] after,double delta,UUID seller,double sellerCredit,String auctionId,Map<String,Object> listing,boolean remove,String type){
+        String tx=UUID.randomUUID().toString();
+        var dir=plugin.getDataFolder().toPath().resolve("commerce-journal");
+        var file=dir.resolve(tx+".yml");
+        var y=new org.bukkit.configuration.file.YamlConfiguration();
+        y.set("player",p.getUniqueId().toString());
+        y.set("player-before",Arrays.asList(cloneContents(p.getInventory().getStorageContents())));
+        y.set("player-after",Arrays.asList(cloneContents(after)));
+        try{java.nio.file.Files.createDirectories(dir);writeJournal(file,y);}
+        catch(java.io.IOException ex){msg(p,"Journal indisponible; transaction annulée.");return false;}
+        if(!economy.commitCommerce(tx,p.getUniqueId(),delta,seller,sellerCredit,auctionId,listing,remove,type)){
+            try{java.nio.file.Files.deleteIfExists(file);}catch(java.io.IOException ignored){}
+            return false;
+        }
+        try{deliver(file,y,"player",p);finishCommerce(file,p);return true;}
+        catch(Exception ex){plugin.getLogger().severe("Commerce "+tx+" à récupérer : "+ex.getMessage());p.kickPlayer("Transaction interrompue. Reconnecte-toi.");return false;}
+    }
+    private void finishCommerce(java.nio.file.Path file,Player p)throws java.io.IOException{
+        String tx=file.getFileName().toString().replace(".yml","");
+        java.nio.file.Files.deleteIfExists(file);economy.clearCommerceCommit(tx);
+        p.getPersistentDataContainer().remove(receipt(tx));p.saveData();
+    }
+    @EventHandler(priority=org.bukkit.event.EventPriority.LOWEST)
+    public void recoverCommerce(org.bukkit.event.player.PlayerJoinEvent event){
+        Player p=event.getPlayer();var dir=plugin.getDataFolder().toPath().resolve("commerce-journal");
+        if(!java.nio.file.Files.isDirectory(dir))return;
+        try(var files=java.nio.file.Files.newDirectoryStream(dir,"*.yml")){
+            for(var file:files){
+                String tx=file.getFileName().toString().replace(".yml","");
+                if(!economy.commerceCommitted(tx))continue;
+                var y=new org.bukkit.configuration.file.YamlConfiguration();y.load(file.toFile());
+                if(!p.getUniqueId().toString().equals(y.getString("player")))continue;
+                deliver(file,y,"player",p);finishCommerce(file,p);
+            }
+        }catch(Exception ex){plugin.getLogger().severe("Commerce non récupéré: "+ex.getMessage());p.kickPlayer("Transaction à vérifier par un administrateur.");}
+    }
     private void complete(Session s){
         Player a=Bukkit.getPlayer(s.first),b=Bukkit.getPlayer(s.second);
         if(!withinRange(a,b)||a.isDead()||b.isDead()){cancel(s,"joueur indisponible ou trop loin");return;}
