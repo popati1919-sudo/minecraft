@@ -147,14 +147,14 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private String clanOf(UUID u) { return db.getString("clan-members."+u); }
     private String clanPath(String clan) { return "clans."+clan.toLowerCase(Locale.ROOT); }
     private boolean member(Player p) { return clanOf(p.getUniqueId()) != null; }
+    private String clanBankId(String clan){return db.getString(clanPath(clan)+".bank-id","legacy-"+clan);}
+    private double clanBank(String clan){return core.clanBank(clanBankId(clan),db.getDouble(clanPath(clan)+".bank"));}
     private void give(Player p, double amount) {
         core.credit(p.getUniqueId(), amount);
         core.saveData();
     }
     private boolean charge(Player p, double amount) {
-        boolean ok = core.debit(p.getUniqueId(), amount);
-        if (ok) core.saveData();
-        return ok;
+        return Double.isFinite(amount)&&amount>0&&core.changeBalanceSaved(p.getUniqueId(),-amount);
     }
     private ItemStack item(Material mat, String name, String... lore) {
         ItemStack it = new ItemStack(mat); ItemMeta meta = it.getItemMeta();
@@ -597,7 +597,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 String n=a[1].toLowerCase(Locale.ROOT), path=clanPath(n);
                 if(db.contains(path)){msg(p,"Ce clan existe déjà.");return true;}
                 db.set(path+".name",a[1]); db.set(path+".owner",id(p)); db.set(path+".members",List.of(id(p))); db.set(path+".roles."+id(p),"leader");
-                db.set(path+".bank",0.0); db.set(path+".level",1); db.set(path+".xp",0); db.set(path+".allies",new ArrayList<String>());
+                db.set(path+".bank",0.0); db.set(path+".bank-id",UUID.randomUUID().toString()); db.set(path+".level",1); db.set(path+".xp",0); db.set(path+".allies",new ArrayList<String>());
                 db.set("clan-members."+id(p),n); save(); msg(p,"Clan "+a[1]+" créé."); return true;
             }
             case "invite" -> {
@@ -640,7 +640,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 if(a.length!=2||!a[1].equalsIgnoreCase("confirm")){msg(p,"Action irréversible: /clan disband confirm.");return true;}
                 if(clanChestUsers.containsKey(own)){msg(p,"Ferme d'abord le coffre du clan avant de le dissoudre.");return true;}
                 String path=clanPath(own);
-                if(db.getDouble(path+".bank")>0){msg(p,"Vide la banque avant la dissolution.");return true;}
+                if(clanBank(own)>0){msg(p,"Vide la banque avant la dissolution.");return true;}
                 if(db.getList(path+".chest",List.of()).stream().anyMatch(x->x instanceof ItemStack st && !st.getType().isAir() && !isChestLock(st))){msg(p,"Vide le coffre avant la dissolution.");return true;}
                 List<String> members=db.getStringList(path+".members");
                 for(String member:members)db.set("clan-members."+member,null);
@@ -656,7 +656,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             case "info","stats","level" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
                 String path=clanPath(own);int level=Math.max(1,db.getInt(path+".level",1));
-                msg(p,db.getString(path+".name")+" | membres: "+db.getStringList(path+".members").size()+" | niveau "+level+" | XP "+db.getInt(path+".xp",0)+"/"+(level*100)+" | banque "+db.getDouble(path+".bank",0)+" Larry");
+                msg(p,db.getString(path+".name")+" | membres: "+db.getStringList(path+".members").size()+" | niveau "+level+" | XP "+db.getInt(path+".xp",0)+"/"+(level*100)+" | banque "+clanBank(own)+" Larry");
                 msg(p,"Ton rôle: "+db.getString(path+".roles."+id(p),"member"));return true;
             }
             case "role" -> {
@@ -670,20 +670,15 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             case "bank" -> {
                 if(own==null){msg(p,"Tu n'as pas de clan.");return true;}
                 String path=clanPath(own)+".bank";
-                if(a.length==1){msg(p,"Banque du clan: "+db.getDouble(path)+" Larry. /clan bank deposit|withdraw <montant>");return true;}
+                if(a.length==1){msg(p,"Banque du clan: "+clanBank(own)+" Larry. /clan bank deposit|withdraw <montant>");return true;}
                 if(a.length!=3){msg(p,"Usage: /clan bank deposit|withdraw <montant>");return true;}
-                double v=Double.parseDouble(a[2]);if(!Double.isFinite(v)||v<=0){msg(p,"Montant invalide.");return true;}
-                if(a[1].equalsIgnoreCase("deposit")){
-                    double nextBank=db.getDouble(path)+v;
-                    if(!Double.isFinite(nextBank)){msg(p,"La banque dépasserait la limite numérique.");return true;}
-                    if(!charge(p,v)){msg(p,"Fonds insuffisants.");return true;}
-                    db.set(path,nextBank);core.recordTransaction("CLAN_DEPOSIT",p.getUniqueId(),new UUID(0L,0L),v);
-                }
-                else if(a[1].equalsIgnoreCase("withdraw")){
-                    if(!clanLeaderOrOfficer(p,own)||db.getDouble(path)<v||!Double.isFinite(core.balance(p.getUniqueId())+v)){msg(p,"Retrait refusé (chef/officier seulement ou fonds insuffisants).");return true;}
-                    db.set(path,db.getDouble(path)-v);give(p,v);core.recordTransaction("CLAN_WITHDRAW",new UUID(0L,0L),p.getUniqueId(),v);
-                }
-                else {msg(p,"Choisis deposit ou withdraw.");return true;} save();msg(p,"Opération effectuée.");return true;
+                double v=Double.parseDouble(a[2].replace(',','.'));
+                if(!Double.isFinite(v)||v<0.0001||java.math.BigDecimal.valueOf(v).stripTrailingZeros().scale()>4){msg(p,"Montant invalide (4 décimales maximum).");return true;}
+                boolean deposit=a[1].equalsIgnoreCase("deposit");
+                if(!deposit&&!a[1].equalsIgnoreCase("withdraw")){msg(p,"Utilise deposit ou withdraw.");return true;}
+                if(!deposit&&!clanLeaderOrOfficer(p,own)){msg(p,"Retrait réservé au chef et aux officiers.");return true;}
+                if(!core.changeClanBank(clanBankId(own),db.getDouble(path),p.getUniqueId(),v,deposit)){msg(p,"Opération annulée : fonds insuffisants ou sauvegarde impossible.");return true;}
+                msg(p,"Opération effectuée. Banque : "+formatShopPrice(clanBank(own))+" Larry.");return true;
             }
             case "audit" -> {
                 if(own==null||!clanLeaderOrOfficer(p,own)){msg(p,"Consultation réservée au chef et aux officiers.");return true;}
@@ -755,13 +750,13 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
                 if(!id(p).equals(db.getString(clanPath(own)+".owner"))||a.length!=3){msg(p,"Chef: /clan allies request|accept|remove <clan>");return true;}
                 String other=a[2].toLowerCase(Locale.ROOT);if(!db.contains(clanPath(other))||other.equals(own)){msg(p,"Clan invalide.");return true;}
                 if(a[1].equalsIgnoreCase("request")) {
-                    db.set("alliance-requests."+other+"."+own,true);save();
+                    db.set("alliance-requests."+other+"."+own,System.currentTimeMillis()+86400000L);save();
                     msg(p,"Demande d'alliance envoyée à "+db.getString(clanPath(other)+".name")+". Le chef adverse doit accepter.");
                     for(Player online:Bukkit.getOnlinePlayers()) if(id(online).equals(db.getString(clanPath(other)+".owner"))) msg(online,"Demande d'alliance de "+db.getString(clanPath(own)+".name")+". /clan allies accept "+own);
                     return true;
                 }
                 if(a[1].equalsIgnoreCase("accept")) {
-                    if(!db.getBoolean("alliance-requests."+own+"."+other,false)){msg(p,"Aucune demande de ce clan.");return true;}
+                    if(db.getLong("alliance-requests."+own+"."+other,0L)<=System.currentTimeMillis()){msg(p,"Aucune demande de ce clan.");return true;}
                     List<String> mine=db.getStringList(ap), theirs=db.getStringList(clanPath(other)+".allies");
                     if(!mine.contains(other))mine.add(other);if(!theirs.contains(own))theirs.add(own);
                     db.set(ap,mine);db.set(clanPath(other)+".allies",theirs);db.set("alliance-requests."+own+"."+other,null);save();msg(p,"Alliance bilatérale créée.");return true;
@@ -774,8 +769,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             }
             case "top","leaderboard" -> {
                 var sec=db.getConfigurationSection("clans");if(sec==null){msg(p,"Aucun clan.");return true;}
-                List<String> names=new ArrayList<>(sec.getKeys(false));names.sort(Comparator.comparingDouble((String n)->db.getDouble(clanPath(n)+".bank")).reversed());
-                msg(p,"Classement des clans (banque):");int i=1;for(String n:names){if(i>10)break;msg(p,i+". "+db.getString(clanPath(n)+".name")+" — "+db.getDouble(clanPath(n)+".bank")+" Larry");i++;}return true;
+                List<String> names=new ArrayList<>(sec.getKeys(false));names.sort(Comparator.comparingDouble((String n)->clanBank(n)).reversed());
+                msg(p,"Classement des clans (banque):");int i=1;for(String n:names){if(i>10)break;msg(p,i+". "+db.getString(clanPath(n)+".name")+" — "+clanBank(n)+" Larry");i++;}return true;
             }
             default -> {msg(p,"Sous-commande inconnue. /clan pour l'aide.");return true;}
         }
@@ -1612,16 +1607,16 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private double sellAllValue(Player p) {
         long cents=0;
         for(ItemStack stack:p.getInventory().getStorageContents()) {
-            if(isSellable(stack)) cents+=Math.round(shopProceeds(stack.getType().name().toLowerCase(Locale.ROOT),stack.getAmount())*100);
+            if(isSellable(stack)) cents+=Math.round(shopProceeds(stack.getType().name().toLowerCase(Locale.ROOT),stack.getAmount())*10000);
         }
-        return cents/100.0;
+        return cents/10000.0;
     }
     private void openSellMenu(Player p){Inventory inv=Bukkit.createInventory(null,54,"Larry | Vendre");int shown=0;for(int slot=0;slot<36;slot++){ItemStack stack=p.getInventory().getItem(slot);if(!isSellable(stack))continue;ItemStack display=stack.clone();ItemMeta meta=display.getItemMeta();if(meta!=null){List<String> lore=meta.hasLore()?new ArrayList<>(meta.getLore()):new ArrayList<>();String k=stack.getType().name().toLowerCase(Locale.ROOT);lore.add(ChatColor.GRAY+"Quantité: "+stack.getAmount());lore.add(ChatColor.GOLD+"Net après taxe: "+formatShopPrice(shopProceeds(k,stack.getAmount()))+" Larry");lore.add(ChatColor.YELLOW+"Clique pour vendre cette pile");meta.setLore(lore);display.setItemMeta(meta);}inv.setItem(slot,display);shown++;}inv.setItem(45,item(Material.GOLD_INGOT,"Vendre tout","Net après taxe: "+formatShopPrice(sellAllValue(p))+" Larry","Une confirmation sera demandée"));inv.setItem(49,item(Material.BARRIER,"Fermer"));inv.setItem(53,item(Material.SUNFLOWER,"Actualiser",shown+" pile(s) vendable(s)"));p.openInventory(inv);}
     private final Map<UUID,ItemStack[]> saleSnapshots=new HashMap<>();
     private final Map<UUID,Double> saleQuotes=new HashMap<>();
     private void openSellAllConfirmation(Player p){double total=sellAllValue(p);saleSnapshots.put(p.getUniqueId(),Arrays.stream(p.getInventory().getStorageContents()).map(x->x==null?null:x.clone()).toArray(ItemStack[]::new));saleQuotes.put(p.getUniqueId(),total);Inventory inv=Bukkit.createInventory(null,27,"Larry | Confirmer vente totale");inv.setItem(11,item(Material.LIME_CONCRETE,"CONFIRMER","Vendre tous les objets admissibles","Net après taxe: "+total+" Larry","Cette action est irréversible"));inv.setItem(15,item(Material.RED_CONCRETE,"ANNULER","Ne rien vendre"));inv.setItem(13,item(Material.GOLD_INGOT,"Résumé","Net après taxe: "+total+" Larry","Les objets renommés/enchantés et interdits sont ignorés"));p.openInventory(inv);}
     private void executeSellAll(Player p){ItemStack[] expected=saleSnapshots.remove(p.getUniqueId());Double quote=saleQuotes.remove(p.getUniqueId());if(expected==null||quote==null||!Arrays.equals(expected,p.getInventory().getStorageContents())||Double.compare(quote,sellAllValue(p))!=0){msg(p,"Inventaire ou prix modifié. Confirme à nouveau.");openSellAllConfirmation(p);return;}int sold=0;double total=0;for(int slot=0;slot<36;slot++){ItemStack stack=p.getInventory().getItem(slot);if(!isSellable(stack))continue;int amount=stack.getAmount();String key=stack.getType().name().toLowerCase(Locale.ROOT);double value=shopProceeds(key,amount);if(value<=0||!Double.isFinite(core.balance(p.getUniqueId())+total+value))continue;if(sellStack(p,slot,amount)){sold+=amount;total+=value;}}msg(p,"Vente totale terminée: "+sold+" objet(s) pour "+formatShopPrice(Math.round(total*10000)/10000.0)+" Larry.");openSellMenu(p);}
-    private boolean buyShop(Player p,String key,int amount){if(!SHOP.containsKey(key)){msg(p,"Objet inconnu. Utilise /shop search <objet>.");return true;}if(amount<1||amount>64){msg(p,"Quantité autorisée: 1 à 64.");return true;}ItemStack purchase=new ItemStack(SHOP.get(key),amount);Inventory test=Bukkit.createInventory(null,36);test.setStorageContents(p.getInventory().getStorageContents());if(!test.addItem(purchase.clone()).isEmpty()){msg(p,"Inventaire insuffisant; aucun Larry débité.");return true;}double price=Math.round(shopBuyPrice(key)*amount*100)/100.0;if(!Double.isFinite(price)||price<=0||!charge(p,price)){msg(p,"Fonds Larry insuffisants. Prix: "+formatShopPrice(price)+" Larry.");return true;}p.getInventory().addItem(purchase);List<Map<String,Object>> history=new ArrayList<>();for(Map<?,?> old:db.getMapList("market.history")){Map<String,Object> rowCopy=new LinkedHashMap<>();for(var x:old.entrySet())rowCopy.put(String.valueOf(x.getKey()),x.getValue());history.add(rowCopy);}Map<String,Object> buyRow=new LinkedHashMap<>();buyRow.put("type","ACHAT");buyRow.put("item",key);buyRow.put("amount",amount);buyRow.put("total",price);buyRow.put("player",p.getName());buyRow.put("time",System.currentTimeMillis());history.add(0,buyRow);if(history.size()>100)history=new ArrayList<>(history.subList(0,100));db.set("market.history",history);db.set("market.purchase-total",db.getLong("market.purchase-total",0L)+amount);save();core.recordTransaction("SHOP_BUY",p.getUniqueId(),new UUID(0L,0L),price);msg(p,"Achat effectué: "+amount+" x "+key+" pour "+formatShopPrice(price)+" Larry.");return true;}
+    private boolean buyShop(Player p,String key,int amount){if(!SHOP.containsKey(key)){msg(p,"Objet inconnu. Utilise /shop search <objet>.");return true;}if(amount<1||amount>64){msg(p,"Quantité autorisée: 1 à 64.");return true;}ItemStack purchase=new ItemStack(SHOP.get(key),amount);Inventory test=Bukkit.createInventory(null,36);test.setStorageContents(p.getInventory().getStorageContents());if(!test.addItem(purchase.clone()).isEmpty()){msg(p,"Inventaire insuffisant; aucun Larry débité.");return true;}double price=Math.round(shopBuyPrice(key)*amount*10000)/10000.0;if(!Double.isFinite(price)||price<=0||!charge(p,price)){msg(p,"Fonds Larry insuffisants. Prix: "+formatShopPrice(price)+" Larry.");return true;}p.getInventory().setStorageContents(test.getStorageContents());List<Map<String,Object>> history=new ArrayList<>();for(Map<?,?> old:db.getMapList("market.history")){Map<String,Object> rowCopy=new LinkedHashMap<>();for(var x:old.entrySet())rowCopy.put(String.valueOf(x.getKey()),x.getValue());history.add(rowCopy);}Map<String,Object> buyRow=new LinkedHashMap<>();buyRow.put("type","ACHAT");buyRow.put("item",key);buyRow.put("amount",amount);buyRow.put("total",price);buyRow.put("player",p.getName());buyRow.put("time",System.currentTimeMillis());history.add(0,buyRow);if(history.size()>100)history=new ArrayList<>(history.subList(0,100));db.set("market.history",history);db.set("market.purchase-total",db.getLong("market.purchase-total",0L)+amount);save();core.recordTransaction("SHOP_BUY",p.getUniqueId(),new UUID(0L,0L),price);msg(p,"Achat effectué: "+amount+" x "+key+" pour "+formatShopPrice(price)+" Larry.");return true;}
     private boolean shop(CommandSender sender,String[] args){if(args.length==0){Player p=player(sender);if(p!=null)openShop(p);return true;}if(args[0].equalsIgnoreCase("sell")){Player p=player(sender);if(p==null)return true;int n=p.getInventory().getItemInMainHand().getAmount();if(args.length>1)try{n=Integer.parseInt(args[1]);}catch(NumberFormatException ex){n=0;}return sellShop(p,n);}if(args.length>=2&&args[0].equalsIgnoreCase("buy")){Player p=player(sender);if(p==null)return true;int n=1;if(args.length>2)try{n=Integer.parseInt(args[2]);}catch(NumberFormatException ex){n=0;}return buyShop(p,args[1].toLowerCase(Locale.ROOT),n);}if(args.length<2||!args[0].equalsIgnoreCase("search")){msg(sender,"Usage: /shop | /shop search <objet> | /shop buy <clé> [quantité] | /shop sell [quantité]");return true;}String q=String.join(" ",Arrays.copyOfRange(args,1,args.length)).toLowerCase(Locale.ROOT);if(sender instanceof Player p){shopSearch.put(p.getUniqueId(),q);openShopSearch(p,0);return true;}List<String> found=SHOP.entrySet().stream().filter(e->e.getKey().contains(q)||e.getValue().name().toLowerCase(Locale.ROOT).contains(q)).limit(30).map(e->e.getKey()+" — Achat "+formatShopPrice(shopBuyPrice(e.getKey()))+" / vente "+formatShopPrice(shopSellPrice(e.getKey()))+" Larry/u").toList();msg(sender,found.isEmpty()?"Aucun objet correspondant.":"Résultats: "+String.join(" | ",found));return true;}
     private boolean auction(CommandSender s,String[] a) {
         Player p=player(s);if(p==null)return true;
