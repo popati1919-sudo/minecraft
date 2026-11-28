@@ -39,8 +39,21 @@ public final class AntiDuplicationTest {
         check(caps.get("stick")*8<=prices.get("log"),"no chained recipe arbitrage");
         check(RecipeEconomy.ceilings(prices,java.util.List.of(new RecipeEconomy.Rule("plank",4,java.util.List.of(java.util.List.of("missing"))))).get("plank")>0,"unknown ingredients not free");
     }
+    private record Stack(String type,String metadata,int count){}
+    private static void itemTests(){
+        var before=java.util.List.of(new Stack("diamond","plain",32),new Stack("book","enchanted",1));
+        var valid=java.util.List.of(new Stack("diamond","plain",16),new Stack("diamond","plain",16),new Stack("book","enchanted",1));
+        var duplicate=java.util.List.of(new Stack("diamond","plain",64),new Stack("book","enchanted",1));
+        var missing=java.util.List.of(new Stack("diamond","plain",31),new Stack("book","enchanted",1));
+        var changed=java.util.List.of(new Stack("diamond","plain",32),new Stack("book","plain",1));
+        java.util.function.BiPredicate<Stack,Stack> similar=(a,b)->a.type.equals(b.type)&&a.metadata.equals(b.metadata);
+        check(AntiDuplication.conserves(before,valid,Stack::count,similar),"stack splitting preserves quantity");
+        check(!AntiDuplication.conserves(before,duplicate,Stack::count,similar),"reject duplicated stack");
+        check(!AntiDuplication.conserves(before,missing,Stack::count,similar),"reject missing item");
+        check(!AntiDuplication.conserves(before,changed,Stack::count,similar),"reject changed metadata");
+    }
     public static void main(String[] args)throws Exception{
-        receiptTests();recipeTests();
+        receiptTests();recipeTests();itemTests();
         check(AntiDuplication.units(0.1+0.2)==3000,"floating point rounding");
         check(AntiDuplication.units(AntiDuplication.add(1.0001,-0.0001))==10000,"exact 4 decimal debit");
         reject(()->AntiDuplication.add(0,-0.0001),"negative balances");
