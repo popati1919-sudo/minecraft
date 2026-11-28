@@ -56,7 +56,10 @@ final class StaffWatch implements Listener, CommandExecutor {
         }
         p.closeInventory();
         var state=new YamlConfiguration();
-        state.set("position",p.getLocation());
+        Location origin=p.getLocation();
+        state.set("world",origin.getWorld().getUID().toString());
+        state.set("x",origin.getX());state.set("y",origin.getY());state.set("z",origin.getZ());
+        state.set("yaw",origin.getYaw());state.set("pitch",origin.getPitch());
         state.set("mode",p.getGameMode().name());
         state.set("flight",p.getAllowFlight());
         state.set("flying",p.isFlying());
@@ -137,7 +140,11 @@ final class StaffWatch implements Listener, CommandExecutor {
     private void restore(Player p) {
         try {
             var state=readSnapshot(p);
-            Location location=state.getLocation("position");
+            Location location=null;
+            if(state.contains("world")) {
+                World world=Bukkit.getWorld(UUID.fromString(state.getString("world")));
+                if(world!=null)location=new Location(world,state.getDouble("x"),state.getDouble("y"),state.getDouble("z"),(float)state.getDouble("yaw"),(float)state.getDouble("pitch"));
+            }else location=state.getLocation("position");
             GameMode mode=GameMode.valueOf(state.getString("mode"));
             ItemStack[] items=new ItemStack[p.getInventory().getSize()];
             for(int i=0;i<items.length;i++) {
@@ -151,7 +158,6 @@ final class StaffWatch implements Listener, CommandExecutor {
             p.setGameMode(mode);
             p.setAllowFlight(state.getBoolean("flight"));
             p.setFlying(state.getBoolean("flying") && p.getAllowFlight());
-            p.getInventory().setContents(items);
             p.getInventory().setHeldItemSlot(Math.max(0,Math.min(8,state.getInt("slot"))));
             if(state.contains("level")) p.setLevel(state.getInt("level"));
             if(state.contains("exp")) p.setExp((float)state.getDouble("exp"));
@@ -163,6 +169,7 @@ final class StaffWatch implements Listener, CommandExecutor {
                 for(Object effect:state.getList("effects",List.of())) if(effect instanceof org.bukkit.potion.PotionEffect potion) p.addPotionEffect(potion);
             }
             features.setVanished(p,state.getBoolean("hidden"));
+            p.getInventory().setContents(items);
             p.getPersistentDataContainer().remove(key);
             p.saveData();
             recoveryWarnings.remove(p.getUniqueId());
@@ -191,6 +198,12 @@ final class StaffWatch implements Listener, CommandExecutor {
             e.setCancelled(true);
             e.getPlayer().sendMessage("Quitte la surveillance avec /modo pour utiliser cette commande.");
         }
+    }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true) public void inventoryClick(org.bukkit.event.inventory.InventoryClickEvent e) {
+        if(e.getWhoClicked() instanceof Player p && active(p) && (e.getClickedInventory()==p.getInventory() || e.isShiftClick() || e.getClick()==org.bukkit.event.inventory.ClickType.NUMBER_KEY || e.getClick()==org.bukkit.event.inventory.ClickType.SWAP_OFFHAND || e.getClick()==org.bukkit.event.inventory.ClickType.DOUBLE_CLICK)) e.setCancelled(true);
+    }
+    @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=true) public void inventoryDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
+        if(e.getWhoClicked() instanceof Player p && active(p)) e.setCancelled(true);
     }
     @EventHandler(ignoreCancelled=true) public void pickup(org.bukkit.event.entity.EntityPickupItemEvent e) {
         if(e.getEntity() instanceof Player p && active(p)) e.setCancelled(true);
