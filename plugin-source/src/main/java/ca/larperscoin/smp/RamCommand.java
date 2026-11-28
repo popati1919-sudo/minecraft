@@ -33,16 +33,18 @@ final class RamCommand implements CommandExecutor, Listener {
     private void set(CommandSender sender,String input) {
         if(!sender.hasPermission("larpers.admin"))return;
         long max=limit();
+        if(max<1) { sender.sendMessage("Mémoire disponible insuffisante ou inconnue."); return; }
         int amount;
         try { amount=Integer.parseInt(input); } catch(NumberFormatException ex) { amount=0; }
-        if(amount<1 || amount>max) {
+        if(amount<1 || amount>max || amount*GIB<Runtime.getRuntime().totalMemory() && amount*GIB<ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getInit()) {
             sender.sendMessage("Choisis un nombre entier de GiB entre 1 et "+max+".");return;
         }
         try {
             Path tmp=Files.createTempFile(file.toAbsolutePath().getParent(),"larry-heap-",".tmp");
             try {
                 Files.writeString(tmp,"-Xmx"+amount+"G\n");
-                Files.move(tmp,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);
+                try { Files.move(tmp,file,StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING); }
+                catch(AtomicMoveNotSupportedException ex) { Files.move(tmp,file,StandardCopyOption.REPLACE_EXISTING); }
             } finally {Files.deleteIfExists(tmp);}
             sender.sendMessage("Limite enregistrée : "+amount+" GiB au prochain démarrage avec le lanceur Larry.");
         } catch(IOException ex){sender.sendMessage("Impossible de sauvegarder la limite RAM.");}
