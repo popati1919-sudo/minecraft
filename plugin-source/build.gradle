@@ -26,9 +26,18 @@ tasks.withType(JavaCompile).configureEach {
 
 jar { archiveBaseName = 'LarpersCoin'; archiveVersion = project.version }
 
+sourceSets {
+    test { java.exclude 'ca/larperscoin/smp/AntiDuplicationTest.java' }
+    antiDuplication {
+        java.srcDir 'src/test/java'
+        java.include 'ca/larperscoin/smp/AntiDuplicationTest.java'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
 tasks.register('antiDuplicationTest', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
+    dependsOn antiDuplicationClasses
+    classpath = sourceSets.antiDuplication.runtimeClasspath
     mainClass = 'ca.larperscoin.smp.AntiDuplicationTest'
     javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
 }
