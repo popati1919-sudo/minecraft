@@ -7,6 +7,7 @@ final class ModoGroup {
     private static final java.util.Set<String> RANKS=java.util.Set.of("default","joueur","modo","moderator","mod","admin","owner");
     static void assign(LarpersCoin plugin,org.bukkit.entity.Player admin,org.bukkit.entity.Player player,String rank) {
         if(!plugin.isLpcAdmin(admin))return;
+        if(!org.bukkit.Bukkit.getPluginManager().isPluginEnabled("LuckPerms")) { admin.sendMessage("LuckPerms indisponible."); return; }
         if(!admin.isOp() && (player.isOp() || player.hasPermission("group.owner") || rank.equals("owner"))) {
             admin.sendMessage("Seul un opérateur peut gérer le grade Owner ou celui d’un opérateur.");return;
         }
@@ -35,6 +36,8 @@ final class ModoGroup {
         for(String rank:java.util.List.of("admin","owner")) {
             groups.createAndLoadGroup(rank).thenCompose(group->{
                 group.data().add(Node.builder("larpers.admin").build());
+                group.data().add(Node.builder("worldedit.*").build());
+                group.data().add(Node.builder("worldguard.*").build());
                 return groups.saveGroup(group);
             }).exceptionally(error->{plugin.getLogger().warning("Groupe "+rank+" : "+error.getMessage());return null;});
         }
