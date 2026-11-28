@@ -26,7 +26,7 @@ final class RamCommand implements CommandExecutor, Listener {
     private long limit() {
         var os=ManagementFactory.getOperatingSystemMXBean();
         if(os instanceof com.sun.management.OperatingSystemMXBean machine && machine.getTotalMemorySize()>0)
-            return machine.getTotalMemorySize()/GIB;
+            return Math.max(0, machine.getTotalMemorySize()/GIB - 3);
         return 0;
     }
 
@@ -48,7 +48,7 @@ final class RamCommand implements CommandExecutor, Listener {
         } catch(IOException ex){sender.sendMessage("Impossible de sauvegarder la limite RAM.");}
     }
     @Override public boolean onCommand(CommandSender sender,Command cmd,String label,String[] args) {
-        if(!sender.hasPermission("larpers.admin"))return true;
+        if(!sender.hasPermission("larpers.admin")){sender.sendMessage("Permission refusée.");return true;}
         if(args.length==1){set(sender,args[0]);return true;}
         if(args.length!=0)return false;
         String saved="non configurée";
@@ -67,6 +67,9 @@ final class RamCommand implements CommandExecutor, Listener {
             p.openInventory(inv);
         }
         return true;
+    }
+    @EventHandler public void drag(InventoryDragEvent e) {
+        if(TITLE.equals(e.getView().getTitle())) e.setCancelled(true);
     }
     @EventHandler public void click(InventoryClickEvent e) {
         if(!TITLE.equals(e.getView().getTitle()))return;
