@@ -45,11 +45,13 @@ public final class SecureTradeManager implements Listener {
 
     private static final class Offer {
         final List<ItemStack> items = new ArrayList<>();
+        final List<Integer> slots=new ArrayList<>();
         boolean confirmed;
         double money;
     }
     private static final class Session {
         final UUID first, second;
+        final String id=UUID.randomUUID().toString();
         final Offer a = new Offer(), b = new Offer();
         boolean countdown;
         long generation;
@@ -75,34 +77,6 @@ public final class SecureTradeManager implements Listener {
         if(lore.length>0) meta.setLore(Arrays.stream(lore).map(x->ChatColor.GRAY+x).toList());
         item.setItemMeta(meta); return item;
     }
-    private void returnItems(Player p,Offer offer) {
-        for(ItemStack item:offer.items) {
-            Map<Integer,ItemStack> left=p.getInventory().addItem(item.clone());
-            for(ItemStack rest:left.values()) {
-                var dropped=p.getWorld().dropItemNaturally(p.getLocation(),rest);
-                dropped.setOwner(p.getUniqueId());
-            }
-        }
-        offer.items.clear();
-    }
-    private void storeReturns(UUID id,Offer offer){
-        if(offer.items.isEmpty())return;
-        var dir=plugin.getDataFolder().toPath().resolve("trade-returns");
-        try {
-            java.nio.file.Files.createDirectories(dir);
-            var file=dir.resolve(id+".yml");
-            var y=new org.bukkit.configuration.file.YamlConfiguration();
-            if(java.nio.file.Files.exists(file))y.load(file.toFile());
-            var items=new ArrayList<ItemStack>();
-            var prior=y.getList("items",List.of());
-            for(Object entry:prior)if(entry instanceof ItemStack item)items.add(item);
-            for(ItemStack item:offer.items)items.add(item.clone());
-            y.set("items",items);
-            var tmp=java.nio.file.Files.createTempFile(dir,"return-",".tmp");
-            try{y.save(tmp.toFile());try{java.nio.file.Files.move(tmp,file,java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}catch(java.nio.file.AtomicMoveNotSupportedException ex){java.nio.file.Files.move(tmp,file,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}}finally{java.nio.file.Files.deleteIfExists(tmp);}
-            offer.items.clear();
-        }catch(Exception ex){plugin.getLogger().severe("Objets à restituer manuellement pour "+id+": "+offer.items+" ("+ex.getMessage()+")");}
-    }
     private void closeViews(Session s) {
         for(UUID id:List.of(s.first,s.second)) {
             Player p=Bukkit.getPlayer(id);
@@ -116,13 +90,10 @@ public final class SecureTradeManager implements Listener {
     private void cancel(Session s,String reason) {
         clear(s);
         Player a=Bukkit.getPlayer(s.first), b=Bukkit.getPlayer(s.second);
-        if(a!=null) returnItems(a,s.a);
-        else storeReturns(s.first,s.a);
-        if(b!=null) returnItems(b,s.b);
-        else storeReturns(s.second,s.b);
+        // Offers are snapshots only; cancellation never transfers or destroys real items.
         closeViews(s);
-        if(a!=null) msg(a,"Échange annulé : "+reason+". Tes objets t'ont été rendus.");
-        if(b!=null) msg(b,"Échange annulé : "+reason+". Tes objets t'ont été rendus.");
+        if(a!=null) msg(a,"Échange annulé : "+reason+". Tes objets sont restés dans ton inventaire.");
+        if(b!=null) msg(b,"Échange annulé : "+reason+". Tes objets sont restés dans ton inventaire.");
     }
     public boolean handle(CommandSender sender,String[] args) {
         if(!(sender instanceof Player p)){msg(sender,"Cette commande doit être utilisée en jeu.");return true;}
@@ -205,13 +176,14 @@ public final class SecureTradeManager implements Listener {
             own.confirmed?"OFFRE CONFIRMÉE":"CONFIRMER L'ÉCHANGE",
             own.confirmed?"En attente de l'autre joueur":"Clique seulement quand tu es satisfait de l'offre",
             "Toute modification annule les deux confirmations"));
-        inv.setItem(53,named(Material.BARRIER,"ANNULER L'ÉCHANGE","Les objets déposés te seront rendus"));
+        inv.setItem(53,named(Material.BARRIER,"ANNULER L'ÉCHANGE","Les objets restent dans ton inventaire"));
         opening.add(p.getUniqueId());
-        p.openInventory(inv);
-        opening.remove(p.getUniqueId());
+        try{p.openInventory(inv);}finally{opening.remove(p.getUniqueId());}
     }
     private void openMoneyInput(Player p) {
         UUID id=p.getUniqueId();
+        Session s=session(id);if(s==null)return;
+        s.a.confirmed=false;s.b.confirmed=false;s.countdown=false;s.generation++;
         opening.add(id);
         InventoryView view=p.openAnvil(null,true);
         opening.remove(id);
@@ -227,7 +199,8 @@ public final class SecureTradeManager implements Listener {
         return -1;
     }
     private void changed(Session s) {
-        s.a.confirmed=false;s.b.confirmed=false;s.countdown=false;s.generation++;refresh(s);
+        s.a.confirmed=false;s.b.confirmed=false;s.countdown=false;s.generation++;
+        Bukkit.getScheduler().runTask(plugin,()->{if(session(s.first)==s)refresh(s);});
     }
     @EventHandler public void onClick(InventoryClickEvent e) {
         if(moneyInput.contains(e.getWhoClicked().getUniqueId()) && e.getView() instanceof AnvilView anvil) {
@@ -267,36 +240,30 @@ public final class SecureTradeManager implements Listener {
         Player other=Bukkit.getPlayer(s.other(p.getUniqueId()));
         if(!withinRange(p,other)){cancel(s,"les joueurs doivent rester à 10 blocs maximum");return;}
         int raw=e.getRawSlot();
-        if(raw==53){cancel(s,p.getName()+" a annulé");return;}
-        if(raw==21){openMoneyInput(p);return;}
+        if(raw==53){Bukkit.getScheduler().runTask(plugin,()->{if(session(s.first)==s)cancel(s,p.getName()+" a annulé");});return;}
+        if(raw==21){Bukkit.getScheduler().runTask(plugin,()->{if(session(p.getUniqueId())==s&&tradeView(p.getOpenInventory()))openMoneyInput(p);});return;}
         if(raw==49) {
             Offer own=s.offer(p.getUniqueId()); own.confirmed=true;
             if(other!=null)msg(other,p.getName()+" a confirmé son offre.");
-            if(s.a.confirmed&&s.b.confirmed)startCountdown(s);else refresh(s);
+            if(moneyInput.contains(s.first)||moneyInput.contains(s.second)){own.confirmed=false;msg(p,"Attends la fin de la saisie du montant.");return;}
+            Bukkit.getScheduler().runTask(plugin,()->{if(session(s.first)!=s)return;if(s.a.confirmed&&s.b.confirmed)startCountdown(s);else refresh(s);});
             return;
         }
+        if(e.getCursor()!=null&&!e.getCursor().getType().isAir())return;
         int index=ownIndex(raw);
-        if(index>=0) {
-            Offer own=s.offer(p.getUniqueId());
-            ItemStack cursor=e.getCursor(), existing=index<own.items.size()?own.items.get(index):null;
-            if(cursor!=null&&!cursor.getType().isAir()) {
-                if(index>own.items.size() || (index==own.items.size()&&own.items.size()>=OWN_SLOTS.length))return;
-                if(index==own.items.size()) own.items.add(cursor.clone()); else own.items.set(index,cursor.clone());
-                e.setCursor(existing==null?null:existing.clone());
-                changed(s);
-            } else if(existing!=null) {
-                own.items.remove(index); e.setCursor(existing.clone()); changed(s);
-            }
+        Offer own=s.offer(p.getUniqueId());
+        if(index>=0){
+            if(index<own.items.size()){own.items.remove(index);own.slots.remove(index);changed(s);}
             return;
         }
-        if(raw>=e.getView().getTopInventory().getSize()) {
-            ItemStack clicked=e.getCurrentItem();
-            if(clicked==null||clicked.getType().isAir())return;
-            Offer own=s.offer(p.getUniqueId());
-            if(own.items.size()>=OWN_SLOTS.length)return;
-            own.items.add(clicked.clone());
-            e.setCurrentItem(null);
-            changed(s);
+        if(e.getClickedInventory()!=null&&e.getClickedInventory().equals(p.getInventory())){
+            int slot=e.getSlot();
+            if(slot<0||slot>=36)return;
+            int existing=own.slots.indexOf(slot);
+            if(existing>=0){own.slots.remove(existing);own.items.remove(existing);changed(s);return;}
+            ItemStack clicked=p.getInventory().getItem(slot);
+            if(clicked==null||clicked.getType().isAir()||own.items.size()>=OWN_SLOTS.length)return;
+            own.slots.add(slot);own.items.add(clicked.clone());changed(s);
         }
     }
     @EventHandler public void onDrag(InventoryDragEvent e) {
@@ -324,40 +291,67 @@ public final class SecureTradeManager implements Listener {
         msg(b,"Échange validé dans "+seconds+" seconde(s)...");
         Bukkit.getScheduler().runTaskLater(plugin,()->countdown(s,seconds-1,generation),20L);
     }
-    private boolean canReceive(Player receiver,Offer incoming) {
-        Inventory test=Bukkit.createInventory(null,36);
-        test.setStorageContents(receiver.getInventory().getStorageContents());
-        return test.addItem(incoming.items.stream().map(ItemStack::clone).toArray(ItemStack[]::new)).isEmpty();
+    private ItemStack[] cloneContents(ItemStack[] contents){
+        return Arrays.stream(contents).map(item->item==null?null:item.clone()).toArray(ItemStack[]::new);
     }
-    private void complete(Session s) {
+    private ItemStack[] simulate(Player p,Offer own,Offer incoming){
+        ItemStack[] before=cloneContents(p.getInventory().getStorageContents());
+        if(own.slots.size()!=own.items.size())return null;
+        for(int i=0;i<own.slots.size();i++){
+            int slot=own.slots.get(i);
+            if(slot<0||slot>=before.length||!Objects.equals(before[slot],own.items.get(i)))return null;
+            before[slot]=null;
+        }
+        Inventory test=Bukkit.createInventory(null,36);test.setStorageContents(before);
+        if(!test.addItem(incoming.items.stream().map(ItemStack::clone).toArray(ItemStack[]::new)).isEmpty())return null;
+        return cloneContents(test.getStorageContents());
+    }
+    private java.nio.file.Path journal(Session s,Player a,Player b,ItemStack[] afterA,ItemStack[] afterB)throws java.io.IOException{
+        var dir=plugin.getDataFolder().toPath().resolve("trade-journal");
+        java.nio.file.Files.createDirectories(dir);
+        var file=dir.resolve(s.id+".yml");
+        var tmp=java.nio.file.Files.createTempFile(dir,"trade-",".tmp");
+        var y=new org.bukkit.configuration.file.YamlConfiguration();
+        y.set("first",s.first.toString());y.set("second",s.second.toString());
+        y.set("first-money",s.a.money);y.set("second-money",s.b.money);
+        y.set("first-balance-before",economy.balance(s.first));y.set("second-balance-before",economy.balance(s.second));
+        y.set("first-before",Arrays.asList(cloneContents(a.getInventory().getStorageContents())));
+        y.set("second-before",Arrays.asList(cloneContents(b.getInventory().getStorageContents())));
+        y.set("first-after",Arrays.asList(afterA));y.set("second-after",Arrays.asList(afterB));
+        try{
+            y.save(tmp.toFile());
+            try{java.nio.file.Files.move(tmp,file,java.nio.file.StandardCopyOption.ATOMIC_MOVE);}
+            catch(java.nio.file.AtomicMoveNotSupportedException ex){java.nio.file.Files.move(tmp,file);}
+        }finally{java.nio.file.Files.deleteIfExists(tmp);}
+        return file;
+    }
+    private void complete(Session s){
         Player a=Bukkit.getPlayer(s.first),b=Bukkit.getPlayer(s.second);
-        if(a==null||b==null){cancel(s,"un joueur s'est déconnecté");return;}
-        if(!withinRange(a,b)){cancel(s,"les joueurs sont trop éloignés");return;}
-        if(s.a.items.isEmpty() && s.b.items.isEmpty() && s.a.money==0 && s.b.money==0){cancel(s,"offres vides");return;}
-        if(!canReceive(a,s.b)||!canReceive(b,s.a)){cancel(s,"inventaire plein; objets rendus sans échange");return;}
-        if(!Double.isFinite(s.a.money)||!Double.isFinite(s.b.money)||s.a.money<0||s.b.money<0
-            ||economy.balance(a.getUniqueId())<s.a.money||economy.balance(b.getUniqueId())<s.b.money) {
-            cancel(s,"solde Larry insuffisant; aucun échange effectué");return;
+        if(!withinRange(a,b)||a.isDead()||b.isDead()){cancel(s,"joueur indisponible ou trop loin");return;}
+        if(s.a.items.isEmpty()&&s.b.items.isEmpty()&&s.a.money==0&&s.b.money==0){cancel(s,"offres vides");return;}
+        ItemStack[] afterA=simulate(a,s.a,s.b),afterB=simulate(b,s.b,s.a);
+        if(afterA==null||afterB==null){cancel(s,"inventaire plein ou offre modifiée");return;}
+        java.nio.file.Path file;
+        try{file=journal(s,a,b,afterA,afterB);}
+        catch(java.io.IOException ex){cancel(s,"journal de sécurité indisponible");return;}
+        if(!economy.commitTradeMoney(s.first,s.second,s.a.money,s.b.money,s.id)){
+            try{java.nio.file.Files.deleteIfExists(file);}catch(java.io.IOException ignored){}
+            cancel(s,"solde insuffisant ou sauvegarde impossible");return;
         }
-        if(s.a.money>0&&!economy.debit(a.getUniqueId(),s.a.money)){cancel(s,"paiement Larry impossible");return;}
-        if(s.b.money>0&&!economy.debit(b.getUniqueId(),s.b.money)){
-            if(s.a.money>0)economy.credit(a.getUniqueId(),s.a.money);
-            cancel(s,"paiement Larry impossible");return;
-        }
-        if(s.a.money>0)economy.credit(b.getUniqueId(),s.a.money);
-        if(s.b.money>0)economy.credit(a.getUniqueId(),s.b.money);
-        economy.saveData();
-        if(s.a.money>0)economy.recordTransaction("TRADE",a.getUniqueId(),b.getUniqueId(),s.a.money);
-        if(s.b.money>0)economy.recordTransaction("TRADE",b.getUniqueId(),a.getUniqueId(),s.b.money);
         clear(s);
-        for(ItemStack item:s.a.items)for(ItemStack rest:b.getInventory().addItem(item.clone()).values()){var dropped=b.getWorld().dropItemNaturally(b.getLocation(),rest);dropped.setOwner(b.getUniqueId());}
-        for(ItemStack item:s.b.items)for(ItemStack rest:a.getInventory().addItem(item.clone()).values()){var dropped=a.getWorld().dropItemNaturally(a.getLocation(),rest);dropped.setOwner(a.getUniqueId());}
-        s.a.items.clear();s.b.items.clear();
+        try{
+            a.getInventory().setStorageContents(afterA);b.getInventory().setStorageContents(afterB);
+            a.saveData();b.saveData();
+            java.nio.file.Files.deleteIfExists(file);
+            economy.clearTradeCommit(s.id);
+        }catch(Exception ex){
+            plugin.getLogger().severe("Échange "+s.id+" à vérifier avec trade-journal et trade-commits: "+ex.getMessage());
+            closeViews(s);msg(a,"Échange à vérifier par un admin.");msg(b,"Échange à vérifier par un admin.");return;
+        }
         closeViews(s);
-        msg(a,"Échange terminé avec "+b.getName()+". Argent reçu : "+s.b.money+" Larry, envoyé : "+s.a.money+" Larry.");
-        msg(b,"Échange terminé avec "+a.getName()+". Argent reçu : "+s.a.money+" Larry, envoyé : "+s.b.money+" Larry.");
-        completedTrade.accept(a.getUniqueId());
-        completedTrade.accept(b.getUniqueId());
+        msg(a,"Échange terminé avec "+b.getName()+".");
+        msg(b,"Échange terminé avec "+a.getName()+".");
+        completedTrade.accept(a.getUniqueId());completedTrade.accept(b.getUniqueId());
     }
     @EventHandler public void onClose(InventoryCloseEvent e) {
         UUID closedId=e.getPlayer().getUniqueId();
