@@ -6,7 +6,7 @@ import java.util.Arrays;
 
 /** Pure rules shared by the ledger and its regression tests. */
 final class AntiDuplication {
-    static final long MAX_UNITS=9_000_000_000_000_000L;
+    static final long MAX_UNITS=100_000_000_000_000L;
     private AntiDuplication(){}
     static long units(double amount){
         if(!Double.isFinite(amount))throw new IllegalArgumentException("Non-finite amount");
