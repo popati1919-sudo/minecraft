@@ -598,7 +598,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
                     setLedgerAmount("bounties." + targetId, nextBounty);
                     appendTransaction("BOUNTY_PLACE",player.getUniqueId(),new UUID(0L,0L),amount);
                     if(!saveData()){setLedgerAmount("bounties."+targetId,previousBounty);setLedgerAmount("balances."+key(player.getUniqueId()),previousBalance);data.set("transactions",previousHistory);reply(sender,"Prime annulée : sauvegarde impossible.");return true;}
-                    Bukkit.broadcastMessage(ChatColor.GOLD + "[Larry] " + player.getName() + " place une prime de " + format(amount) + " sur " + target.getName() + " !");
+                    Bukkit.broadcastMessage(ChatColor.GOLD + "[Larry] " + player.getName() + " ajoute " + format(amount) + " à la prime de " + target.getName() + " ! Prime totale : " + format(nextBounty) + ".");
                     return true;
                 }
                 case "eco" -> {
