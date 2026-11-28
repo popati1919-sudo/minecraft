@@ -325,6 +325,72 @@ public final class SecureTradeManager implements Listener {
         }finally{java.nio.file.Files.deleteIfExists(tmp);}
         return file;
     }
+    private org.bukkit.NamespacedKey receipt(String tradeId){return new org.bukkit.NamespacedKey(plugin,"trade_"+tradeId);}
+    private ItemStack[] readContents(org.bukkit.configuration.file.YamlConfiguration y,String field){
+        var list=y.getList(field);
+        if(list==null||list.size()!=36)throw new IllegalStateException("Inventaire incomplet: "+field);
+        ItemStack[] result=new ItemStack[36];
+        for(int i=0;i<36;i++){
+            Object value=list.get(i);
+            if(value!=null&&!(value instanceof ItemStack))throw new IllegalStateException("Objet invalide: "+field);
+            result[i]=value==null?null:((ItemStack)value).clone();
+        }
+        return result;
+    }
+    private void writeJournal(java.nio.file.Path file,org.bukkit.configuration.file.YamlConfiguration y)throws java.io.IOException{
+        var tmp=java.nio.file.Files.createTempFile(file.getParent(),"receipt-",".tmp");
+        try{
+            y.save(tmp.toFile());
+            try{java.nio.file.Files.move(tmp,file,java.nio.file.StandardCopyOption.ATOMIC_MOVE,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}
+            catch(java.nio.file.AtomicMoveNotSupportedException ex){java.nio.file.Files.move(tmp,file,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}
+        }finally{java.nio.file.Files.deleteIfExists(tmp);}
+    }
+    private void deliver(java.nio.file.Path file,org.bukkit.configuration.file.YamlConfiguration y,String side,Player p)throws java.io.IOException{
+        if(y.getBoolean(side+"-done"))return;
+        String tradeId=file.getFileName().toString().replace(".yml","");
+        var key=receipt(tradeId);
+        var pdc=p.getPersistentDataContainer();
+        var type=org.bukkit.persistence.PersistentDataType.BYTE;
+        if(!pdc.has(key,type)){
+            ItemStack[] before=readContents(y,side+"-before"),after=readContents(y,side+"-after");
+            if(!Arrays.equals(before,p.getInventory().getStorageContents()))throw new IllegalStateException("Inventaire différent du journal");
+            p.getInventory().setStorageContents(after);
+            pdc.set(key,type,(byte)1);
+            p.saveData();
+        }
+        y.set(side+"-done",true);writeJournal(file,y);
+    }
+    private void finishJournal(java.nio.file.Path file,org.bukkit.configuration.file.YamlConfiguration y)throws java.io.IOException{
+        if(!y.getBoolean("first-done")||!y.getBoolean("second-done"))return;
+        String tradeId=file.getFileName().toString().replace(".yml","");
+        java.nio.file.Files.deleteIfExists(file);
+        economy.clearTradeCommit(tradeId);
+        for(String side:List.of("first","second")){
+            Player p=Bukkit.getPlayer(UUID.fromString(y.getString(side)));
+            if(p!=null){p.getPersistentDataContainer().remove(receipt(tradeId));p.saveData();}
+        }
+    }
+    @EventHandler(priority=org.bukkit.event.EventPriority.LOWEST)
+    public void recoverTrade(org.bukkit.event.player.PlayerJoinEvent event){
+        Player p=event.getPlayer();
+        var dir=plugin.getDataFolder().toPath().resolve("trade-journal");
+        if(!java.nio.file.Files.isDirectory(dir))return;
+        try(var files=java.nio.file.Files.newDirectoryStream(dir,"*.yml")){
+            for(var file:files){
+                String tradeId=file.getFileName().toString().replace(".yml","");
+                if(!economy.hasTradeCommit(tradeId))continue;
+                var y=new org.bukkit.configuration.file.YamlConfiguration();y.load(file.toFile());
+                String playerId=p.getUniqueId().toString();
+                String side=playerId.equals(y.getString("first"))?"first":playerId.equals(y.getString("second"))?"second":null;
+                if(side==null)continue;
+                try{deliver(file,y,side,p);finishJournal(file,y);}
+                catch(Exception ex){
+                    plugin.getLogger().severe("Échange "+tradeId+" non récupéré pour "+p.getName()+": "+ex.getMessage());
+                    p.kickPlayer("Échange interrompu à vérifier par un admin : "+tradeId);return;
+                }
+            }
+        }catch(Exception ex){plugin.getLogger().severe("Lecture des journaux d'échange impossible : "+ex.getMessage());p.kickPlayer("Récupération des échanges indisponible. Contacte un admin.");}
+    }
     private void complete(Session s){
         Player a=Bukkit.getPlayer(s.first),b=Bukkit.getPlayer(s.second);
         if(!withinRange(a,b)||a.isDead()||b.isDead()){cancel(s,"joueur indisponible ou trop loin");return;}
@@ -340,13 +406,11 @@ public final class SecureTradeManager implements Listener {
         }
         clear(s);
         try{
-            a.getInventory().setStorageContents(afterA);b.getInventory().setStorageContents(afterB);
-            a.saveData();b.saveData();
-            java.nio.file.Files.deleteIfExists(file);
-            economy.clearTradeCommit(s.id);
+            var y=new org.bukkit.configuration.file.YamlConfiguration();y.load(file.toFile());
+            deliver(file,y,"first",a);deliver(file,y,"second",b);finishJournal(file,y);
         }catch(Exception ex){
             plugin.getLogger().severe("Échange "+s.id+" à vérifier avec trade-journal et trade-commits: "+ex.getMessage());
-            closeViews(s);msg(a,"Échange à vérifier par un admin.");msg(b,"Échange à vérifier par un admin.");return;
+            closeViews(s);a.kickPlayer("Échange interrompu : "+s.id);b.kickPlayer("Échange interrompu : "+s.id);return;
         }
         closeViews(s);
         msg(a,"Échange terminé avec "+b.getName()+".");
