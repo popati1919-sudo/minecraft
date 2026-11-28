@@ -16,7 +16,10 @@ final class LarryModeration implements Listener, CommandExecutor {
 
     LarryModeration(LarpersCoin plugin) {
         store=new LarryServiceData(plugin);
-        for(String id:store.ids()) muted.put(UUID.fromString(id),store.name(id));
+        for(String id:store.ids()) {
+            try { String name=store.name(id); if(name!=null && !name.isBlank()) muted.put(UUID.fromString(id),name); }
+            catch(IllegalArgumentException ex) { plugin.getLogger().warning("Invalid mute UUID: "+id); }
+        }
         for(String command: new String[]{"mute","unmute","banip","listban"})
             plugin.getCommand(command).setExecutor(this);
         Bukkit.getPluginManager().registerEvents(this,plugin);
