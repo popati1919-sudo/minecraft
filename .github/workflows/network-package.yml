@@ -36,6 +36,8 @@ jobs:
         run: gradle --no-daemon clean build
 
       - name: Telecharger Paper, Velocity et plugins
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -68,11 +70,11 @@ jobs:
           cp "$plugin_jar" "$ROOT/Lobby/plugins/LarpersCoin.jar"
 
           # EduGeyser + EduFloodgate: Minecraft Education et Bedrock via Velocity.
-          edugeyser_meta="$(curl -fsSL https://api.github.com/repos/EduGeyser/EduGeyser/releases/latest)"
+          edugeyser_meta="$(curl --retry 3 -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/EduGeyser/EduGeyser/releases/latest)"
           edugeyser_url="$(echo "$edugeyser_meta" | jq -r '.assets[] | select(.name == "EduGeyser-Velocity.jar") | .browser_download_url' | head -n 1)"
           test -n "$edugeyser_url"
           curl -fL "$edugeyser_url" -o "$ROOT/Velocity/plugins/EduGeyser-Velocity.jar"
-          edufloodgate_meta="$(curl -fsSL https://api.github.com/repos/EduGeyser/EduFloodgate/releases/latest)"
+          edufloodgate_meta="$(curl --retry 3 -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/EduGeyser/EduFloodgate/releases/latest)"
           edufloodgate_velocity_url="$(echo "$edufloodgate_meta" | jq -r '.assets[] | select(.name == "edufloodgate-velocity.jar") | .browser_download_url' | head -n 1)"
           edufloodgate_paper_url="$(echo "$edufloodgate_meta" | jq -r '.assets[] | select(.name == "edufloodgate-spigot.jar") | .browser_download_url' | head -n 1)"
           test -n "$edufloodgate_velocity_url"
