@@ -12,7 +12,35 @@ public final class AntiDuplicationTest {
     private static void reject(Runnable action,String name){
         try{action.run();throw new AssertionError(name);}catch(IllegalArgumentException|ArithmeticException expected){checks++;}
     }
-    public static void main(String[] args){
+    private static void receiptTests()throws Exception{
+        var dir=java.nio.file.Files.createTempDirectory("larry-receipt-");
+        var path=dir.resolve("player.dat");
+        try{
+            String key="larperscoin:trade_123";
+            for(int mode=0;mode<3;mode++){
+                try(var out=new java.io.DataOutputStream(new java.util.zip.GZIPOutputStream(java.nio.file.Files.newOutputStream(path)))){
+                    out.writeByte(10);out.writeUTF("");
+                    out.writeByte(10);out.writeUTF(mode==1?"NotPlayerPdc":"BukkitValues");
+                    out.writeByte(1);out.writeUTF(key);out.writeByte(mode==2?0:1);
+                    out.writeByte(0);out.writeByte(0);
+                }
+                check(PlayerReceipt.exists(path,key)==(mode==0),"disk receipt "+mode);
+            }
+            java.nio.file.Files.writeString(path,"invalid");
+            try{PlayerReceipt.exists(path,key);throw new AssertionError("malformed NBT accepted");}
+            catch(java.io.IOException expected){checks++;}
+        }finally{java.nio.file.Files.deleteIfExists(path);java.nio.file.Files.deleteIfExists(dir);}
+    }
+    private static void recipeTests(){
+        var prices=java.util.Map.of("log",0.20,"plank",0.20,"stick",0.20);
+        var rules=java.util.List.of(new RecipeEconomy.Rule("plank",4,java.util.List.of(java.util.List.of("log"))),new RecipeEconomy.Rule("stick",4,java.util.List.of(java.util.List.of("plank"),java.util.List.of("plank"))));
+        var caps=RecipeEconomy.ceilings(prices,rules);
+        check(caps.get("plank")*4<=prices.get("log"),"no direct recipe arbitrage");
+        check(caps.get("stick")*8<=prices.get("log"),"no chained recipe arbitrage");
+        check(RecipeEconomy.ceilings(prices,java.util.List.of(new RecipeEconomy.Rule("plank",4,java.util.List.of(java.util.List.of("missing"))))).get("plank")>0,"unknown ingredients not free");
+    }
+    public static void main(String[] args)throws Exception{
+        receiptTests();recipeTests();
         check(AntiDuplication.units(0.1+0.2)==3000,"floating point rounding");
         check(AntiDuplication.units(AntiDuplication.add(1.0001,-0.0001))==10000,"exact 4 decimal debit");
         reject(()->AntiDuplication.add(0,-0.0001),"negative balances");
