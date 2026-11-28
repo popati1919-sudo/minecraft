@@ -230,6 +230,8 @@ jobs:
           show-plugins = false
           EOF
 
+          echo "-Xmx1G" > "$ROOT/Lobby/larry-heap.args"
+          echo "-Xmx4G" > "$ROOT/SMP/larry-heap.args"
           for SERVER in Lobby SMP; do
             PORT=25566
             PVP=false
@@ -381,9 +383,9 @@ jobs:
               exit /b 1
             )
           )
-          start "Larry Lobby" cmd /k "cd /d ""%~dp0Lobby"" && java -Dlarpers.server=Lobby -Xms512M -Xmx1G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
+          start "Larry Lobby" cmd /k "cd /d ""%~dp0Lobby"" && java -Dlarpers.server=Lobby -Xms512M @larry-heap.args -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
           timeout /t 8 /nobreak >nul
-          start "Larry SMP" cmd /k "cd /d ""%~dp0SMP"" && java -Dlarpers.server=SMP -Xms1G -Xmx4G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
+          start "Larry SMP" cmd /k "cd /d ""%~dp0SMP"" && java -Dlarpers.server=SMP -Xms512M @larry-heap.args -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui"
           timeout /t 8 /nobreak >nul
           start "Larry Velocity" cmd /k "cd /d ""%~dp0Velocity"" && java -Xms512M -Xmx1G -jar velocity.jar"
           echo Reseau demarre. Les joueurs se connectent sur le port Java 25565.
@@ -413,8 +415,8 @@ jobs:
             do { Start-Sleep -Seconds 2; $stillRunning = Get-Process -Id $pidToWait -ErrorAction SilentlyContinue } while ($stillRunning -and (Get-Date) -lt $deadline)
             if ($stillRunning) { Write-Host "Arret non confirme. Aucun redemarrage force."; exit 1 }
           } else { Write-Host "$Server est deja arrete; demarrage..." }
-          if ($Server -eq "Lobby") { $javaArgs = "-Dlarpers.server=Lobby -Xms512M -Xmx1G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui" }
-          else { $javaArgs = "-Dlarpers.server=SMP -Xms1G -Xmx4G -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui" }
+          if ($Server -eq "Lobby") { $javaArgs = "-Dlarpers.server=Lobby -Xms512M @larry-heap.args -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui" }
+          else { $javaArgs = "-Dlarpers.server=SMP -Xms512M @larry-heap.args -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UseStringDeduplication -jar paper.jar --nogui" }
           Start-Process -FilePath $env:ComSpec -WorkingDirectory $serverDir -ArgumentList @("/k", "title Larry $Server && java $javaArgs")
           Write-Host "$Server relance. Velocity et l’autre serveur restent actifs."
           EOF

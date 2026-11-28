@@ -7,6 +7,10 @@ author: Larry SMP
 description: "Plugin Larry SMP: économie, clans, quêtes, hôtel des ventes, modération et anti-triche."
 softdepend: [floodgate, GrimAC, LuckPerms]
 commands:
+  ram:
+    description: Régler la mémoire maximale de ce serveur Paper au prochain démarrage
+    usage: /ram [GiB]
+    permission: larpers.admin
   modo:
     description: Entrer ou sortir de la surveillance du SMP
   tp:

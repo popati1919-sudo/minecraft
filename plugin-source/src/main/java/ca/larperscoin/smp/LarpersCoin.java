@@ -94,6 +94,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         Bukkit.getWorlds().forEach(this::disablePlayerLocatorBar);
         getConfig().addDefault("economy.sale-tax-percent",5.0);
         new LarryModeration(this);
+        new RamCommand(this);
         auth = new LarpersAuth(this);
         features = new LarpersFeatures(this);
         antiCheat = new LarpersAntiCheat(this);
@@ -101,7 +102,7 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         long lotteryEnd=data.getLong("lottery.ends-at",0L);
         if(data.getBoolean("lottery.active",false)) {
             long remaining=Math.max(1L,lotteryEnd-System.currentTimeMillis());
-            getServer().getScheduler().runTaskLater(this,()->finishLottery(true),Math.max(1L,remaining/50L));
+            lotteryTimer=getServer().getScheduler().runTaskLater(this,()->finishLottery(true),Math.max(1L,remaining/50L));
         }
         getServer().getScheduler().runTaskTimer(this,this::updatePlayerTags,40L,40L);
         getServer().getScheduler().runTaskLater(this, () -> {
@@ -555,6 +556,8 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
     private boolean isLpcAdminSender(CommandSender sender){return sender.isOp()||sender.hasPermission("larpers.admin");}
     public boolean isLpcAdmin(Player player){return isLpcAdminSender(player);}
 
+    private org.bukkit.scheduler.BukkitTask lotteryTimer;
+
     private void startLottery(int minutes,String starter) {
         long end=System.currentTimeMillis()+minutes*60_000L;
         data.set("lottery.active",true);data.set("lottery.ends-at",end);saveData();
@@ -563,10 +566,11 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         Bukkit.broadcastMessage(ChatColor.GREEN+"Ticket: 50 Larry | Durée: "+minutes+" minute(s) | Jackpot: "+format(lotteryPot()));
         Bukkit.broadcastMessage(ChatColor.AQUA+"Ouvre /lottery pour acheter tes tickets!");
         Bukkit.broadcastMessage(ChatColor.GRAY+"Lancée par "+starter+".");
-        getServer().getScheduler().runTaskLater(this,()->finishLottery(true),minutes*60L*20L);
+        lotteryTimer=getServer().getScheduler().runTaskLater(this,()->finishLottery(true),minutes*60L*20L);
     }
     private void finishLottery(boolean automatic) {
         if(!lotteryActive())return;
+        if(lotteryTimer!=null){lotteryTimer.cancel();lotteryTimer=null;}
         data.set("lottery.active",false);data.set("lottery.ends-at",0L);saveData();
         List<String> tickets=data.getStringList("lottery.tickets");
         if(tickets.isEmpty()) {

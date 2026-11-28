@@ -378,7 +378,9 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     private void createAuction(Player p,double price) {
         ItemStack hand=p.getInventory().getItemInMainHand();
         if(!Double.isFinite(price)||price<=0||hand.getType()==Material.AIR){msg(p,"Prix invalide ou main vide.");return;}
-        String key=UUID.randomUUID().toString().substring(0,8),path="ah."+key;
+        String key;
+        do { key=UUID.randomUUID().toString(); } while(db.contains("ah."+key));
+        String path="ah."+key;
         db.set(path+".seller",p.getName());db.set(path+".sellerId",id(p));
         db.set(path+".item",hand.getType().name());db.set(path+".amount",hand.getAmount());
         db.set(path+".price",price);db.set(path+".stack",hand.clone());db.set(path+".created",System.currentTimeMillis());
@@ -1585,7 +1587,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
         return saleNet(Math.round(shopSellPrice(key)*quantity*100)/100.0);
     }
 
-    private boolean sellStack(Player p,int inventorySlot,int amount){ItemStack stack=p.getInventory().getItem(inventorySlot);if(stack==null||stack.getType().isAir()||amount<1||amount>stack.getAmount()){msg(p,"Quantité invalide ou aucun objet vendable.");return false;}String k=stack.getType().name().toLowerCase(Locale.ROOT);if(!SHOP.containsKey(k)||SHOP_BLOCKED.contains(stack.getType())||SHOP_BLOCKED_NAMES.contains(stack.getType().name())||k.contains("netherite")){msg(p,"Cet objet ne peut pas être vendu.");return false;}if(stack.hasItemMeta()){msg(p,"Les objets renommés ou enchantés ne sont pas acceptés.");return false;}double total=shopProceeds(k,amount);if(total<=0||!Double.isFinite(core.balance(p.getUniqueId())+total)){msg(p,"Vente impossible.");return false;}int left=stack.getAmount()-amount;if(left<=0)p.getInventory().setItem(inventorySlot,null);else stack.setAmount(left);give(p,total);db.set("market.window-sold."+k,db.getLong("market.window-sold."+k,0L)+amount);db.set("market.total-sold."+k,db.getLong("market.total-sold."+k,0L)+amount);db.set("market.sales-total",db.getLong("market.sales-total",0L)+amount);db.set("market.sales-count",db.getLong("market.sales-count",0L)+1);List<Map<String,Object>> h=new ArrayList<>();for(Map<?,?> old:db.getMapList("market.history")){Map<String,Object> r=new LinkedHashMap<>();for(var x:old.entrySet())r.put(String.valueOf(x.getKey()),x.getValue());h.add(r);}Map<String,Object> row=new LinkedHashMap<>();row.put("type","VENTE");row.put("item",k);row.put("amount",amount);row.put("total",total);row.put("player",p.getName());row.put("time",System.currentTimeMillis());h.add(0,row);if(h.size()>100)h=new ArrayList<>(h.subList(h.size()-100,h.size()));db.set("market.history",h);save();core.recordTransaction("SHOP_SELL",new UUID(0L,0L),p.getUniqueId(),total);msg(p,"Vente: "+amount+" x "+k+" pour "+formatShopPrice(total)+" Larry. Prix mis à jour dans "+marketTimeLeft()+".");return true;}
+    private boolean sellStack(Player p,int inventorySlot,int amount){ItemStack stack=p.getInventory().getItem(inventorySlot);if(stack==null||stack.getType().isAir()||amount<1||amount>stack.getAmount()){msg(p,"Quantité invalide ou aucun objet vendable.");return false;}String k=stack.getType().name().toLowerCase(Locale.ROOT);if(!SHOP.containsKey(k)||SHOP_BLOCKED.contains(stack.getType())||SHOP_BLOCKED_NAMES.contains(stack.getType().name())||k.contains("netherite")){msg(p,"Cet objet ne peut pas être vendu.");return false;}if(stack.hasItemMeta()){msg(p,"Les objets renommés ou enchantés ne sont pas acceptés.");return false;}double total=shopProceeds(k,amount);if(total<=0||!Double.isFinite(core.balance(p.getUniqueId())+total)){msg(p,"Vente impossible.");return false;}int left=stack.getAmount()-amount;if(left<=0)p.getInventory().setItem(inventorySlot,null);else stack.setAmount(left);give(p,total);db.set("market.window-sold."+k,db.getLong("market.window-sold."+k,0L)+amount);db.set("market.total-sold."+k,db.getLong("market.total-sold."+k,0L)+amount);db.set("market.sales-total",db.getLong("market.sales-total",0L)+amount);db.set("market.sales-count",db.getLong("market.sales-count",0L)+1);List<Map<String,Object>> h=new ArrayList<>();for(Map<?,?> old:db.getMapList("market.history")){Map<String,Object> r=new LinkedHashMap<>();for(var x:old.entrySet())r.put(String.valueOf(x.getKey()),x.getValue());h.add(r);}Map<String,Object> row=new LinkedHashMap<>();row.put("type","VENTE");row.put("item",k);row.put("amount",amount);row.put("total",total);row.put("player",p.getName());row.put("time",System.currentTimeMillis());h.add(0,row);if(h.size()>100)h=new ArrayList<>(h.subList(0,100));db.set("market.history",h);save();core.recordTransaction("SHOP_SELL",new UUID(0L,0L),p.getUniqueId(),total);msg(p,"Vente: "+amount+" x "+k+" pour "+formatShopPrice(total)+" Larry. Prix mis à jour dans "+marketTimeLeft()+".");return true;}
     private boolean sellShop(Player p,int amount){return sellStack(p,p.getInventory().getHeldItemSlot(),amount);}
     private boolean isSellable(ItemStack stack){if(stack==null||stack.getType().isAir())return false;String k=stack.getType().name().toLowerCase(Locale.ROOT);return SHOP.containsKey(k)&&!SHOP_BLOCKED.contains(stack.getType())&&!SHOP_BLOCKED_NAMES.contains(stack.getType().name())&&!k.contains("netherite")&&!stack.hasItemMeta();}
     private double sellAllValue(Player p) {
@@ -2006,6 +2008,8 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
     }
     @EventHandler public void onQuit(PlayerQuitEvent e) {
         UUID id=e.getPlayer().getUniqueId();
+        ahSlots.remove(id);ahPage.remove(id);ahSearch.remove(id);
+        shopPage.remove(id);shopSearch.remove(id);shopCategory.remove(id);
         rankTargets.remove(id);frozen.remove(id);awaitingAhSearch.remove(id);awaitingShopSearch.remove(id);pendingBountyTarget.remove(id);
         awaitingSelectorSearch.remove(id);awaitingBountySearch.remove(id);
         awaitingLotteryAmount.remove(id);awaitingAdminIp.remove(id);awaitingBountyListSearch.remove(id);
@@ -2045,7 +2049,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             Bukkit.getScheduler().runTask(plugin,()->{
                 String action=selectorAction.get(senderId);
                 if(query.equalsIgnoreCase("annuler")){msg(sender,"Recherche annulée.");if(action!=null)openPlayerSelector(sender,action);return;}
-                if(query.length()>16){msg(sender,"Pseudo trop long (16 caractères maximum).");if(action!=null)openPlayerSelector(sender,action);return;}
+                if(query.length()>64){msg(sender,"Pseudo trop long (64 caractères maximum).");if(action!=null)openPlayerSelector(sender,action);return;}
                 selectorSearch.put(senderId,query);
                 if(action!=null)openPlayerSelector(sender,action);
             });
@@ -2056,7 +2060,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             String query=e.getMessage().trim();
             Bukkit.getScheduler().runTask(plugin,()->{
                 if(query.equalsIgnoreCase("annuler")){msg(sender,"Recherche de primes annulée.");openBountyMenu(sender);return;}
-                if(query.length()>16){msg(sender,"Pseudo trop long.");openBountyMenu(sender);return;}
+                if(query.length()>64){msg(sender,"Pseudo trop long.");openBountyMenu(sender);return;}
                 bountySearch.put(senderId,query);openBountyMenu(sender);
             });
             return;
@@ -2066,7 +2070,7 @@ public final class LarpersFeatures implements CommandExecutor, TabCompleter, Lis
             String query=e.getMessage().trim();
             Bukkit.getScheduler().runTask(plugin,()->{
                 if(query.equalsIgnoreCase("annuler")){msg(sender,"Recherche de prime annulée.");openBountyTargets(sender);return;}
-                if(query.length()>16){msg(sender,"Pseudo trop long.");openBountyTargets(sender);return;}
+                if(query.length()>64){msg(sender,"Pseudo trop long.");openBountyTargets(sender);return;}
                 bountySearch.put(senderId,query);openBountyTargets(sender);
             });
             return;
