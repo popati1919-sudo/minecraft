@@ -8,8 +8,8 @@ final class ModoGroup {
     static void assign(LarpersCoin plugin,org.bukkit.entity.Player admin,org.bukkit.entity.Player player,String rank) {
         if(!plugin.isLpcAdmin(admin))return;
         if(!org.bukkit.Bukkit.getPluginManager().isPluginEnabled("LuckPerms")) { admin.sendMessage("LuckPerms indisponible."); return; }
-        if(!admin.isOp() && (player.isOp() || player.hasPermission("group.owner") || rank.equals("owner"))) {
-            admin.sendMessage("Seul un opérateur peut gérer le grade Owner ou celui d’un opérateur.");return;
+        if(!admin.isOp() && (player.isOp() || player.hasPermission("group.owner") || plugin.isLpcAdmin(player) || rank.equals("owner") || rank.equals("admin"))) {
+            admin.sendMessage("Seul un opérateur peut gérer les grades administratifs.");return;
         }
         var lp=LuckPermsProvider.get();
         var groups=lp.getGroupManager();
@@ -18,7 +18,7 @@ final class ModoGroup {
         var user=lp.getUserManager().getUser(player.getUniqueId());
         if(user==null){admin.sendMessage("Profil LuckPerms indisponible.");return;}
         user.data().clear(node -> node instanceof net.luckperms.api.node.types.InheritanceNode parent &&
-            node.getContexts().isEmpty() && RANKS.contains(parent.getGroupName()));
+            RANKS.contains(parent.getGroupName()));
         user.data().add(net.luckperms.api.node.types.InheritanceNode.builder(rank).build());
         user.setPrimaryGroup(rank);
         String label=rank.equals("default")?"joueur":rank;
