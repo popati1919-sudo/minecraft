@@ -221,6 +221,25 @@ public final class LarpersCoin extends JavaPlugin implements Listener, org.bukki
         }
         data.set("balances." + key(uuid), next);
     }
+    boolean commitTradeMoney(UUID first,UUID second,double firstPays,double secondPays,String tradeId) {
+        double a=balance(first),b=balance(second);
+        if(!Double.isFinite(firstPays)||!Double.isFinite(secondPays)||firstPays<0||secondPays<0||a<firstPays||b<secondPays)return false;
+        double nextA=a-firstPays+secondPays,nextB=b-secondPays+firstPays;
+        if(!Double.isFinite(nextA)||!Double.isFinite(nextB))return false;
+        var history=data.getStringList("transactions");
+        data.set("balances."+key(first),nextA);
+        data.set("balances."+key(second),nextB);
+        appendTransaction("TRADE",first,second,firstPays);
+        appendTransaction("TRADE",second,first,secondPays);
+        data.set("trade-commits."+tradeId,true);
+        if(saveData())return true;
+        data.set("balances."+key(first),a);data.set("balances."+key(second),b);
+        data.set("transactions",history);data.set("trade-commits."+tradeId,null);
+        return false;
+    }
+    void clearTradeCommit(String tradeId){
+        data.set("trade-commits."+tradeId,null);saveData();
+    }
     void recordTransaction(String type, UUID from, UUID to, double amount) {
         appendTransaction(type,from,to,amount);saveData();
     }
