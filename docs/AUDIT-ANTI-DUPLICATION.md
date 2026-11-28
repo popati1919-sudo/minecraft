@@ -41,3 +41,43 @@ Les trois workflows de ce commit sont réussis. Aucun test de panne en jeu n'a �
 - Tester les parcours Java, Bedrock et Education après modifications.
 
 Sources dans plugin-source/src/main/java/ca/larperscoin/smp/. Aucun fichier Java modifié pour cet audit.
+
+
+## Correctifs implémentés après l'audit
+
+| ID | Protection actuelle | Limite de validation |
+|---|---|---|
+| D01 | Coffre et inventaire modifiés via journal et registre économique; contrôle de conservation des quantités et métadonnées | Tester les arrêts forcés sur Paper |
+| D02 | Récompenses monétaires de succès idempotentes dans le registre | Tester la migration des anciens succès |
+| D03 | Identifiant du quiz par joueur et horodatage, crédit et validation atomiques | Tester la reprise d'un quiz après panne |
+| D04 | Reçu PDC relu dans le fichier .dat avant archivage du journal trade | Tester la vraie sauvegarde Paper 26.3 |
+| D05 | Même contrôle pour commerce et coffre | Tester la vraie sauvegarde Paper 26.3 |
+| D06 | Écriture du journal avec FileChannel.force(true) avant déplacement | Panne matérielle et systèmes de fichiers non atomiques non garantis |
+| D07 | InventoryHolder dédié, identifiant de clan indépendant du titre | Tester ouverture/fermeture et reconnexion |
+| D08 | Clic gauche contrôlé sur pile entière, curseur vide, autres clics et drag bloqués | Tester Java, Bedrock, Education |
+| D09 | Chargement strict de data.yml, arrêt si invalide | Tester des copies corrompues |
+| D10 | Chargement strict de features.yml, validation avant démarrage | Tester des copies corrompues |
+| D11 | Les blocs replacés ne donnent plus les récompenses de minage | Tester les blocs déplacés par piston et historiques existants |
+| D12 | Quête kills réservée aux créatures; PvP séparé | Tester les catégories de créatures |
+| D13 | Pêche annulée ignorée | Tester les plugins de protection |
+| D14 | Événement chat autorisé en survie authentifiée, paiement confirmé avant annonce | Tester les autres plugins de chat |
+| D15 | Niveau du coffre et solde sauvegardés dans le même registre | Tester les 7 niveaux |
+| D16 | Plafonds de revente selon recettes connues et chaînes de fabrication | Recettes spéciales, échanges villageois et sous-produits non exhaustifs |
+| D17 | Sauvegarde modo identifiée par session unique; archive de la restauration | Ancien snapshot corrompu : intervention manuelle |
+| D18 | Délai de 24 h entre les mêmes joueurs pour récupérer une prime | Ne détecte pas tous les groupes de comptes complices |
+| D19 | Unités entières de 0,0001 Larry, sauvegarde préalable et miroir décimal | Montant maximal 10 milliards Larry; vérifier les anciennes données |
+| D20 | Journaux non commités de plus de 24 h isolés dans aborted | Archives conservées; politique de purge à choisir |
+
+### Tests automatiques
+
+Depuis plugin-source : `gradle clean build` ou `gradle antiDuplicationTest`.
+Le test exécutable contrôle les opérations monétaires, 10 000 échanges de soldes pseudo-aléatoires reproductibles, les décisions de reprise, les limites de coffre, les types de clics autorisés, les reçus NBT, les recettes et la conservation des piles et métadonnées. Ce sont des tests unitaires des règles réutilisées en production, pas des sessions Minecraft simulées.
+
+### Avant déploiement
+
+1. Arrêter Lobby, SMP et Velocity, conserver une sauvegarde intégrale des mondes et des dossiers de plugins.
+2. Mettre à jour les deux backends avec la même version. Ne pas revenir à l'ancien plugin après migration sans restaurer une sauvegarde cohérente des données et inventaires.
+3. Tester dans une copie du serveur avec deux joueurs : déposer/retirer au coffre, échanger, acheter/vendre, récupérer une annonce, réclamer un succès, interrompre le serveur en laboratoire pendant une transaction. Vérifier conservation des objets et soldes.
+4. Examiner les journaux et archives avant toute correction manuelle. Une transaction incohérente peut déconnecter le joueur pour empêcher un écrasement d'inventaire.
+5. Ne pas considérer les duplications vanilla, les interactions avec des plugins tiers, les pannes disque ou tous les arbitrages du jeu comme définitivement éliminés par ces tests.
+
