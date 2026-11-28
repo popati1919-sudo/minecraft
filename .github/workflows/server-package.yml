@@ -238,7 +238,7 @@ jobs:
           web-admin:
             enabled: true
             bind: 127.0.0.1
-            port: 80
+            port: 8765
           EOF
           cat > "$ROOT/START-SERVER.bat" <<'EOF'
           @echo off
@@ -325,7 +325,7 @@ jobs:
           pause
           EOF
           cat > "$ROOT/LISEZ-MOI.txt" <<'EOF'
-          LARRY SMP SMP - SERVEUR PAPER 26.3
+          LARRY SMP - SERVEUR PAPER 26.3
           =====================================
           Inclus:
           - Paper 26.3
@@ -371,6 +371,18 @@ jobs:
           demarrage complet sur ta machine ni par un test de charge/Bedrock.
           Fais une sauvegarde du dossier world et des fichiers plugins avant chaque mise a jour.
           EOF
+
+      - name: Installer WorldEdit et WorldGuard compatibles Paper 26.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          for project in worldedit worldguard; do
+            meta="$(curl --retry 3 -fsSL "https://api.modrinth.com/v2/project/$project/version?game_versions=%5B%2226.3%22%5D&loaders=%5B%22paper%22%2C%22bukkit%22%2C%22spigot%22%5D")"
+            url="$(echo "$meta" | jq -r '[.[] | select(.version_type == "release") | .files[] | select(.primary == true) | .url][0] // empty')"
+            test -n "$url" || { echo "Aucune version compatible de $project"; exit 1; }
+            curl --retry 3 -fL "$url" -o "package/LarrySMP-Server-Ready/plugins/$project.jar"
+            unzip -tq "package/LarrySMP-Server-Ready/plugins/$project.jar"
+          done
 
       - name: Ajouter le lanceur HTTPS du dashboard
         run: cp DEMARRER-DASHBOARD-HTTPS.bat DEMARRER-DASHBOARD-HTTPS.ps1 package/LarrySMP-Server-Ready/
