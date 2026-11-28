@@ -37,6 +37,8 @@ jobs:
         run: gradle --no-daemon clean build
 
       - name: Préparer le serveur Paper 26.3 et LuckPerms
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -54,9 +56,9 @@ jobs:
           curl -fL "$LP_URL" -o package/LarrySMP-Server-Ready/plugins/LuckPerms.jar
           test -s package/LarrySMP-Server-Ready/plugins/LuckPerms.jar
 
-          EDUGEYSER_META="$(curl -fsSL https://api.github.com/repos/EduGeyser/EduGeyser/releases/latest)"
+          EDUGEYSER_META="$(curl --retry 3 -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/EduGeyser/EduGeyser/releases/latest)"
           EDUGEYSER_URL="$(echo "$EDUGEYSER_META" | jq -r '.assets[] | select(.name == "EduGeyser-Spigot.jar") | .browser_download_url' | head -n 1)"
-          EDUFLOODGATE_META="$(curl -fsSL https://api.github.com/repos/EduGeyser/EduFloodgate/releases/latest)"
+          EDUFLOODGATE_META="$(curl --retry 3 -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" https://api.github.com/repos/EduGeyser/EduFloodgate/releases/latest)"
           EDUFLOODGATE_URL="$(echo "$EDUFLOODGATE_META" | jq -r '.assets[] | select(.name == "edufloodgate-spigot.jar") | .browser_download_url' | head -n 1)"
           test -n "$EDUGEYSER_URL"
           test -n "$EDUFLOODGATE_URL"
