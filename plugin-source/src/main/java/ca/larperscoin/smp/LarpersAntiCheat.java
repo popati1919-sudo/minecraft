@@ -326,8 +326,14 @@ public final class LarpersAntiCheat implements Listener, CommandExecutor {
         if (!globallyEnabled() || !plugin.getConfig().getBoolean("anticheat.checks.reach.enabled", true)) return;
         if (!(event.getDamager() instanceof Player attacker) || !(event.getEntity() instanceof Player victim)) return;
         if (attacker.getWorld() != victim.getWorld() || bypass(attacker) || inGrace(attacker)) return;
-        double distance = attacker.getEyeLocation().distance(victim.getLocation().add(0.0D, 1.0D, 0.0D));
-        double limit = plugin.getConfig().getDouble("anticheat.checks.reach.max-distance", 4.45D);
+        var eye=attacker.getEyeLocation().toVector();
+        var box=victim.getBoundingBox();
+        double x=Math.max(box.getMinX(),Math.min(eye.getX(),box.getMaxX()));
+        double y=Math.max(box.getMinY(),Math.min(eye.getY(),box.getMaxY()));
+        double z=Math.max(box.getMinZ(),Math.min(eye.getZ(),box.getMaxZ()));
+        double distance=eye.distance(new org.bukkit.util.Vector(x,y,z));
+        double limit = plugin.getConfig().getDouble("anticheat.checks.reach.max-distance", 3.75D);
+        limit+=Math.min(0.5,Math.max(0,attacker.getPing()-100)*0.001);
         if (distance > limit) {
             flag(attacker, "REACH", String.format(Locale.ROOT, "%.2f blocs (seuil %.2f)", distance, limit));
         }
