@@ -25,3 +25,11 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 jar { archiveBaseName = 'LarpersCoin'; archiveVersion = project.version }
+
+tasks.register('antiDuplicationTest', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'ca.larperscoin.smp.AntiDuplicationTest'
+    javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(25) }
+}
+tasks.named('check') { dependsOn 'antiDuplicationTest' }
