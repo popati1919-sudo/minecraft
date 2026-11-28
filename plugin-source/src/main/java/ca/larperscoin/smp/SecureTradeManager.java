@@ -63,6 +63,8 @@ public final class SecureTradeManager implements Listener {
     public SecureTradeManager(JavaPlugin plugin, LarpersCoin economy, Consumer<UUID> completedTrade) {
         this.plugin=plugin; this.economy=economy; this.completedTrade=completedTrade;
         Bukkit.getPluginManager().registerEvents(this,plugin);
+        Bukkit.getScheduler().runTaskLater(plugin,this::reconcileAbandonedJournals,20L);
+        Bukkit.getScheduler().runTaskTimer(plugin,this::reconcileAbandonedJournals,72000L,72000L);
     }
     private void msg(CommandSender sender,String message) { sender.sendMessage(PREFIX+message); }
     private Session session(UUID id) { return sessions.get(id); }
@@ -358,6 +360,37 @@ public final class SecureTradeManager implements Listener {
             catch(java.nio.file.AtomicMoveNotSupportedException ex){java.nio.file.Files.move(tmp,file,java.nio.file.StandardCopyOption.REPLACE_EXISTING);}
         }finally{java.nio.file.Files.deleteIfExists(tmp);}
     }
+    private java.nio.file.Path playerSave(UUID id)throws java.io.IOException{
+        if(Bukkit.getWorlds().isEmpty())throw new java.io.IOException("Monde principal indisponible");
+        var folder=Bukkit.getWorlds().getFirst().getWorldFolder().toPath().toAbsolutePath().normalize();
+        for(String layout:List.of("players/data","playerdata")){
+            var root=folder;
+            for(int depth=0;root!=null&&depth<5;depth++,root=root.getParent()){
+                var dir=root.resolve(layout);
+                if(java.nio.file.Files.isDirectory(dir))return dir.resolve(id+".dat");
+            }
+        }
+        throw new java.io.IOException("Dossier de sauvegarde joueur introuvable");
+    }
+    private void verifyReceipt(UUID id,String tradeId)throws java.io.IOException{
+        if(!PlayerReceipt.exists(playerSave(id),receipt(tradeId).toString()))throw new java.io.IOException("Reçu absent du fichier joueur "+id);
+    }
+    private void reconcileAbandonedJournals(){
+        long cutoff=System.currentTimeMillis()-86400000L;
+        for(String name:List.of("trade-journal","commerce-journal")){
+            var dir=plugin.getDataFolder().toPath().resolve(name);
+            if(!java.nio.file.Files.isDirectory(dir))continue;
+            try(var files=java.nio.file.Files.newDirectoryStream(dir,"*.yml")){
+                for(var file:files){
+                    String id=file.getFileName().toString().replace(".yml","");
+                    if(java.nio.file.Files.getLastModifiedTime(file).toMillis()>cutoff)continue;
+                    if(name.equals("trade-journal")?economy.hasTradeCommit(id):economy.commerceCommitted(id))continue;
+                    var aborted=dir.resolve("aborted");java.nio.file.Files.createDirectories(aborted);
+                    java.nio.file.Files.move(file,aborted.resolve(file.getFileName()));
+                }
+            }catch(java.io.IOException ex){plugin.getLogger().warning("Nettoyage des journaux: "+ex.getMessage());}
+        }
+    }
     private void deliver(java.nio.file.Path file,org.bukkit.configuration.file.YamlConfiguration y,String side,Player p)throws java.io.IOException{
         // A YAML done flag alone is not proof that the player data was persisted.
         String tradeId=file.getFileName().toString().replace(".yml","");
@@ -370,13 +403,16 @@ public final class SecureTradeManager implements Listener {
         if(decision==AntiDuplication.Recovery.APPLY){
             p.getInventory().setStorageContents(after);
             pdc.set(key,type,(byte)1);
-            p.saveData();
         }
+        p.saveData();
+        verifyReceipt(p.getUniqueId(),tradeId);
         y.set(side+"-done",true);writeJournal(file,y);
     }
     private void finishJournal(java.nio.file.Path file,org.bukkit.configuration.file.YamlConfiguration y)throws java.io.IOException{
         if(!y.getBoolean("first-done")||!y.getBoolean("second-done"))return;
         String tradeId=file.getFileName().toString().replace(".yml","");
+        verifyReceipt(UUID.fromString(y.getString("first")),tradeId);
+        verifyReceipt(UUID.fromString(y.getString("second")),tradeId);
         archiveJournal(file);
         economy.clearTradeCommit(tradeId);
         for(String side:List.of("first","second")){
@@ -412,7 +448,7 @@ public final class SecureTradeManager implements Listener {
         return inventoryTransaction(p,after,tx->economy.commitChest(tx,id,beforeChest,afterChest));
     }
     private boolean inventoryTransaction(Player p,ItemStack[] after,java.util.function.Predicate<String> commit){
-        if(!p.isOnline()||p.isDead())return false;
+        if(!economy.isEconomyPlayer(p))return false;
         String tx=UUID.randomUUID().toString();
         var dir=plugin.getDataFolder().toPath().resolve("commerce-journal");
         var file=dir.resolve(tx+".yml");
@@ -431,6 +467,7 @@ public final class SecureTradeManager implements Listener {
     }
     private void finishCommerce(java.nio.file.Path file,Player p)throws java.io.IOException{
         String tx=file.getFileName().toString().replace(".yml","");
+        verifyReceipt(p.getUniqueId(),tx);
         archiveJournal(file);economy.clearCommerceCommit(tx);
         p.getPersistentDataContainer().remove(receipt(tx));p.saveData();
     }
@@ -450,7 +487,7 @@ public final class SecureTradeManager implements Listener {
     }
     private void complete(Session s){
         Player a=Bukkit.getPlayer(s.first),b=Bukkit.getPlayer(s.second);
-        if(!withinRange(a,b)||a.isDead()||b.isDead()){cancel(s,"joueur indisponible ou trop loin");return;}
+        if(!withinRange(a,b)||!economy.isEconomyPlayer(a)||!economy.isEconomyPlayer(b)){cancel(s,"joueur indisponible ou trop loin");return;}
         if(s.a.items.isEmpty()&&s.b.items.isEmpty()&&s.a.money==0&&s.b.money==0){cancel(s,"offres vides");return;}
         ItemStack[] afterA=simulate(a,s.a,s.b),afterB=simulate(b,s.b,s.a);
         if(afterA==null||afterB==null){cancel(s,"inventaire plein ou offre modifiée");return;}
